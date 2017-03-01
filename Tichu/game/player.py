@@ -6,7 +6,7 @@ class Player(metaclass=abc.ABCMeta):
         self.name = name
         self.id = playerID
         self.hand_cards = Cards([])
-        self.tricks = [] # list of Cards instances
+        self.tricks = [] # list of tricks
 
     # TODO add hash and equals (hash is UUID)
 

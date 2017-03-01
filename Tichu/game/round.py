@@ -128,59 +128,75 @@ class Round():
         leading_player: the Player to  play first.
         Returns the player to go next
         """
+        # TODO WHOLE FUNCTION
         doppelsieg = False
+        trick_on_table = Trick()
         next_to_play = leading_player
-        trick_on_table = leading_player.play_first() # QUESTION give 'game state' as argument?
-
-        # check validity of the move
-        if not isinstance(trick, Combination) or trick.type is CombinationType.PASS:
-            raise IllegalMoveError()
-
-        # update gamestate
-        next_to_play.hand_cards.remove_all(trick_on_table)
-        if next_to_play.hash_finished():
-            self._player_ranks.append(next_to_play.id)
-            doppelsieg = self._is_doppelsieg() # test doppelsieg
-
-        # handle dog
-        if Card.DOG in trick:
-            leading_player.trick += trick_on_table
-            return self._teammate(leading_player.id)
-
-        # ask all players whether they want to play a bomb
-        bomb_player, bomb = self._ask_for_bomb(trick_on_table)
-        while bomb_player is not None:
-            # check validity of bomb
-            if (bomb.type is CombinationType.SQUAREBOMB or bomb.type is CombinationType.STRAIGHTBOMB) and bomb > trick_on_table:
-                trick_on_table = bomb
-                bomb_player.hand_cards.remove_all(trick_on_table)
-            else:
-                raise IllegalMoveError()
-            # ask again
-            bomb_player, bomb = self._ask_for_bomb(trick_on_table)
-
-
-        # trick-loop
         nbr_pass = 0
         while nbr_pass < 3 and not doppelsieg:
-            next_to_play = self_next_to_play(next_to_play.id)
-            # demand move form player
-            action = next_to_play.play_combination(on_trick=trick_on_table) # QUESTION give 'game state' as argument?
-            # TODO check validity of the move
-            # if pass
-            if action.type is CombinationType.PASS:
+            played_comb = None
+            if trick_on_table.is_empty():
+                played_comb = next_to_play.play_first() # QUESTION give 'game state' as argument?
+                # check validity of the move
+                # TODO check wheter player has all those cards on hand
+                if not isinstance(played_comb, Combination) or played_comb.type is CombinationType.PASS:
+                    raise IllegalMoveError()
+
+            else:
+                played_comb = next_to_play.play_combination(on_trick=trick_on_table) # QUESTION give 'game state' as argument?
+                # TODO check validity of the move (if same type and higher)
+                # TODO check wheter player has all those cards on hand
+
+
+
+            if played_comb.type is CombinationType.PASS:
                 nbr_pass += 1
             else: # if trick
-                trick_on_table = action
+                # remove the played cards from the players hand, update the trick on the table and the leading_player
+                next_to_play.hand_cards.remove_all(played_comb)
+                trick_on_table.add(played_comb)
                 leading_player = next_to_play
                 nbr_pass = 0
-                # TODO update gamestate (inkl update handcards and if player finished)
-                # TODO if player finished, test doppelsieg, test if 3rd player to win. 3rd to win automatically gets the trick
-            # TODO ask all players for bomb play.
-        # end-while
 
-        # TODO give the whole trick to the leading player
-        # TODO handle Dragon trick (if highest_trick is Dragon: ...)
+            # test whether the player has finished
+            if next_to_play.has_finished():
+                self._player_ranks.append(next_to_play.id)
+                doppelsieg = self._is_doppelsieg() # test doppelsieg
+                # TODO test whether 3rd player to win. 3rd to win automatically gets the trick
+                if len(self._player_ranks) == 3:
+                    self._player_ranks.append(self._next_to_play(next_to_play.id)) # add last player
+                    break # trick is over
+
+            # handle dog
+            if Card.DOG in played_comb:
+                assert len(played_comb) == 1 # just to be sure
+                leading_player = self._teammate(next_to_play.id)
+                break # no one can play on the DOG (not even a bomb)
+
+            # TODO control if correct, TODO and dont repeat code from above
+            # ask all players whether they want to play a bomb
+            bomb_player, bomb = self._ask_for_bomb(trick_on_table, next_to_play.id)
+            while bomb_player is not None:
+                # TODO check validity of bomb
+                # TODO check wheter player has all those cards on hand
+                if (bomb.type is CombinationType.SQUAREBOMB or bomb.type is CombinationType.STRAIGHTBOMB) and bomb > trick_on_table:
+                    trick_on_table.add(bomb)
+                    bomb_player.hand_cards.remove_all(bomb)
+                    nbr_pass = 0
+                else:
+                    raise IllegalMoveError()
+                # ask again
+                bomb_player, bomb = self._ask_for_bomb(trick_on_table)
+
+            # determine the next player to play
+            next_to_play = self._next_to_play(next_to_play.id)
+
+        # end-while
+        receiving_player = leading_player
+        if trick_on_table.is_dragon_trick():
+            receiving_player = leading_player.give_dragon_away() # QUESTION give trick as argument?
+
+        receiving_player.tricks.append(trick_on_table)
 
         # return the leading player
         return leading_player
@@ -203,16 +219,19 @@ class Round():
 
         return None
 
-    def _ask_for_bomb(self, trick_on_table):
+    def _ask_for_bomb(self, trick_on_table, current_playerID):
         """
         Asks all players whether they want to play a bomb.
         Returns the player that wants to play a bomb. Or None if no player plays a bomb.
         """
-        for p in self._players:
+        pID = (current_playerID + 1) % 4
+        while pID != current_playerID:
+            p = self._players[pID]
             if not p.has_finished():
                 bomb = p.play_bomb_or_not(trick_on_table)
                 if bomb:
                     return (p, bomb)
+            pID = (pID + 1) % 4
         return (None, None)
 
 
@@ -234,7 +253,7 @@ class Round():
     def _next_to_play(self, current_playerID):
         """ Returns the next player that still has handcards left """
         next_to_playID = (current_playerID + 1) % 4
-        while self._nbr_handcards(next_to_playID) == 0:
+        while self._nbr_handcards(next_to_playID) == 0: # TODO make better
             # make sure no infinite loop happens
             if next_to_playID == current_playerID:
                 raise LogicError("No player has any cards left!")

@@ -420,6 +420,15 @@ class Trick(tuple):
     """ Immutable List of Cards instances """
     # TODO IMPORTANT!
 
+    def is_empty(self):
+        #TODO implement
+
+    def add(self, combination): # QUESTION maybe add player that played it too
+        #TODO implement
+
+    def is_dragon_trick(self):
+        # TODO
+
 class Deck(Cards):
 
     def __init__(self, full=True, cards=[]):
