@@ -9,6 +9,7 @@ class Player(metaclass=abc.ABCMeta):
         self.tricks = [] # list of tricks
 
     # TODO add hash and equals (hash is UUID)
+    # TODO make @property the attribures
 
     def has_finished(self):
         return len(self.hand_cards) == 0

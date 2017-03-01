@@ -72,7 +72,7 @@ class Round():
                 leading_player = self._next_to_play(leading_player.id)
 
         # round ended, count scores
-        (score_t1, score_t2) = self._count_scores()
+        (score_t1, score_t2) = self._count_points()
 
         return (score_t1, score_t2)
 
@@ -82,7 +82,7 @@ class Round():
         assert player in t # just to be sure
         return t
 
-    def _count_scores(self):
+    def _count_points(self):
         """
         Counts the points for each team.
         Also gives the hand cards of the last player to the enemy and the tricks to the first player
@@ -128,26 +128,41 @@ class Round():
         leading_player: the Player to  play first.
         Returns the player to go next
         """
-        # TODO WHOLE FUNCTION
-        doppelsieg = False
+
+        def _check_move_validity(self, comb, player, trick_on_table):
+            """
+            Tests:
+            - whether comb is a combination
+            - whether the player has the cards to play that combination
+            - the combination can be played on the trick_on_table
+            Raises a IllegalMoveError if move is not valid.
+            Returns True otherwise
+            """
+            if not isinstance(played_comb, Combination):
+                raise IllegalMoveError("{} is no Combiantion.".format(repr(comb)))
+            if not comb.subset(player.hand_cards):
+                raise IllegalMoveError("The player does not posess those cards.")
+            if not comb > trick_on_table.last(): # QUESTION is this enough or also test 'same type & same size or bomb'?
+                raise IllegalMoveError("The {} can't be played on {}.".format(repr(comb), repr(trick_on_table)))
+
+            return True
+
+        trick_ended = False
         trick_on_table = Trick()
         next_to_play = leading_player
         nbr_pass = 0
-        while nbr_pass < 3 and not doppelsieg:
+        while nbr_pass < 3 and not trick_ended:
             played_comb = None
             if trick_on_table.is_empty():
                 played_comb = next_to_play.play_first() # QUESTION give 'game state' as argument?
                 # check validity of the move
-                # TODO check wheter player has all those cards on hand
-                if not isinstance(played_comb, Combination) or played_comb.type is CombinationType.PASS:
-                    raise IllegalMoveError()
+                self._check_move_validity(played_comb, next_to_play, trick_on_table)
+                if played_comb.type is CombinationType.PASS:
+                    raise IllegalMoveError("First to play can't PASS.")
 
             else:
                 played_comb = next_to_play.play_combination(on_trick=trick_on_table) # QUESTION give 'game state' as argument?
-                # TODO check validity of the move (if same type and higher)
-                # TODO check wheter player has all those cards on hand
-
-
+                self._check_move_validity(played_comb, next_to_play, trick_on_table)
 
             if played_comb.type is CombinationType.PASS:
                 nbr_pass += 1
@@ -161,41 +176,50 @@ class Round():
             # test whether the player has finished
             if next_to_play.has_finished():
                 self._player_ranks.append(next_to_play.id)
-                doppelsieg = self._is_doppelsieg() # test doppelsieg
-                # TODO test whether 3rd player to win. 3rd to win automatically gets the trick
-                if len(self._player_ranks) == 3:
-                    self._player_ranks.append(self._next_to_play(next_to_play.id)) # add last player
-                    break # trick is over
+
+            # test doppelsieg
+            trick_ended = trick_ended or self._is_doppelsieg()
+
+            # test whether 3rd player to win. 3rd to win automatically gets the last trick
+            if len(self._player_ranks) == 3:
+                self._player_ranks.append(self._next_to_play(next_to_play.id)) # add last player
+                trick_ended = True
 
             # handle dog
             if Card.DOG in played_comb:
                 assert len(played_comb) == 1 # just to be sure
-                leading_player = self._teammate(next_to_play.id)
-                break # no one can play on the DOG (not even a bomb)
+                leading_player = self._teammate(next_to_play.id) # give lead to teammate
+                trick_ended = True # no one can play on the DOG (not even a bomb)
 
-            # TODO control if correct, TODO and dont repeat code from above
-            # ask all players whether they want to play a bomb
-            bomb_player, bomb = self._ask_for_bomb(trick_on_table, next_to_play.id)
-            while bomb_player is not None:
-                # TODO check validity of bomb
-                # TODO check wheter player has all those cards on hand
-                if (bomb.type is CombinationType.SQUAREBOMB or bomb.type is CombinationType.STRAIGHTBOMB) and bomb > trick_on_table:
-                    trick_on_table.add(bomb)
-                    bomb_player.hand_cards.remove_all(bomb)
-                    nbr_pass = 0
-                else:
-                    raise IllegalMoveError()
-                # ask again
-                bomb_player, bomb = self._ask_for_bomb(trick_on_table)
+            if not trick_ended:
+                # ask all players whether they want to play a bomb
+                bomb_player, bomb = self._ask_for_bomb(trick_on_table, next_to_play.id)
+                while bomb_player is not None:
+                    # is it really a bomb?
+                    if (bomb.type is CombinationType.SQUAREBOMB or bomb.type is CombinationType.STRAIGHTBOMB):
+                        self._check_move_validity(bomb, bomb_player, trick_on_table)
+                        # remove the played cards from the players hand, update the trick on the table and the leading_player IMPROVE dont repeate code
+                        trick_on_table.add(bomb)
+                        bomb_player.hand_cards.remove_all(bomb)
+                        leading_player = bomb_player
+                        next_to_play = self._next_to_play(bomb_player)
+                        nbr_pass = 0
+                    else:
+                        raise IllegalMoveError("Only bombs can be played here!")
+                    # ask again
+                    bomb_player, bomb = self._ask_for_bomb(trick_on_table)
 
             # determine the next player to play
             next_to_play = self._next_to_play(next_to_play.id)
 
         # end-while
+
         receiving_player = leading_player
+        # handle dragon trick
         if trick_on_table.is_dragon_trick():
             receiving_player = leading_player.give_dragon_away() # QUESTION give trick as argument?
 
+        # give trick to the correct player
         receiving_player.tricks.append(trick_on_table)
 
         # return the leading player
@@ -204,7 +228,7 @@ class Round():
     def _swap_cards(self):
         """
         Asks all players to swap cards.
-        Returns None
+        Returns True
         """
         # QUESTION create a 'SwapCards' class? -> change description of players methods
         distribute_cards = {k: [] for k in range(4)}
@@ -215,9 +239,11 @@ class Round():
             distribute_cards[p.id + 1 % 4].append(swapcards[1])
             distribute_cards[p.id - 1 % 4].append(swapcards[-1])
             distribute_cards[p.id + 2 % 4].append(swapcards['teammate'])
-        # TODO distribute swapped cards
+        # distribute swapped cards
+        for p in self._players:
+            p.hand_cards = p.hand_cards + Cards([distribute_cards[p.id]])
 
-        return None
+        return True
 
     def _ask_for_bomb(self, trick_on_table, current_playerID):
         """
@@ -276,12 +302,15 @@ class Round():
         """ Returns the teamate of the player with the given playerID"""
         return self._players[(playerID + 2) % 4]
 
-    def _mahjong_player(self, hand_cards):
+    def _mahjong_player(self):
         """
         Returns the player holding the mahjong
         Raises a LogicError if no such player exists.
         """
-        # TODO
+        for p in self._players:
+            if Card.MAHJONG in p.hand_cards:
+                return p
+        raise LogicError("No player has MAHJONG card")
 
     def _distribute_cards(self):
         """

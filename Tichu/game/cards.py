@@ -194,6 +194,12 @@ class Cards():
         """
         return sum([c.points() for c in self._cards])
 
+    def subset(self, other):
+        """
+        Returns True iff this cards all appear in 'other'.
+        """
+        return all([(c in other) for c in self._cards])
+
     def __add__(self, other):
         """
         Returns a new Cards instance containing both card lists appended to each other.
@@ -416,18 +422,34 @@ class Combination(Cards):
 
         return None
 
-class Trick(tuple):
-    """ Immutable List of Cards instances """
-    # TODO IMPORTANT!
+class Trick():
+    """ List of Cards instances """
+    def __init__(self, other=None):
+        # TODO check parameters
+        if other is not None:
+            self._combs = list(other._combs)
+        else:
+            self._combs = []
+
 
     def is_empty(self):
-        #TODO implement
+        return len(self._combs) == 0
 
     def add(self, combination): # QUESTION maybe add player that played it too
-        #TODO implement
+        # TODO thest whether can be added
+        self._combs.append(combination)
 
     def is_dragon_trick(self):
-        # TODO
+        return Card.DRAGON in self.last()
+
+    def last(self):
+        return self._combs[-1]
+
+    def copy(self):
+        return Trick(other=self)
+
+    def __repr__(self):
+        "Trick({})".format(' -> '.join([repr(com) for com in self._combs]))
 
 class Deck(Cards):
 

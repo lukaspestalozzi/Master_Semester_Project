@@ -26,10 +26,10 @@ class TichuGameManager():
 
         while self._points_team1 < self._target_points and self._points_team2 < self._target_points:
             self._current_round_nbr += 1
-            # create the round
+            # create the round TODO give teams as arguments
             next_round = Round(players=self._players, points=(self._points_team1, self._points_team2, self._target_points))
             round_res = next_round.run()
-            # update the points
+            # update the points TODO update directly into the team instances
             self._points_team1 += round_res.points_team1
             self._points_team2 += round_res.points_team2
 
@@ -60,4 +60,4 @@ class Team():
     def __contains__(self, player):
         return self.in_team(player)
 
-    # TODO add methods: add_points; get_points;
+    # TODO add methods: add_points; get_points; Hash == UUID; eq
