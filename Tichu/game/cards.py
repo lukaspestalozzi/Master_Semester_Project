@@ -50,7 +50,6 @@ class CardValue(ComparableEnum):
     PHOENIX = 1.5
     MAHJONG = 1
     DOG = 0
-    UNKNOWN = None
 
     def points(self):
         if self.value == 5:
@@ -154,7 +153,7 @@ class Card(ComparableEnum):
         self._suit = cardsuit
         self._val = cardvalue
         self._color = cardsuit.color
-        self._value_ = self._val
+        self._value_ = self._val # TODO rename value to cardvalue or similar
 
     @property
     def suit(self):
@@ -258,22 +257,73 @@ class CombinationType(ComparableEnum):
     TRIO = 3 # three cards with same value
     FULLHOUSE = 5 # a Pair and a Trio
     PAIR_STEPS = 6 # 2 or more consecutive Pairs
-    TRIO_STEPS = 7 # 2 or more consecutive trios
-    STRAIGHT = 8 # 5 or more consecutive cards
-    SQUAREBOMB = 9 # four cards with same value
-    STRAIGHTBOMB = 10 # 5 or more consecutive cards with the same suit
+    STRAIGHT = 7 # 5 or more consecutive cards
+    SQUAREBOMB = 8 # four cards with same value
+    STRAIGHTBOMB = 9 # 5 or more consecutive cards with the same suit
 
 class Combination(Cards):
     # TODO handle PHOENIX
     # TODO define combination value (hight of combination)
     # TODO make combinations comparable.
+    bomb_types = frozenset([CombinationType.SQUAREBOMB, CombinationType.STRAIGHTBOMB])
 
     def __init__(self, cards):
         self._comb_type = Combination.is_combination(cards)
         if self._comb_type is not None:
             super().__init__(cards)
+            self._comb_value = self._init_value()
         else:
             raise ValueError("{} is no valid combination.".format(str(cards)))
+
+    @property
+    def type(self):
+        return self._comb_type
+
+    @property
+    def value(self):
+        return self._comb_type
+
+    def _init_value(self):
+        if self._comb_type is CombinationType.PASS:
+            return 0
+        elif self._comb_type is CombinationType.FULLHOUSE: # the tripple counts.
+            counts = defaultdict(lambda: 0)
+            for c in self._cards:
+                counts[c] += 1
+            for k in counts:
+                if counts[k] == 3:
+                    return 1000*self._comb_type.value + k.value.value
+            raise LogicError("This seems not to be a FULLHOUSE")
+
+        elif self._comb_type is CombinationType.STRAIGHT or self._comb_type is CombinationType.STRAIGHTBOMB:
+            # a straight is strictly higher if it is longer.
+            return 1000*self._comb_type.value + 100*(len(self._cards)-4) + max(self._cards).value.value
+
+        else: # in all other cases, the highest card counts.
+            return 1000*self._comb_type.value + max(self._cards).value.value
+
+    def __repr__(self):
+        return "Combination({}, {}, {})".format(repr(self._comb_type), repr(self._comb_value), repr(self._cards))
+
+
+    def __lt__(self, other):
+        if all([
+            self.__class__ is other.__class__, # must be same class
+            self.type is other.type or self.type is in self.bomb_types or other.type is in self.bomb_types, # must be same type or one must be a bomb
+            (self.type is not CombinationType.STRAIGHT and self.type is not CombinationType.PAIR_STEPS) or len(self._cards) == len(other._cards) # if a straight or pairsteps, then the number of cards must be the same
+        ]):
+            return self.value < other.value
+        else:
+            raise ValueError("Can't compare {} to {}".format(self.__repr__(), other.__repr__()))
+
+    def __le__(self, other):
+        return self.__lt__(other) or self.__eq__(other)
+
+    def __ge__(self, other):
+        return self.__gt__(other) or self.__eq__(other)
+
+    def __gt__(self, other):
+        return not self.__le__(other)
 
     @staticmethod
     def is_single(cards):
@@ -308,19 +358,6 @@ class Combination(Cards):
             if not Combination.is_pair(sorted_cards[k:k+2]):
                 return False
             k += 2
-        return True
-
-
-    @staticmethod
-    def is_trio_step(cards):
-        if len(cards) < 6:
-            return False
-        sorted_cards = sorted(cards)
-        k = 0
-        while k < len(sorted_cards):
-            if not Combination.is_trio(sorted_cards[k:k+3]):
-                return False
-            k += 3
         return True
 
     @staticmethod
@@ -371,9 +408,6 @@ class Combination(Cards):
         elif Combination.is_pair_step(cards):
             return CombinationType.PAIR_STEPS
 
-        elif Combination.is_trio_step(cards):
-            return CombinationType.TRIO_STEPS
-
         elif Combination.is_straightbomb(cards): # Important: bomb test before straight test.
             return CombinationType.STRAIGHTBOMB
 
@@ -381,6 +415,10 @@ class Combination(Cards):
             return CombinationType.STRAIGHT
 
         return None
+
+class Trick(tuple):
+    """ Immutable List of Cards instances """
+    # TODO IMPORTANT!
 
 class Deck(Cards):
 

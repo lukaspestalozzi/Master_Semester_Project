@@ -38,12 +38,13 @@ class TichuGameManager():
 
 class Team():
 
-    def __init__(self, player1, player2):
+    def __init__(self, player1, player2, teamID):
         if not (isinstance(player1, Player) and isinstance(player2, Player)):
             raise ValueError("player1 and player2 must be instances of 'Player' class.")
         self._player1 = player1
         self._player2 = player2
         self._points = 0
+        self._id = teamID
 
         # TODO add point counting here?
 
@@ -56,4 +57,7 @@ class Team():
     def in_team(self, player):
         return player == self._player1 or player == self._player2
 
-    # TODO add methods: players -> list(player); get_player1; get_player2; add_points; get_points;
+    def __contains__(self, player):
+        return self.in_team(player)
+
+    # TODO add methods: add_points; get_points;

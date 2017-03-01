@@ -6,8 +6,12 @@ class Player(metaclass=abc.ABCMeta):
         self.name = name
         self.id = playerID
         self.hand_cards = Cards([])
+        self.tricks = [] # list of Cards instances
 
     # TODO add hash and equals (hash is UUID)
+
+    def has_finished(self):
+        return len(self.hand_cards) == 0
 
     @abc.abstractmethod
     def receive_first_8_cards(self, cards):
@@ -52,6 +56,14 @@ class Player(metaclass=abc.ABCMeta):
         on_trick: the highest trick on the table
         Returns the combination the player wants to play. The combination must be a valid play according to the Tichu rules, in particular it must be of the same type as on_trick (or a bomb) and higher than on_trick
         Note that the combination may be empty (PASS)
+        """
+
+    @abc.abstractmethod
+    def play_bomb_or_not(self, on_trick):
+        """
+        Called by the the game manager allow the player to play a bomb.
+        on_trick (instance of Trick): The tricks currently on the table
+        Returns the bomb (as Combination) if the player wants to play a bomb or False otherwise
         """
 
     @abc.abstractmethod

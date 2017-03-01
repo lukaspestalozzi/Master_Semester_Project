@@ -37,20 +37,23 @@ class TichuAnounced():
 
 class Round():
 
-    def __init__(self, teams):
+    def __init__(self, team1, team2):
         # TODO what to do when both teams may win in this round.
         """
         Creates a new Round for the game TichuGame
-        players: list (of length 4) containing the players. The players at position 0 and 2 (team1) play against position 1 and 3 (team2)
         """
         if any([not isinstance(t, Team) for t in teams])
         # TODO check parameters
-        self._teams = teams
-        self._players = [teams[0].first_player(), teams[1].first_player(), teams[0].second_player(), teams[1].second_player()]
+        self._teams = [team1, team2]
+        self._players = [self._teams[0].first_player(), self._teams[1].first_player(), self._teams[0].second_player(), self._teams[1].second_player()]
         self._tichus = TichuAnounced()
-        self._player_ranks = []
+        self._player_ranks = [] # used to store which player finished at which position
 
     def run(self):
+        """
+        Runs a single round (from distributing cards until 3 players finished) and counts the points
+        Returns a tuple with points of the teams (points of team 1, points of team 2)
+        """
         # distribute cards
         hand_cards = self._distribute_cards()
 
@@ -63,18 +66,31 @@ class Round():
         # round-loop
         leading_player = self._mahjong_player(hand_cards) # player with MAHJONG Starts
 
-        while self._nbr_finished_players < 3: # while more than 1 players have cards left
+        while self._nbr_finished_players() < 3: # while more than 1 players have cards left
             leading_player = self._run_trick(leading_player=leading_player)
+            if leading_player.has_finished(): # if the player finished with the winning of the trick
+                leading_player = self._next_to_play(leading_player.id)
 
         # round ended, count scores
         (score_t1, score_t2) = self._count_scores()
 
-        return None # TODO decide what to return.
+        return (score_t1, score_t2)
 
     def _team_of(self, player):
-        return self._teams[0] if self._teams[0].in_team(player) else self._teams[1]
+        """ Returns the team of the given player """
+        t = self._teams[0] if player in self._teams[0] else self._teams[1]
+        assert player in t # just to be sure
+        return t
 
     def _count_scores(self):
+        """
+        Counts the points for each team.
+        Also gives the hand cards of the last player to the enemy and the tricks to the first player
+        Returns a tuple (points of team 1, points of team 2) ie. (point of player 0 and 2, point of player 1 and 3)
+        """
+        # TODO add some asserts to make sure everything is as expected
+        assert len(self._player_ranks) == 4
+
         points = {k: 0 for k in range(4)}
         winnerID = self._player_ranks[0]
         # grand + normal tichu
@@ -90,15 +106,21 @@ class Round():
         for pID in [pID for pID in self._tichus.get_announced_tichu() if pID != winnerID]:
             points[pID] -= 100
 
+        # doppelsieg
+        if self._player_ranks[1] in self._team_of(self._players[winnerID]):
+            points[winnerID] += 200
+        else:
+            loosingID = self._player_ranks[-1]
+            # last player gives handcards to enemy...
+            self._players[(loosingID + 1) % 4].tricks += self._players[loosingID].hand_cards
+            # ... and tricks to first player
+            self._players[winnerID].tricks += self._players[loosingID].tricks
+            self._players[loosingID].tricks = []
+            # count points in tricks
+            for pID in range(4):
+                points[pID] += sum([cards.sum() for cards in self._players[pID].tricks])
 
-
-
-
-
-
-        # TODO doppelsieg
-        # TODO last player; handcards to enemy, tricks to first player
-        # TODO count points in tricks
+        return (points[0] + points[2], points[1] + points[3])
 
     def _run_trick(self, leading_player):
         """
@@ -106,33 +128,54 @@ class Round():
         leading_player: the Player to  play first.
         Returns the player to go next
         """
-
+        doppelsieg = False
         next_to_play = leading_player
-        trick = leading_player.play_first() # QUESTION give 'game state' as argument?
-        # TODO check validity of the move
-        # TODO if valid, update gamestate (inkl update handcards and if player finished)
+        trick_on_table = leading_player.play_first() # QUESTION give 'game state' as argument?
+
+        # check validity of the move
+        if not isinstance(trick, Combination) or trick.type is CombinationType.PASS:
+            raise IllegalMoveError()
+
+        # update gamestate
+        next_to_play.hand_cards.remove_all(trick_on_table)
+        if next_to_play.hash_finished():
+            self._player_ranks.append(next_to_play.id)
+            doppelsieg = self._is_doppelsieg() # test doppelsieg
+
+        # handle dog
         if Card.DOG in trick:
-            # TODO give the dog to the leading players tricks
-            # TODO maybe just jump over the while loop (to have the 'end trick' handling in the same place)
+            leading_player.trick += trick_on_table
             return self._teammate(leading_player.id)
-        # TODO ask all players for bomb play. ( for p in active players: ...) if if p.play_bomb(): ... and set nbr_pass = 0
+
+        # ask all players whether they want to play a bomb
+        bomb_player, bomb = self._ask_for_bomb(trick_on_table)
+        while bomb_player is not None:
+            # check validity of bomb
+            if (bomb.type is CombinationType.SQUAREBOMB or bomb.type is CombinationType.STRAIGHTBOMB) and bomb > trick_on_table:
+                trick_on_table = bomb
+                bomb_player.hand_cards.remove_all(trick_on_table)
+            else:
+                raise IllegalMoveError()
+            # ask again
+            bomb_player, bomb = self._ask_for_bomb(trick_on_table)
+
 
         # trick-loop
-        highest_trick = trick
         nbr_pass = 0
-        while nbr_pass < 3:
-            next_to_play = self_next_to_play(next_to_play.id) # QUESTION don't use player.id (players should not be able to change own id)
+        while nbr_pass < 3 and not doppelsieg:
+            next_to_play = self_next_to_play(next_to_play.id)
             # demand move form player
-            action = next_to_play.play_combination(on_trick=highest_trick) # QUESTION give 'game state' as argument?
+            action = next_to_play.play_combination(on_trick=trick_on_table) # QUESTION give 'game state' as argument?
             # TODO check validity of the move
             # if pass
             if action.type is CombinationType.PASS:
                 nbr_pass += 1
             else: # if trick
-                highest_trick = action
+                trick_on_table = action
                 leading_player = next_to_play
                 nbr_pass = 0
                 # TODO update gamestate (inkl update handcards and if player finished)
+                # TODO if player finished, test doppelsieg, test if 3rd player to win. 3rd to win automatically gets the trick
             # TODO ask all players for bomb play.
         # end-while
 
@@ -160,6 +203,19 @@ class Round():
 
         return None
 
+    def _ask_for_bomb(self, trick_on_table):
+        """
+        Asks all players whether they want to play a bomb.
+        Returns the player that wants to play a bomb. Or None if no player plays a bomb.
+        """
+        for p in self._players:
+            if not p.has_finished():
+                bomb = p.play_bomb_or_not(trick_on_table)
+                if bomb:
+                    return (p, bomb)
+        return (None, None)
+
+
     def _ask_for_tichu(self):
         """
         Asks all players whether they want to announce a Tichu.
@@ -185,6 +241,9 @@ class Round():
             next_to_playID = (next_to_playID + 1) % 4
         return self._players[next_to_playID]
 
+    def _is_doppelsieg(self):
+        return len(self._player_ranks) == 2 and self._player_ranks[0] in self._team_of(self._player_ranks[1])
+
     def _nbr_handcards(self, playerID):
         """ Returns the number of handcards of the player with the given playerID """
         # TODO implement
@@ -192,8 +251,7 @@ class Round():
 
     def _nbr_finished_players(self):
         """ Returns the number of players with no handcards left """
-        # TODO implement
-        raise NotImplemented()
+        return len(self._player_ranks)
 
     def _teammate(self, playerID):
         """ Returns the teamate of the player with the given playerID"""
