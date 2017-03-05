@@ -20,8 +20,7 @@ class LogicError(ExceptionWithMessage):
         super().__init__(message)
 
 
-
-class IllegalMoveError(ExceptionWithMessage):
+class IllegalActionError(ExceptionWithMessage):
     """
     Exception raised when a Player makes an illegal Move
     """

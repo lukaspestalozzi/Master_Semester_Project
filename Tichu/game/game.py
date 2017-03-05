@@ -1,63 +1,95 @@
 
-from player import DummyPlayer
-
-# TODO create a calss to keep track of points
-# TODO create a class Team containing the players and score and other statistics
 # TODO integrate Logging
+from collections import namedtuple
 
-class TichuGameManager():
+from game.agent import Agent
+from game.tichuplayers import PassingTichuPlayer
+from game.abstract_tichuplayer import TichuPlayer
+from game.round import Round
 
-    def __init__(target_points):
-        self._player0 = DummyPlayer(name="player0")
-        self._player1 = DummyPlayer(name="player1")
-        self._player2 = DummyPlayer(name="player2")
-        self._player3 = DummyPlayer(name="player3")
+GameOutcome = namedtuple("GameOutcome", ['team1', 'team2', 'winner_team_id', 'game_history'])
 
 
-        self._players = [self._player0, self._player1, self._player2, self._player3]
+class TichuGameHistory(object):
+    pass  # TODO
+
+
+class TichuGameManager(object):
+
+    def __init__(self, target_points):
+        # TODO get teams as parameters
+
+        self._players = [
+            PassingTichuPlayer(name="player0", agent=Agent),
+            PassingTichuPlayer(name="player1", agent=Agent),
+            PassingTichuPlayer(name="player2", agent=Agent),
+            PassingTichuPlayer(name="player3", agent=Agent)
+        ]
+
+        self._teams = [
+            Team(self._players[0], self._players[2], team_id=0),
+            Team(self._players[1], self._players[2], team_id=1)
+        ]
 
         self._target_points = target_points
+        self._current_round_nbr = 0
+        self._history = TichuGameHistory()
 
     def start(self):
         """
         Starts the game
-        Returns the final points as tuple (points for team 1, points for team 2, winner), where winner is the integer 1 or 2
+        Returns a tuple containing the two teams, the winner team, and the game history
         """
+        for k in range(4):
+            self._players[k].position = k
 
-        while self._points_team1 < self._target_points and self._points_team2 < self._target_points:
+        while not (self._teams[0].points > self._target_points or self._teams[1].points > self._target_points):
             self._current_round_nbr += 1
-            # create the round TODO give teams as arguments
-            next_round = Round(players=self._players, points=(self._points_team1, self._points_team2, self._target_points))
+            # create the round
+            next_round = Round(team1=self._teams[0], team2=self._teams[1])
             round_res = next_round.run()
-            # update the points TODO update directly into the team instances
-            self._points_team1 += round_res.points_team1
-            self._points_team2 += round_res.points_team2
+            # update the points
+            self._teams[0].add_points(round_res.points_team1)
+            self._teams[1].add_points(round_res.points_team2)
 
         # determine winner
-        return (self._points_team1, self._points_team2, 1 if self._points_team1 > self._points_team2 else 2)
+        return GameOutcome(team1=self._teams[0],
+                           team2=self._teams[1],
+                           winner_team_id=max(self._teams, key=lambda t: t.points).id,
+                           game_history=self._history)
 
-class Team():
 
-    def __init__(self, player1, player2, teamID):
-        if not (isinstance(player1, Player) and isinstance(player2, Player)):
+class Team(object):
+
+    def __init__(self, player1, player2, team_id):
+        if not (isinstance(player1, TichuPlayer) and isinstance(player2, TichuPlayer)):
             raise ValueError("player1 and player2 must be instances of 'Player' class.")
         self._player1 = player1
         self._player2 = player2
         self._points = 0
-        self._id = teamID
+        self._id = team_id
 
-        # TODO add point counting here?
+    @property
+    def points(self):
+        return self._points
 
+    @property
+    def id(self):
+        return self._id
+
+    @property
     def second_player(self):
         return self._player2
 
+    @property
     def first_player(self):
         return self._player1
 
+    def add_points(self, amount):
+        self._points += amount
+
     def in_team(self, player):
-        return player == self._player1 or player == self._player2
+        return self.__contains__(player)
 
     def __contains__(self, player):
-        return self.in_team(player)
-
-    # TODO add methods: add_points; get_points; Hash == UUID; eq
+        return player == self._player1 or player == self._player2
