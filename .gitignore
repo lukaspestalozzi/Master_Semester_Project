@@ -3,8 +3,10 @@
 # My stuff
 .ipynb_checkpoints/
 *.zip
-networks/
 *~
+
+# PyCharm/IntelliJ
+**.idea/
 
 # Python stuff
 # Byte-compiled / optimized / DLL files
