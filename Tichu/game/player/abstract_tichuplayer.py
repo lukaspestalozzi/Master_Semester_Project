@@ -1,9 +1,11 @@
 import abc
 import uuid
 from enum import Enum
+import logging
 
 from game.cards import Combination, CombinationType, Cards
 from game.exceptions import IllegalActionError
+
 
 
 class TichuPlayer(metaclass=abc.ABCMeta):
@@ -15,7 +17,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         """
         # TODO verify parameters
         self._name = name
-        self._hash = uuid.uuid4()
+        self._hash = int(uuid.uuid4())
         self._agent = agent
         self._position = None
         self._hand_cards = Cards(cards=list())
@@ -68,6 +70,12 @@ class TichuPlayer(metaclass=abc.ABCMeta):
     def __eq__(self, other):
         return isinstance(other, self.__class__) and self.__hash__() == hash(other) and self.name == other.name
 
+    def __str__(self):
+        return "{}(\n\tname: {}, pos: {}, teammate:{},\n\thandcards:{}, \n\ttricks:{}, \n\tagent:{}, \n\thash:{}\n)".format(str(self.__class__), str(self.name), str(self.position), str(self.team_mate), str(self.hand_cards), str(self.tricks), str(self._agent), str(self._hash))
+
+    def __repr__(self):
+        return "{}(\n\tname: {}, pos: {}, \n\thandcards:{}, \n\ttricks:{}\n)".format(str(self.__class__), str(self.name), str(self.position), str(self.hand_cards), str(self.tricks))
+
     def remove_hand_cards(self):
         """
         Removes the hand cards of this player.
@@ -81,7 +89,13 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         return len(self.hand_cards) == 14
 
     def remove_tricks(self):
+        """
+        Removes the tricks from this player
+        :return: List; the removed tricks
+        """
+        tricks = self._tricks
         self._tricks = list()
+        return tricks
 
     def add_trick(self, trick):
         """
@@ -90,6 +104,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :return: Nothing
         """
         self._tricks.append(trick)
+        logging.info("{} added trick {}".format(self.name, trick))
 
     def count_points_in_tricks(self):
         """
@@ -104,20 +119,30 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         """
         assert len(cards) == 8
         self.hand_cards.add_all(cards)
+        assert len(self.hand_cards) == 8
+        logging.info("{} added 8 cards: {}".format(self.name, cards))
 
     def receive_last_6_cards(self, cards):
         """
         Called by the game manager to hand over the last 6 cards.
         :param cards: Cards; The 6 cards
         """
+        assert len(cards) == 6
         self.hand_cards.add_all(cards)
+        assert len(self.hand_cards) == 14
+        logging.info("{} added 6 cards: {}".format(self.name, cards))
 
     def receive_swapped_cards(self, swapped_cards):
         """
         :param swapped_cards: A set of SwapCard instances.
         :return Nothing
         """
-        self.hand_cards.add_all(swapped_cards)
+        from game.round import SwapCard  # TODO
+        assert len(swapped_cards) == 3
+        assert all([isinstance(sc, SwapCard) for sc in swapped_cards])
+        # print("swapped cards",self.position, "->", [c.card for c in swapped_cards])
+        self.hand_cards.add_all([c.card for c in swapped_cards])  # TODO agent, store info about swapped card
+        logging.info("{} received swap cards: {}".format(self.name, swapped_cards))
 
     @abc.abstractmethod
     def announce_grand_tichu_or_not(self, announced_tichu, announced_grand_tichu):
@@ -160,10 +185,11 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def play_combination(self, on_trick):
+    def play_combination(self, on_trick, wish):
         """
         Called by the the game manager to request a move.
         :param on_trick:
+        :param wish: The CardValue beeing wished, None if no wish is present
         :return: pass, or the combination the player wants to play as PlayerAction.
         """
         """
@@ -207,6 +233,12 @@ class PlayerActionType(Enum):
     COMBINATION = 1
     COMBINATION_TICHU = 2
 
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return self.__str__()
+
 
 class PlayerAction(object):
     """
@@ -235,7 +267,7 @@ class PlayerAction(object):
             raise ValueError("Player must be instance of TichuPlayer, but was {}".format(player.__class__))
         elif not combination and not pass_:
             raise ValueError("Either combination or pass must be truthy.")
-        elif not isinstance(combination, Combination):
+        elif not pass_ and not isinstance(combination, Combination):
             raise ValueError("combination must be an instance of Combination, but was {}".format(combination.__class__))
 
         self._player = player
@@ -265,6 +297,14 @@ class PlayerAction(object):
         """
         return self._comb
 
+    def __str__(self):
+        return ("Action[{}](player: {})".format(self._type, self._player.name)
+                if self.is_pass()
+                else "Action[{}](player: {}, tichu:{}, comb:{})".format(self._type, self._player.name, self._tichu, self._comb))
+
+    def __repr__(self):
+        return self.__str__()
+
     def is_combination(self):
         return self._type is PlayerActionType.COMBINATION or self._type is PlayerActionType.COMBINATION_TICHU
 
@@ -287,6 +327,8 @@ class PlayerAction(object):
         :param raise_exception: boolean (default False); if True, instead of returning False, raises an IllegalActionError.
         :return: True iff this check succeeds, False otherwise
         """
+        if comb is None:
+            return True
         try:
             res = self._type is PlayerActionType.PASS or comb < self._comb  # Do not change < (or a single phoenix does not work anymore.)
         except ValueError as ve:
@@ -306,7 +348,7 @@ class PlayerAction(object):
         """
         if player is None:
             player = self.player
-        res = self._type is PlayerActionType.PASS or self._comb.subset(player.hand_cards)
+        res = self._type is PlayerActionType.PASS or self._comb.issubset(player.hand_cards)
         if not res and raise_exception:
             raise IllegalActionError("Player {} does not have the right cards for {}".format(player, self._comb))
         return res

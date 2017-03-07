@@ -1,8 +1,9 @@
-import warnings
+import logging
 from collections import namedtuple
-from game.cards import Card, Deck, Cards, CardValue
+
+from game.cards import Card, Deck, CardValue
 from game.exceptions import LogicError, IllegalActionError
-from game.abstract_tichuplayer import PlayerAction, TichuPlayer
+from game.player.abstract_tichuplayer import PlayerAction, TichuPlayer
 
 
 class Trick(object):
@@ -34,16 +35,19 @@ class Trick(object):
 
     @property
     def combinations(self):
-        return [a.combination for a in self._actions]
+        return [a.combination for a in self._actions if not a.is_pass()]
 
     def is_dragon_trick(self):
         return Card.DRAGON in self.last_combination()
 
     def last_combination(self):
-        return self._actions[-1].combination
+        return self._actions[-1].combination if len(self._actions) > 0 else None
 
     def last_action(self):
-        return self._actions[-1]
+        return self._actions[-1] if len(self._actions) > 0 else None
+
+    def sum_points(self):
+        return sum([comb.count_points() for comb in self.combinations])
 
     def copy(self):
         new_trick = Trick()
@@ -52,7 +56,7 @@ class Trick(object):
         return new_trick
 
     def __repr__(self):
-        "Trick({})".format(' -> '.join([repr(com) for com in self._actions]))
+        return "Trick({})".format(' -> '.join([repr(com) for com in self._actions]))
 
     def __iter__(self):
         return self._actions.__iter__()
@@ -110,15 +114,15 @@ class TichuAnnounced(object):
         # TODO Improvement, can be made more efficient by storing the list.
         return [k for k in self._normal_tichu if self._normal_tichu[k]]
 
-    def tichu_points(self, winner_id):
+    def tichu_points(self, winner_pos):
         """
-        :param winner_id: int, The id of the player finished first
+        :param winner_pos: int, The id of the player finished first
         :return: dict{int: points}, a dict containing the points of each player gained (or lost) by succeeding or failing to fullfill a (grand)Tichu
         """
         points_gt = {pid: val * -200 for pid, val in self._grand_tichu.items()}  # assuming all players failed
-        points_gt[winner_id] *= -1  # inverse winner points.
+        points_gt[winner_pos] *= -1  # inverse winner points.
         points_t = {pid: val * -100 for pid, val in self._normal_tichu.items()}  # assuming all players failed
-        points_t[winner_id] *= -1  # inverse winner points.
+        points_t[winner_pos] *= -1  # inverse winner points.
         return {pid: points_gt[pid] + points_t[pid] for pid in range(self._nbr_players)}  # put together
 
 
@@ -164,11 +168,11 @@ class Ranking(object):
 
     def next_to_finish(self, player):
         """
-        Adds the player_id to the ranking.
-        :param player: int, must be a player with valid player.id and must not yet be in the ranking.
+        Adds the player to the ranking on the next empty rank.
+        :param player: Player, must be a player with valid player.position and must not yet be in the ranking.
         :raise ValueError if player_id is not valid
         """
-        if player.id not in range(4) or player in self._rank:
+        if player.position not in range(4) or player in self._rank:
             raise ValueError("player({}) not valid for {}.".format(player, self.__repr__()))
         self._rank.append(player)
 
@@ -235,7 +239,7 @@ class SwapCards(object):
             raise ValueError("The card_toX must be instance of Card_To and card must be instance of Card and 'to' must be in range(4).")
         if not isinstance(player, TichuPlayer):
             raise ValueError("The player must be instance of TichuPlayer")
-        if player.id in [sc.to for sc in swapcards]:
+        if player.position in [sc.to for sc in swapcards]:
             raise ValueError("can't swap a card to itself")
         if not len(set([sc.to for sc in swapcards])) == 3:
             raise ValueError("must have 3 different recipients")
@@ -244,8 +248,8 @@ class SwapCards(object):
         if not all([sc.card in player.hand_cards for sc in swapcards]):
             raise ValueError("the player must possess all 3 cards")
 
-        self._swapcards = tuple([SwapCard(card=sc.card, from_=player.id, to=sc.to) for sc in swapcards])
-        self._from = player.id
+        self._swapcards = tuple([SwapCard(card=sc.card, from_=player.position, to=sc.to) for sc in swapcards])
+        self._from = player.position
 
     @property
     def swapcards(self):
@@ -263,6 +267,9 @@ class SwapCards(object):
 
     def __getitem__(self, item):
         return self._swapcards.__getitem__(item)
+
+    def __str__(self):
+        return "SwapCards({})".format(self.swapcards)
 
 
 class Round(object):
@@ -301,7 +308,7 @@ class Round(object):
 
         while self._nbr_finished_players() < 3:  # while more than 1 player has cards left
             leading_player = self._run_trick(leading_player=leading_player)
-            if leading_player.has_finished():  # if the leading player has already finished
+            if leading_player.has_finished:  # if the leading player has already finished
                 leading_player = self._next_to_play(leading_player.position)
 
         # round ended, count scores
@@ -370,10 +377,18 @@ class Round(object):
 
                 # verify wish
                 if wish is not None:
-                    if not played_action.is_pass() and wish in {c.cardvalue for c in played_action.combination}:
+                    if not played_action.is_pass() and wish in {c.card_value for c in played_action.combination}:
+                        logging.info("Wish {} satisfied.".format(str(wish)))
                         wish = None  # wish is satisfied
-                    elif wish in {c.cardvalue for c in next_to_play.hand_cards}:  # TODO! make correct
-                        warnings.warn("Must comply with the wish when possible.")
+                    elif wish in {c.card_value for c in next_to_play.hand_cards}:
+                        # test whether the player could have satisfied the wish.
+                        # TODO speed, find more intelligent algo.
+                        partitions = next_to_play.hand_cards.partitions()
+                        for partition in partitions:
+                            for comb in partition.combinations:
+                                if played_action.combination < comb:
+                                    raise IllegalActionError("Must comply with the wish when possible, but did not. Could have played {}".format(comb))
+                # fi wish
 
                 # handle Mahjong (wish)
                 if Card.MAHJONG in played_action.combination:
@@ -383,8 +398,8 @@ class Round(object):
                         raise IllegalActionError("The wish must be a CardValue and not a special card.")
 
                 # if the player finished with this move
-                if next_to_play.has_finished():
-                    self._player_ranking.next_to_finish(next_to_play.position)
+                if next_to_play.has_finished:
+                    self._player_ranking.next_to_finish(next_to_play)
 
                     # test doppelsieg
                     trick_ended = trick_ended or self._player_ranking.is_double_win()
@@ -457,61 +472,73 @@ class Round(object):
         # TODO add some asserts to make sure everything is as expected
         assert len(self._player_ranking) == 4
 
-        winner_id = self._player_ranking.winner
+        winner_pos = self._player_ranking.winner.position
         # grand + normal tichu
-        points = self._tichus.tichu_points(winner_id)
+        points = self._tichus.tichu_points(winner_pos)
 
         # doppelsieg
         if self._player_ranking.is_double_win():
-            points[winner_id] += 200
+            points[winner_pos] += 200
         else:
-            loosing_id = self._player_ranking.looser
-            # last player gives hand_cards to enemy ...
-            self._players[(loosing_id + 1) % 4].tricks.append(self._players[loosing_id].remove_hand_cards())
+            loosing_pos = self._player_ranking.looser.position
+            # last player gives hand_card points to enemy ...
+            loosing_handcard_points = self._players[loosing_pos].remove_hand_cards().count_points()
+            points[(loosing_pos+1)%4] += loosing_handcard_points
 
             # ... and tricks to first player
-            self._players[winner_id].tricks.add_all(self._players[loosing_id].remove_tricks())
+            loosing_trick_points = sum([trick.sum_points() for trick in self._players[loosing_pos].remove_tricks()])
+            points[winner_pos] += loosing_trick_points
 
             # count points in tricks
-            for p_id in range(4):
-                points[p_id] += sum([cards.sum() for cards in self._players[p_id].tricks])
+            for player_pos in range(4):
+                points[player_pos] += sum([trick.sum_points() for trick in self._players[player_pos].tricks])
+
+            # remove handcards and tricks
+            for player in self._players:
+                player.remove_hand_cards()
+                player.remove_tricks()
+
 
         return (points[0] + points[2], points[1] + points[3])
 
     def _swap_cards(self):
         """
         Asks all players to swap cards.
-        :return List containing the swapped cards
+        :return set containing the swapped cards
         """
         swapcards = set()
         # ask for swapcards
-        for pl in self._players:
-            pl_swapcards = pl.swap_cards()
-            if not isinstance(pl_swapcards, SwapCards):
-                raise IllegalActionError("The Swapcards must be an instance of 'SwapCards', but were {}".format(pl_swapcards.__class__))
-            for sc in pl_swapcards:
+        for player in self._players:
+            player_swapcards = player.swap_cards()
+
+            if not isinstance(player_swapcards, SwapCards):
+                raise IllegalActionError("The Swapcards must be an instance of 'SwapCards', but were {}".format(player_swapcards.__class__))
+            for sc in player_swapcards:
                 swapcards.add(sc)
+                # remove cards from player
+                player.hand_cards.remove(sc.card)
+
         # distribute swapped cards
-        for pl in self._players:
-            pl.receive_swapped_cards([sc for sc in swapcards if sc.to == pl.id])
+        for player in self._players:
+            player.receive_swapped_cards([sc for sc in swapcards if sc.to == player.position])
 
-        return True
+        assert all([len(p.hand_cards) == 14 for p in self._players])
+        assert all([p.hand_cards.issubset(Deck(full=True)) for p in self._players])
 
-    def _ask_for_bomb(self, trick_on_table, current_player_id):
+        return swapcards
+
+    def _ask_for_bomb(self, trick_on_table, current_player_pos):
         """
         Asks all players whether they want to play a bomb.
         :param trick_on_table: Trick; The trick on the table.
-        :param current_player_id: int; The id of the player whose turn it is.
+        :param current_player_pos: int; The id of the player whose turn it is.
         :return The player that wants to play a bomb. Or None if no player plays a bomb.
         """
-        p_id = self._next_to_play(current_player_id)
-        while p_id != current_player_id: # To prevent infinite loop
-            p = self._players[p_id]
-            if not p.has_finished():
-                bomb_action = p.play_bomb_or_not(trick_on_table)
-                if bomb_action:
-                    return bomb_action
-            p_id = (p_id + 1) % 4
+        players_to_ask = [self._players[p_pos] for p_pos in [i % 4 for i in range(current_player_pos, current_player_pos+4)] if not self._players[p_pos].has_finished]
+        for player in players_to_ask:
+            bomb_action = player.play_bomb_or_not(trick_on_table)
+            if bomb_action:
+                return bomb_action
         return None
 
     def _ask_for_tichu(self):
@@ -525,7 +552,7 @@ class Round(object):
             # can't announce tichu if already announced grand tichu
             if not self._tichus.has_announced_grand_tichu(pl.position) and pl.announce_tichu_or_not(
                     self._tichus.get_announced_tichu(), self._tichus.get_announced_grand_tichu()):
-                self._tichus.announce_tichu(pl.id)
+                self._tichus.announce_tichu(pl.position)
                 did_announce = True
 
         self._notify_all_players_about_tichus()
@@ -577,23 +604,31 @@ class Round(object):
         Distributes 14 cards to each player and asks after the 8th card for a grand Tichu.
         Returns the distributed hand_cards as a list of Cards instances
         """
-        # remove all cards from the players
-        for pl in self._players:
-            pl.remove_hand_cards()
-            pl.remove_tricks()
 
         deck = Deck(full=True)
         piles = deck.split(nbr_piles=4, random_=True)
-        assert all([len(pile) == 14 for pile in piles])  # make sure the piles are correct (have size 14)
-        for pile in piles:
-            assert all([isinstance(c, Card) for c in pile])
+        assert len(piles) == 4
 
-        # distribute cards and ask for grand tichus
         for k in range(0, 4):
-            self._players[k].receive_first_8_cards(piles[k][0:8])
-            if self._players[k].announce_grand_tichu_or_not(announced_tichu=[], announced_grand_tichu=self._tichus.get_announced_grand_tichu()):
+            player_cards = piles[k]
+            player = self._players[k]
+            assert len(player_cards) == 14
+            assert all([isinstance(c, Card) for c in player_cards])
+
+            # remove all cards from the players
+            player.remove_hand_cards()
+            player.remove_tricks()
+
+            # distribute cards and ask for grand tichu
+            first_8 = player_cards[0:8]
+            last_6 = player_cards[8:14]
+
+            player.receive_first_8_cards(first_8)
+
+            if player.announce_grand_tichu_or_not(announced_tichu=[], announced_grand_tichu=self._tichus.get_announced_grand_tichu()):
                 self._tichus.announce_grand_tichu(player_id=k)
-            self._players[k].receive_last_6_cards(piles[k][8:14])
+
+            player.receive_last_6_cards(last_6)
 
         # notify all players about the announced grand tichus
         for player in self._players:

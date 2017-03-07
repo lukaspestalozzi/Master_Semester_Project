@@ -1,5 +1,5 @@
-from game.game import TichuGameManager
+from game.game import TichuGame
 
 if __name__ == "__main__":
-    GM = TichuGameManager(target_points=1000)
-    GM.start()
+    GM = TichuGame(target_points=10000)
+    res = GM.start()
