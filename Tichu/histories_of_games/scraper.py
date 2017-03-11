@@ -137,13 +137,13 @@ def get_player_elos(game_url):
 def find_round_results(single_round):
     """
     Given a BeautifulSoup object containing a single game round, find for
-    each player:
-        - player name
+    each players:
+        - players name
         - grand tichu cards
         - final cards (after trades)
-        - if the player called tichu
-        - if the player called grand tichu
-        - if the player went out first
+        - if the players called tichu
+        - if the players called grand tichu
+        - if the players went out first
 
     single_round: BS object
 
@@ -173,7 +173,7 @@ def get_player_names(single_round):
     names = []
     for elem in single_round.findAll('div', {'class': 'gtHands'}):
         for line in elem.findAll('div', {'class': 'line'}):
-            names.append(line.find('span', {'class': 'tip'})['data-player'])
+            names.append(line.find('span', {'class': 'tip'})['data-players'])
     return names
 
 def get_gt_cards(single_round):
@@ -263,7 +263,7 @@ def get_out_first(single_round, player_names):
 
     for elem in single_round.findAll('div', {'class': 'gameMove'}):
         if (elem.findAll('div', {'class': 'trading'}) != [] and len(elem.findAll('div', {'class': 'trading'})) == len([line.findAll('span') for line in elem.find('div', {'class': 'cards'})])):
-                first_out = elem.find('span', {'class': 'tip'})['data-player']
+                first_out = elem.find('span', {'class': 'tip'})['data-players']
                 break
 
     return [int(name == first_out) for name in player_names]

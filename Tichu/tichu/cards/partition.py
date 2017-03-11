@@ -1,6 +1,7 @@
 from collections import abc
 
-from game.cards.combination import Combination, CombinationType
+from tichu.cards.cards import ImmutableCards
+from tichu.cards.cards import Combination, CombinationType
 
 
 class Partition(abc.Collection):
@@ -54,39 +55,19 @@ class Partition(abc.Collection):
     def find_all_straights(self):
         """
 
-        :return: all possible Partitions created from merging 5 single combinations to a straight
+        :return: all possible Partitions created from merging single combinations to a straight
         """
-        straights = []
-        def to_straight_rec(remaining, acc_straight):
-            if len(acc_straight) == 5:
-                straights.append(acc_straight)
-                return None
 
-            if len(remaining) == 0:
-                return None
-            cc = remaining[0]  # current combination
-            tail = remaining[1:]
-            ccheight = cc.any_card.card_height
-            accheight = acc_straight[-1].any_card.card_height if len(acc_straight) > 0 else None
-            # card may be added to straight
-            if len(acc_straight) == 0 or ccheight == accheight + 1:
-                to_straight_rec(tail, acc_straight + [cc])  # take cc
-            # same height as last added card
-            elif ccheight == accheight:
-                to_straight_rec(tail, acc_straight[:-1] + [cc])  # remove last and take cc instead
-            to_straight_rec(tail, acc_straight)  # don't take cc
-
-        sorted_singles = sorted([comb for comb in self._combs if comb.type is CombinationType.SINGLE_CARD
-                                 or comb.type is CombinationType.SINGLE_MAHJONG],
-                              key=lambda cmb: cmb.lowest_card.card_value)
-
-        if len(sorted_singles) < 5:
+        single_cards = ImmutableCards([comb.any_card for comb in self._combs if comb.type is CombinationType.SINGLE_CARD
+                        or comb.type is CombinationType.SINGLE_MAHJONG])
+        if len(single_cards) < 5:
             return set()
 
-        to_straight_rec(sorted_singles, list())
+        straights = single_cards.all_straights()
         partitions = set()
         for st in straights:
-            partitions.add(self.merge(st))
+            stcombs = [Combination([s]) for s in st]
+            partitions.add(self.merge(stcombs))
 
         return partitions
 
@@ -96,6 +77,7 @@ class Partition(abc.Collection):
         """
 
         # TODO only look at card values -> handle straightbomb
+        # TODO handle phoenix
 
         def single_same_valued(val_single1, val_comb2, type2):
             return (val_single1 is val_comb2 and (type2 is CombinationType.SINGLE_CARD

@@ -1,11 +1,309 @@
+from collections import abc
 from collections import defaultdict
 from enum import Enum
 
-from game.cards.card import Card
-from game.cards.card import CardSuit
-from game.cards.cards import ImmutableCards
-from game.exceptions import LogicError
-from game.utils import raiser
+from tichu.cards.card import Card, CardSuit
+from tichu.exceptions import LogicError
+from tichu.utils import raiser
+
+__author__ = 'Lukas Pestalozzi'
+
+
+class ImmutableCards(abc.Collection):
+    _card_val_to_sword_card = {
+        2: Card.TWO_SWORD,
+        3: Card.THREE_SWORD,
+        4: Card.FOUR_SWORD,
+        5: Card.FIVE_SWORD,
+        6: Card.SIX_SWORD,
+        7: Card.SEVEN_SWORD,
+        8: Card.EIGHT_SWORD,
+        9: Card.NINE_SWORD,
+        10: Card.TEN_SWORD,
+        11: Card.J_SWORD,
+        12: Card.Q_SWORD,
+        13: Card.K_SWORD,
+        14: Card.A_SWORD,
+    }
+
+    def __init__(self, cards):
+        """
+        :param cards: An iterable containing Card instances or another Card instance.
+        """
+        if isinstance(cards, ImmutableCards):
+            self._cards = frozenset(cards.cards_list)
+        elif all([isinstance(c, Card) for c in cards]):
+            self._cards = frozenset(cards)
+        else:
+            raise TypeError("Only instances of 'Card' can be put into 'Cards'.")
+
+        assert len(self._cards) == len(cards)  # make sure no card is 'lost' due to duplicated cards in 'cards'
+        self._hash = hash(self._cards)
+        self._repr = "(len: {}, cards: {})".format(len(self._cards), repr(self._cards))
+        self._str = "({})".format(', '.join([str(c) for c in self._cards]))
+
+    def __hash__(self):
+        return self._hash
+
+    def __eq__(self, other):
+        if self.__class__ is other.__class__ and len(self) == len(other):
+            for c in self._cards:
+                if c not in other:
+                    return False
+            return True
+        else:
+            return False
+
+    @property
+    def cards_list(self):
+        return list(self._cards)
+
+    @property
+    def any_card(self):
+        return next(iter(self._cards))
+
+    @property
+    def highest_card(self):
+        return max(self._cards, key=lambda c: c.card_value)
+
+    @property
+    def lowest_card(self):
+        return min(self._cards, key=lambda c: c.card_value)
+
+    def copy(self):
+        """
+
+        :return: copy of this ImmutableCards instance
+        """
+        return ImmutableCards(self._cards)
+
+    def count_points(self):
+        """
+        :return the Tichu points in this set of cards.
+        """
+        return sum([c.points for c in self._cards])
+
+    def issubset(self, other):
+        """
+        :param other: Cards instance
+        :return True iff this cards all appear in 'other'.
+        """
+        return self._cards.issubset(other._cards)
+
+    def sorted_tuple(self, *args, **kwargs):
+        """
+        :param args, kwargs: same parameters as for the built in 'sorted' method
+        :return: The elements as a sorted tuple
+        """
+        return sorted(tuple(self._cards), *args, **kwargs)
+
+    def partitions(self):
+        """
+        :return: a set of partitions of the cards
+        """
+        # TODO speed, use other algorithm
+        # TODO implement
+
+        def powerset(seq):
+            """
+            Returns all the possible combinations of this set. This is a generator.
+            """
+            if len(seq) <= 1:
+                yield seq  # single combination
+                yield []
+            else:
+                for item in powerset(seq[1:]):
+                    # item is a list of cards.
+                    # cards_seq[0] is a single card.
+                    yield [seq[0]] + item
+                    yield item
+
+        raise NotImplementedError()
+
+    def _value_dict(self):
+        """
+        :return: a dict mapping the card_values appearing in self._cards to the list of corresponding cards.
+        """
+        # TODO precompute, -> must be overridden by mutable subclasses
+        val_dict = defaultdict(lambda: [])
+        for c in self._cards:
+            val_dict[c.card_value].append(c)
+        return val_dict
+
+    def all_bombs(self):
+        return self.all_squarebombs().union(self.all_straightbombs())
+
+    def all_squarebombs(self):
+        squares = set()
+        for l in self._value_dict():
+            if len(l) == 4:
+                squares.add(Combination(l))
+        return squares
+
+    def all_straightbombs(self):
+        return {comb for comb in self.all_straights() if comb.is_bomb()}
+
+    def all_pairs(self, ignore_phoenix=False):
+        # TODO speed, sort and then iterate? probably not worth it.
+        pairs = set()
+        if not ignore_phoenix and Card.PHOENIX in self._cards:
+            for c in self._cards:
+                pairs.add(Combination([c, Card.PHOENIX]))
+
+        for c1 in self._cards:
+            for c2 in self._cards:
+                if c1 is c2:
+                    continue
+                elif c1.card_value is c2.card_value:
+                    pairs.add(Combination([c1, c2]))
+
+        return pairs
+
+    def all_trios(self, ignore_phoenix=False):
+        # TODO speed, but probably not worth it.
+        trios = set()
+        if not ignore_phoenix and Card.PHOENIX in self._cards:
+            for p in self.all_pairs(ignore_phoenix=True):
+                trios.add(Combination(p.cards_list + [Card.PHOENIX]))
+
+        for l in self._value_dict():
+            if len(l) == 3:
+                trios.add(Combination(l))
+            elif len(l) == 4:
+                trios.add(Combination(l[:3]))  # 0, 1, 2
+                trios.add(Combination(l[1:]))  # 1, 2, 3
+                trios.add(Combination(l[2:] + l[:1]))  # 2, 3, 0
+                trios.add(Combination(l[3:] + l[:2]))  # 3, 0, 1
+
+        return trios
+
+    def all_straights(self, ignore_phoenix=False):
+        if len(self._cards) < 5:
+            return set()
+
+        phoenix = not ignore_phoenix and Card.PHOENIX in self._cards
+        straights = set()
+
+        def all_straights_rec(remaining, acc_straight, last_height, ph_in_acc=None):
+            if len(acc_straight) >= 5:
+                straights.add(Combination(acc_straight, phoenix_as=ph_in_acc))
+
+            if len(remaining) == 0:
+                return None
+
+            cc = remaining[0]
+            c_height = cc.card_height  # current card height
+
+            # card may be added to straight
+            if len(acc_straight) == 0 or c_height == last_height + 1:
+                all_straights_rec(remaining[1:], acc_straight + [cc], c_height, ph_in_acc=ph_in_acc)  # take cc
+
+            # same height as last added card
+            elif c_height == last_height:
+                all_straights_rec(remaining[1:], acc_straight[:-1] + [cc], c_height, ph_in_acc=ph_in_acc)  # remove last and take cc instead
+                all_straights_rec(remaining[1:], acc_straight, last_height, ph_in_acc=ph_in_acc)  # don't take cc
+
+            all_straights_rec(remaining[1:], list(), None, ph_in_acc=None)  # start new straight
+
+            if phoenix and not ph_in_acc and len(acc_straight) > 0 and last_height < 14:  # the phoenix is not yet used and can be used
+                # take phoenix instead of any other card
+                all_straights_rec(remaining, acc_straight + [Card.PHOENIX], last_height + 1,
+                                  ph_in_acc=ImmutableCards._card_val_to_sword_card[last_height + 1])
+
+        s_cards = sorted([c for c in self._cards
+                          if c is not Card.PHOENIX
+                          and c is not Card.DOG
+                          and c is not Card.DRAGON],
+                         key=lambda c: c.card_value)
+
+        all_straights_rec(s_cards, list(), None, ph_in_acc=None)
+
+        # append phoenix at the beginning of each straight
+        phoenix_prepended = set()
+        if phoenix:
+            for st in straights:
+                l_card = st.lowest_card
+                if Card.PHOENIX not in st and l_card.card_height > 2:
+                    phoenix_prepended.add(Combination([Card.PHOENIX] + st.cards_list,
+                                                      phoenix_as=ImmutableCards._card_val_to_sword_card[l_card.card_height-1]))
+            straights.update(phoenix_prepended)
+
+        return straights
+
+    def __str__(self):
+        return type(self).__name__+self._str
+
+    def __repr__(self):
+        return type(self).__name__+self._repr
+
+    def __len__(self):
+        return len(self._cards)
+
+    def __iter__(self):
+        return self._cards.__iter__()
+
+    def __contains__(self, item):
+        return self._cards.__contains__(item)
+
+
+class Cards(ImmutableCards):
+    """
+    A mutable set of Cards with some helpful functions.
+    """
+
+    def __init__(self, cards):
+        super().__init__(cards)
+        self._cards = set(self._cards)
+
+    def add(self, card):
+        """
+        Adds the card to this Cards set
+        :param card: the Card to add
+        :return: Nothing
+        """
+        if isinstance(card, Card):
+            self._cards.add(card)
+        else:
+            raise TypeError("Only instances of 'Card' can be put into 'Cards', but was {}.".format(card))
+
+    def add_all(self, other):
+        """
+        Adds all elements in 'other' to this Cards set.
+        :param other: Iterable containing only Card instances.
+        :return Nothing
+        """
+        for card in other:
+            self.add(card)
+
+    def remove(self, card):
+        """
+        Removes the card to this Cards set
+        :param card: the Card to remove
+        :return: Nothing
+        """
+        assert card in self._cards
+        self._cards.remove(card)
+
+    def remove_all(self, other):
+        """
+        Removes all elements in 'other' from this Cards set.
+        :param other: Iterable containing only Card instances.
+        :return: Nothing
+        """
+        for card in other:
+            self.remove(card)
+
+    def to_immutable(self):
+        """
+        :return: An ImmutableCards instance containing the same cards as calling instance
+        """
+        return ImmutableCards(self._cards)
+
+    def copy(self):
+        """
+        :return: copy of this Cards instance
+        """
+        return Cards(self._cards)
 
 
 class CombinationType(Enum):
@@ -51,7 +349,7 @@ class Combination(ImmutableCards):
             elif not isinstance(phoenix_as, Card):
                 raise ValueError("The phoenix_as must be a Card.")
             elif phoenix_as in cards:
-                raise ValueError("The phoenix can't take on a card already in the combination.")
+                raise ValueError("The phoenix can't take on a card already in the combination. \ncards:{} \nphoenix: {}".format(cards, phoenix_as))
             elif phoenix_as.suit is CardSuit.SPECIAL:
                 raise ValueError("The phoenix can't take on a special card.")
 
@@ -60,10 +358,9 @@ class Combination(ImmutableCards):
         self._cards_with_phoenix_replaced = frozenset([c for c in self._cards if c is not Card.PHOENIX] + [self._phoenix]) if self._phoenix else self._cards
         self._comb_type = self._find_combination_type()
         if self._comb_type is None:
-            raise ValueError("This is no valid combination {}.".format(str(cards)))
+            raise ValueError("This is no valid combination {}.".format(str(sorted(cards))))
         self._comb_height = self._init_height()
-        self._card_value_tuple = tuple(sorted([c.card_value for c in self._cards],
-                                              key=lambda x: x.card_value))
+        self._card_value_tuple = tuple(sorted([c.card_value for c in self._cards]))
 
     @property
     def type(self):
