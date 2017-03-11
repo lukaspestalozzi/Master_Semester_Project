@@ -34,7 +34,7 @@ class BaseAgent(metaclass=abc.ABCMeta):
         # TODO describe
 
     @abc.abstractmethod
-    def announce_tichu(self, announced_tichu, announced_grand_tichu, game_history):
+    def announce_tichu(self, announced_tichu, announced_grand_tichu, round_history):
         """
 
         :param announced_tichu:
@@ -44,7 +44,7 @@ class BaseAgent(metaclass=abc.ABCMeta):
         # TODO describe
 
     @abc.abstractmethod
-    def swap_cards(self, hand_cards, game_history):
+    def swap_cards(self, hand_cards):
         """
 
         :return:
@@ -52,42 +52,42 @@ class BaseAgent(metaclass=abc.ABCMeta):
         # TODO describe
 
     @abc.abstractmethod
-    def play_first(self, hand_cards, game_history):
+    def play_first(self, hand_cards, round_history):
         """
 
-        :param game_history:
+        :param round_history:
         :return:
         """
         # TODO describe
 
     @abc.abstractmethod
-    def play_bomb(self, hand_cards, game_history):
+    def play_bomb(self, hand_cards, round_history):
         """
 
-        :param game_history:
+        :param round_history:
         :return:
         """
 
     @abc.abstractmethod
-    def play_combination(self, wish, hand_cards, game_history):
+    def play_combination(self, wish, hand_cards, round_history):
         """
 
-        :param game_history:
+        :param round_history:
         :return:
         """
         # TODO describe
 
     @abc.abstractmethod
-    def wish(self, hand_cards, game_history):
+    def wish(self, hand_cards, round_history):
         """
 
         :param hand_cards:
-        :param game_history:
+        :param round_history:
         :return:
         """
 
     @abc.abstractmethod
-    def give_dragon_away(self, hand_cards, game_history):
+    def give_dragon_away(self, hand_cards, round_history):
         """
 
         :param hand_cards:

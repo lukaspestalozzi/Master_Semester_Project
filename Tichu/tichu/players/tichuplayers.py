@@ -7,7 +7,6 @@ from tichu.agents.abstractagent import BaseAgent
 from tichu.cards.card import CardValue, Card
 from tichu.cards.cards import Cards, CombinationType, Combination
 from tichu.exceptions import IllegalActionException
-from tichu.game.gameutils import SwapCards, SwapCard
 from tichu.utils import assert_
 
 
@@ -100,7 +99,6 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :return: Nothing
         """
         self._tricks.append(trick)
-        logging.info("{} added trick {}".format(self.name, trick))
 
     def count_points_in_tricks(self):
         """
@@ -129,7 +127,6 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         assert len(self._hand_cards) == 0
         self._hand_cards.add_all(cards)
         assert len(self._hand_cards) == 8
-        logging.info("{} added 8 cards: {}".format(self.name, cards))
 
     def receive_last_6_cards(self, cards):
         """
@@ -139,25 +136,25 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         assert len(cards) == 6
         self._hand_cards.add_all(cards)
         assert len(self._hand_cards) == 14
-        logging.info("{} added 6 cards: {}".format(self.name, cards))
 
     def receive_swapped_cards(self, swapped_cards):
         """
         :param swapped_cards: A set of SwapCard instances.
         :return Nothing
         """
+        from tichu.game.gameutils import SwapCard
         assert len(swapped_cards) == 3
         assert all([isinstance(sc, SwapCard) for sc in swapped_cards])
         self._hand_cards.add_all([c.card for c in swapped_cards])  # TODO agent, store info about swapped card
-        logging.info("{} received swap cards: {}".format(self.name, swapped_cards))
 
     # ### Agent Methods ###
-    def swap_cards(self, game_history):
+    def swap_cards(self):
         """
         Called by the the tichu manager to ask for the 3 cards to be swapped
         :return a SwapCards instance.
         """
-        swap_cards = self._agent.swap_cards(self.hand_cards, game_history.copy(save=self.position))
+        from tichu.game.gameutils import SwapCards
+        swap_cards = self._agent.swap_cards(self.hand_cards)
         sc = SwapCards(self, *swap_cards)
         self._hand_cards.remove_all(sc.cards())
         return sc
@@ -170,13 +167,13 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         gt = self._agent.announce_grand_tichu(announced_grand_tichu)
         return bool(gt)
 
-    def announce_tichu_or_not(self, announced_tichu, announced_grand_tichu):
+    def announce_tichu_or_not(self, announced_tichu, announced_grand_tichu, game_history):
         """
         :param announced_tichu: a list of integers (in range(0, 4)), denoting playerIDs that already have announced a Tichu.
         :param announced_grand_tichu: a list of integers (in range(0, 4)), denoting playerIDs that already have announced a grand Tichu.
         :return True if this players announces a normal Tichu, False otherwise.
         """
-        nt = self._agent.announce_tichu(announced_tichu, announced_grand_tichu)
+        nt = self._agent.announce_tichu(announced_tichu, announced_grand_tichu, round_history=game_history.current_round.copy(save=self.position))
         return bool(nt)
 
     def players_announced_tichus(self, tichu=list(), grand_tichu=list()):
@@ -195,21 +192,21 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         The combination must be a valid play according to the Tichu rules, in particular, PlayerAction must not be Pass.
         :return: the combination the players wants to play as PlayerAction.
         """
-        action = PlayerAction(self, combination=self._agent.play_first(hand_cards=self.hand_cards, game_history=game_history.copy(save=self.position)))
+        action = PlayerAction(self, combination=self._agent.play_first(hand_cards=self.hand_cards, round_history=game_history.current_round.copy(save=self.position)))
         action.check(has_cards=self, not_pass=True, raise_exception=True)
         self._hand_cards.remove_all(action.combination.cards_list)
         return action
 
-    def play_combination(self, history, wish):
+    def play_combination(self, game_history, wish):
         """
         Called by the the tichu manager to request a move.
-        :param history: The history of the tichu so far.
+        :param game_history: The history of the tichu so far.
         :param wish: The CardValue beeing wished, None if no wish is present
         :return: pass, or the combination the players wants to play as PlayerAction.
         """
-        comb = self._agent.play_combination(wish=wish, hand_cards=self.hand_cards, game_history=history.copy(save=self.position))
+        comb = self._agent.play_combination(wish=wish, hand_cards=self.hand_cards, round_history=game_history.current_round.copy(save=self.position))
         action = PlayerAction(self, combination=comb)
-        action.check(played_on=history.last_combination(), has_cards=self, raise_exception=True)
+        action.check(played_on=game_history.last_combination(), has_cards=self, raise_exception=True)
         if not action.is_pass():
             self._hand_cards.remove_all(action.combination.cards_list)
 
@@ -222,7 +219,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param game_history:The history of the tichu so far.
         :return: the bomb (as PlayerAction) if the players wants to play a bomb. False or None otherwise
         """
-        bomb_action = self._agent.play_bomb(hand_cards=self.hand_cards, game_history=game_history.copy(save=self.position))
+        bomb_action = self._agent.play_bomb(hand_cards=self.hand_cards, round_history=game_history.current_round.copy(save=self.position))
         if bomb_action:
             bomb_action.check(played_on=game_history.last_combination(), has_cards=self, is_bomb=True, raise_exception=True)
             self._hand_cards.remove_all(bomb_action.combination.cards_list)
@@ -233,7 +230,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param game_history:The history of the tichu so far.
         :return: id of the players to give the trick to.
         """
-        pos = self._agent.give_dragon_away(hand_cards=self.hand_cards, game_history=game_history.copy(save=self.position))
+        pos = self._agent.give_dragon_away(hand_cards=self.hand_cards, round_history=game_history.current_round.copy(save=self.position))
         assert_(pos in range(4) and pos != self.position and pos != self.team_mate)
         return pos
 
@@ -242,7 +239,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param game_history:The history of the tichu so far.
         :return: The CardValue to be wished
         """
-        w = self._agent.wish(self.hand_cards, game_history.copy(save=self.position))
+        w = self._agent.wish(self.hand_cards, game_history.current_round.copy(save=self.position))
         assert_(isinstance(w, CardValue) and w not in {CardValue.PHOENIX, CardValue.DRAGON, CardValue.DOG, CardValue.MAHJONG},
                 IllegalActionException("The wish must be a CardValue and not a special card, but was "+repr(w)))
         return w

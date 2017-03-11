@@ -8,7 +8,7 @@ def raiser(ex):
     raise ex
 
 
-def assert_(expr, e=AssertionError()):
+def assert_(expr, e=AssertionError("personal assert_ failed")):
     """
     Raises an Exception when expr evaluates to False.
 

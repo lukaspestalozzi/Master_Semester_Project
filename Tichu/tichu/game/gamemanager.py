@@ -33,13 +33,15 @@ class TichuGame(object):
         # init logger # TODO log to file and init logger from json file
         logging.basicConfig(format='%(levelname)s [%(module)s]:%(message)s',
                             datefmt='%Y.%m.%d %H:%M:%S',
-                            level=logging.WARN)  # TODO logging; filename='example.log',
+                            level=logging.DEBUG)  # TODO logging; filename='example.log',
 
     def start_game(self):
         """
         Starts the tichu
         Returns a tuple containing the two teams, the winner team, and the tichu history
         """
+        logging.debug("Start game...")
+
         for k in range(4):
             self._players[k].new_game(k, (k+2) % 4)
 
@@ -59,11 +61,15 @@ class TichuGame(object):
                               points=final_points,
                               game_history=self._history.build())
 
+        logging.debug("Game ended: "+str(outcome))
+
         return outcome
 
     def _start_round(self):
         # TODO what to do when both teams may win in this round.
+
         roundstate = self._history.start_new_round()
+        logging.debug("Start round, with points: "+str(roundstate.initial_points))
 
         # inform players about new round
         for player in self._players:
@@ -71,8 +77,8 @@ class TichuGame(object):
 
         # distribute cards
         piles = self._distribute_cards()
-        roundstate.grand_tichu_hands = HandCardSnapshot(*[pile[0:8] for pile in piles])
-        roundstate.before_swap_hands = HandCardSnapshot(*[pile for pile in piles])
+        roundstate.grand_tichu_hands = HandCardSnapshot(*[ImmutableCards(pile[0:8]) for pile in piles])
+        roundstate.before_swap_hands = HandCardSnapshot(*[ImmutableCards(pile) for pile in piles])
 
         # Players may announce a normal tichu before card swap
         self._ask_for_tichu()
@@ -80,7 +86,7 @@ class TichuGame(object):
         # card swaps
         swapped_cards = self._swap_cards()
         roundstate.card_swaps = tuple(swapped_cards)
-
+        roundstate.complete_hands = self.make_handcards_snapshot()
 
         # round-loop
         leading_player = self._mahjong_player()
@@ -107,9 +113,9 @@ class TichuGame(object):
         """
 
         rs = self._history.current_round  # current round state
+        logging.debug("run trick..., points: {}".format(rs.points))
 
         trick_ended = False
-        rs.current_trick = rs.current_trick  # TODO make sure that
         next_to_play = leading_player
         nbr_pass = 0
         wish = None
@@ -117,9 +123,9 @@ class TichuGame(object):
             assert not next_to_play.has_finished
             played_action = None
             if rs.current_trick.is_empty():  # first play of the trick
-                played_action = next_to_play.play_first(history=self._history)
+                played_action = next_to_play.play_first(game_history=self._history)
             else:
-                played_action = next_to_play.play_combination(history=self._history, wish=wish)
+                played_action = next_to_play.play_combination(game_history=self._history, wish=wish)
 
             if played_action.is_pass():
                 nbr_pass += 1
@@ -154,7 +160,7 @@ class TichuGame(object):
                     # test whether 3rd players to win and thus ends the trick.
                     # (3rd to win automatically gets the last trick)
                     if len(rs.ranking) == 3:
-                        rs.ranking_append_player(self._next_to_play(next_to_play.position))  # add last players
+                        rs.ranking_append_player(self._next_to_play(next_to_play.position).position)  # add last players
                         trick_ended = True
 
                 # handle dog
@@ -166,7 +172,7 @@ class TichuGame(object):
 
             if not trick_ended:
                 # ask all players whether they want to play a bomb
-                bomb_action = self._ask_for_bomb(rs.current_trick, next_to_play.position)
+                bomb_action = self._ask_for_bomb(next_to_play.position)
                 while bomb_action is not None:
                     bomb_player = bomb_action.player
                     rs.current_trick.add(bomb_action)  # update the trick on the table
@@ -174,7 +180,7 @@ class TichuGame(object):
                     next_to_play = self._next_to_play(bomb_player.position)
                     nbr_pass = 0
                     # ask again for bomb
-                    bomb_action = self._ask_for_bomb(rs.current_trick, next_to_play.position)
+                    bomb_action = self._ask_for_bomb(next_to_play.position)
 
             # determine the next player to play
             next_to_play = self._next_to_play(next_to_play.position)
@@ -184,7 +190,7 @@ class TichuGame(object):
         # give the trick to the correct player.
         receiving_player = leading_player
         if rs.current_trick.is_dragon_trick():  # handle dragon trick
-            receiving_player = self._players[leading_player.give_dragon_away(rs.current_trick)]
+            receiving_player = self._players[leading_player.give_dragon_away(self._history)]
 
         # give trick to the receiving player
         receiving_player.tricks.append(rs.current_trick.finish())
@@ -244,7 +250,6 @@ class TichuGame(object):
 
     def _calculate_tichu_points(self):
         """
-        :param winner_pos: int, The id of the players finished first
         :return: dict{int: points}, a dict containing the points of each players gained (or lost) by succeeding or failing to fullfill a (grand)Tichu
         """
         points_t, points_gt = defaultdict(lambda: 0), defaultdict(lambda: 0)
@@ -261,6 +266,7 @@ class TichuGame(object):
         :return set containing the swapped cards
         """
         swapcards = set()
+        swapcards_to_return = set()
         # ask for swapcards
         for player in self._players:
             player_swapcards = player.swap_cards()
@@ -269,6 +275,7 @@ class TichuGame(object):
                 raise IllegalActionException("The Swapcards must be an instance of 'SwapCards', but were {}".format(player_swapcards.__class__))
             for sc in player_swapcards:
                 swapcards.add(sc)
+            swapcards_to_return.add(player_swapcards)
 
         # distribute swapped cards
         for player in self._players:
@@ -277,18 +284,17 @@ class TichuGame(object):
         assert all([len(p.hand_cards) == 14 for p in self._players])
         assert all([p.hand_cards.issubset(Deck(full=True)) for p in self._players])
 
-        return swapcards
+        return swapcards_to_return
 
-    def _ask_for_bomb(self, trick_on_table, current_player_pos):
+    def _ask_for_bomb(self, current_player_pos):
         """
         Asks all players whether they want to play a bomb.
-        :param trick_on_table: Trick; The trick on the table.
         :param current_player_pos: int; The id of the players whose turn it is.
         :return The players that wants to play a bomb. Or None if no players plays a bomb.
         """
         players_to_ask = [self._players[p_pos] for p_pos in [i % 4 for i in range(current_player_pos, current_player_pos+4)] if not self._players[p_pos].has_finished]
         for player in players_to_ask:
-            bomb_action = player.play_bomb_or_not(trick_on_table)
+            bomb_action = player.play_bomb_or_not(game_history=self._history)
             if bomb_action:
                 return bomb_action
         return None
@@ -302,7 +308,8 @@ class TichuGame(object):
         did_announce = False
         for pl in self._players:
             # can't announce tichu if already announced grand tichu
-            if pl.position not in announced_gt and pl.announce_tichu_or_not(self._history.current_round.announced_tichus, list(announced_gt)):
+            if pl.position not in announced_gt and pl.announce_tichu_or_not(
+                    self._history.current_round.announced_tichus, list(announced_gt), self._history):
                 self._history.current_round.announce_tichu(pl.position)
                 did_announce = True
 

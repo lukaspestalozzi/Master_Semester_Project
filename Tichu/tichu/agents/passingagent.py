@@ -11,11 +11,11 @@ class PassingAgent(BaseAgent):
     def __init__(self):
         super().__init__()
 
-    def give_dragon_away(self, hand_cards, game_history):
+    def give_dragon_away(self, hand_cards, round_history):
         pl_pos = (self.position + 1) % 4
         return pl_pos
 
-    def wish(self, hand_cards, game_history):
+    def wish(self, hand_cards, round_history):
         wish = random.choice([cv for cv in CardValue
                               if cv is not CardValue.DOG
                               and cv is not CardValue.DRAGON
@@ -23,18 +23,18 @@ class PassingAgent(BaseAgent):
                               and cv is not CardValue.PHOENIX])
         return wish
 
-    def play_combination(self, wish, hand_cards, game_history):
+    def play_combination(self, wish, hand_cards, round_history):
         return None
 
-    def play_bomb(self, hand_cards, game_history):
+    def play_bomb(self, hand_cards, round_history):
         return False
 
-    def play_first(self, hand_cards, game_history):
+    def play_first(self, hand_cards, round_history):
         card = next(iter(hand_cards))
         comb = Combination(cards=[card], phoenix_as=Card.PHOENIX)
         return comb
 
-    def swap_cards(self, hand_cards, game_history):
+    def swap_cards(self, hand_cards):
         it = iter(hand_cards)
         scards = [
                    Card_To(next(it), (self.position + 1) % 4),
@@ -46,7 +46,7 @@ class PassingAgent(BaseAgent):
     def notify_about_announced_tichus(self, tichu, grand_tichu):
         pass
 
-    def announce_tichu(self, announced_tichu, announced_grand_tichu, game_history):
+    def announce_tichu(self, announced_tichu, announced_grand_tichu, round_history):
         return False
 
     def announce_grand_tichu(self, announced_grand_tichu):

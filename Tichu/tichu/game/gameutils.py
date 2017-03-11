@@ -3,15 +3,15 @@ from collections import namedtuple
 from tichu.cards.card import Card
 from tichu.cards.cards import ImmutableCards, Cards
 from tichu.exceptions import IllegalActionException
-from tichu.players.abstract_tichuplayer import PlayerAction, TichuPlayer
-from tichu.utils import assert_
+from tichu.players.tichuplayers import PlayerAction, TichuPlayer
+from tichu.utils import assert_, raiser
 
 
 class Team(namedtuple("T", ["player1", "player2"])):
 
     def __init__(self, player1, player2):
         assert_(isinstance(player1, TichuPlayer) and isinstance(player2, TichuPlayer))
-        super(Team, self).__init__(player1, player2)
+        super(Team, self).__init__()
 
     @property
     def second_player(self):
@@ -90,6 +90,31 @@ class GameState(object):
         assert_(isinstance(tichu_round, TichuRoundHistory))
         self._rounds.append(tichu_round)
 
+    def last_combination(self):
+        return self._current_round.last_combination if self._current_round else None
+
+    def copy(self, save=False):
+        """
+        Makes a copy of this instance
+        :param save: (default False)
+         - an integer (in range(4)) then the copy will only contain information as seen by the player at this position.
+         - False, it is a complete copy.
+
+        :return: a copy of this instance
+        """
+        gs = GameState(self.team1, self.team2, self._target_points)
+        gs._winner_team = self._winner_team
+        gs._rounds = [r.copy(save=save) for r in self._rounds]
+        gs._current_round = self._current_round.copy(save=save) if self._current_round else None
+        if save is False:
+            return gs
+        else:
+            # TODO copy the teams and remove the handcards from the players
+            gs._team1 = None
+            gs._team2 = None
+            gs._winner_team = None
+            return gs
+
     def build(self):
         """
         :return: A TichuGameHistory instance (which is immutable)
@@ -107,8 +132,9 @@ class HandCardSnapshot(namedtuple("HCS", ["handcards0", "handcards1", "handcards
     Contains 4 ImmutableCards instances representing the handcards of the 4 players.
     """
     def __init__(self, handcards0, handcards1, handcards2, handcards3):
-        assert_(all([isinstance(cs, ImmutableCards) for cs in [handcards0, handcards1, handcards2, handcards3]]))
-        super().__init__(handcards0, handcards1, handcards2, handcards3)
+        assert_(all([isinstance(cs, ImmutableCards) for cs in [handcards0, handcards1, handcards2, handcards3]]),
+                TypeError("handcards must be ImmutableCards, but were: "+str([type(handcards0), type(handcards1), type(handcards2), type(handcards3)])))
+        super().__init__()
 
     def copy(self, save=False):
         """
@@ -136,7 +162,7 @@ class TichuGameHistory(namedtuple("TGH", ["team1", "team2", "winner_team", "poin
         assert_(isinstance(points, tuple) and len(points) == 2)
         assert_(isinstance(target_points, int))
         assert_(all([isinstance(r, TichuRoundHistory) for r in rounds]))
-        super().__init__(team1, team2, winner_team, points, target_points, rounds)
+        super().__init__()
 
     @property
     def points_team1(self):
@@ -157,7 +183,7 @@ class TrickHandcards(namedtuple("AH", ["trick", "handcards"])):
     def __init__(self, trick, handcards):
         assert_(isinstance(trick, Trick))
         assert_(isinstance(handcards, HandCardSnapshot))
-        super().__init__(trick, handcards)
+        super().__init__()
 
 
 class RoundState(object):
@@ -207,7 +233,7 @@ class RoundState(object):
     def points(self, points):
         assert_(isinstance(points, tuple))
         assert_(len(points) == 2)
-        assert_(all([isinstance(points[p], int) for p in points]))
+        assert_(all([isinstance(p, int) for p in points]))
         self._points = points
 
     @property
@@ -234,7 +260,7 @@ class RoundState(object):
 
     @card_swaps.setter
     def card_swaps(self, swaps):
-        assert_(all([isinstance(swap, SwapCards) for swap in swaps]))
+        assert_(all([isinstance(swap, SwapCards) for swap in swaps]), TypeError("Must be SwapCards, but were: "+str(swaps)))
         self._swaps = swaps
 
     @property
@@ -333,12 +359,12 @@ class RoundState(object):
 
         if (save is not True and save in range(4)) or save is False:
             rs = RoundState(self.initial_points)
-            rs._grand_tichu_hands = self.grand_tichu_hands.copy(save=save)
-            rs._before_swap_hands = self.before_swap_hands.copy(save=save)
-            rs._card_swaps = (self._swaps if save is False
-                              else tuple([cs if save == i else None for i, cs in enumerate(self._swaps)]))
-            rs._complete_hands = self.complete_hands.copy(save=save)
-            rs._announced_grand_tichus = self.announced_grand_tichus
+            rs._grand_tichu_hands = self.grand_tichu_hands.copy(save=save) if self.grand_tichu_hands else None
+            rs._before_swap_hands = self.before_swap_hands.copy(save=save) if self.before_swap_hands else None
+            rs._card_swaps = (self._swaps if save is False or self._swaps is None
+                              else tuple([(cs if save == i else None) for i, cs in enumerate(self._swaps)]))
+            rs._complete_hands = self.complete_hands.copy(save=save) if self.complete_hands else None
+            rs._announced_grand_tichus = self.announced_grand_tichus if self.announced_grand_tichus else None
             rs._announced_tichus = self.announced_tichus
             rs._tricks_handcards = [TrickHandcards(trick=t_h.trick, handcards=t_h.handcards.copy(save=save))
                                     for t_h in self._tricks_handcards]
@@ -350,6 +376,7 @@ class RoundState(object):
     def build(self):
         return TichuRoundHistory(initial_points=self.initial_points,
                                  final_points=self.final_points,
+                                 points=self.points,
                                  grand_tichu_hands=self.grand_tichu_hands,
                                  before_swap_hands=self.before_swap_hands,
                                  card_swaps=self.card_swaps,
@@ -361,24 +388,26 @@ class RoundState(object):
                                  ranking=self.ranking)
 
 
-class TichuRoundHistory(namedtuple("RoundHistory", ["initial_points", "final_points",
+class TichuRoundHistory(namedtuple("RoundHistory", ["initial_points", "final_points", "points",
                                                     "grand_tichu_hands", "before_swap_hands",
                                                     "card_swaps", "complete_hands",
                                                     "announced_grand_tichus", "announced_tichus",
                                                     "tricks", "handcards", "ranking"])):
 
-    def __init__(self, initial_points, final_points, grand_tichu_hands, before_swap_hands,
+    def __init__(self, initial_points, final_points, points, grand_tichu_hands, before_swap_hands,
                  card_swaps, complete_hands, announced_grand_tichus, announced_tichus, tricks, handcards, ranking):
-        assert_(isinstance(initial_points, int) and isinstance(final_points, int))
+        assert_(isinstance(initial_points, tuple) and isinstance(final_points, tuple) and isinstance(points, tuple)
+                and len(initial_points) == len(final_points) == len(points) == 2)
         assert_(all([isinstance(hds, HandCardSnapshot) for hds in [grand_tichu_hands, before_swap_hands, complete_hands]]))
-        assert_(isinstance(card_swaps, tuple) and len(card_swaps) == 4 and all([isinstance(cs, SwapCards) for cs in card_swaps]))
+        assert_(isinstance(card_swaps, tuple))
+        assert_(len(card_swaps) == 4)
+        assert_(all([isinstance(cs, SwapCards) or cs is None for cs in card_swaps]))
         assert_(isinstance(announced_grand_tichus, set) and isinstance(announced_tichus, set))
         assert_(all([isinstance(t, Trick) for t in tricks]))
         assert_(all([isinstance(hc, HandCardSnapshot) for hc in handcards]))
         assert_(isinstance(ranking, list), len(ranking) <= 4)
 
-        super().__init__(initial_points, final_points, grand_tichu_hands, before_swap_hands,
-                 card_swaps, complete_hands, announced_grand_tichus, announced_tichus, tricks, handcards, ranking)
+        super().__init__()
 
     def last_combination(self):
         k = len(self.actions) - 1
@@ -388,6 +417,25 @@ class TichuRoundHistory(namedtuple("RoundHistory", ["initial_points", "final_poi
             ac = self.actions[k]
         return ac
 
+    def copy(self, save=False):
+        """
+        Makes a copy of this instance
+        :param save: (default False)
+         - an integer (in range(4)) then the copy will only contain information as seen by the player at this position.
+         - False, it is a complete copy.
+
+        :return: a copy of this instance
+        """
+        if save is False:
+            return TichuRoundHistory(self.initial_points, self.final_points, self.points, self.grand_tichu_hands,
+                                     self.before_swap_hands, self.card_swaps, self.complete_hands,
+                                     self.announced_grand_tichus, self.announced_tichus, self.tricks, self.handcards, self.ranking)
+        else:
+            return TichuRoundHistory(self.initial_points, self.final_points, self.points, self.grand_tichu_hands.copy(save=save),
+                                     self.before_swap_hands.copy(save=save),
+                                     tuple([(cs if save == i else None) for i, cs in enumerate(self.card_swaps)]),
+                                     self.complete_hands.copy(save=save), self.announced_grand_tichus, self.announced_tichus, self.tricks,
+                                     tuple([hc.copy(save=save) for hc in self.handcards]), self.ranking)
 
 class Trick(object):
     """ List of PlayerActions """
@@ -406,7 +454,7 @@ class Trick(object):
         return Card.DRAGON in self.last_combination()
 
     def last_combination(self):
-        return self.combinations[-1].combination if len(self._actions) > 0 else None
+        return self.combinations[-1] if len(self._actions) > 0 else None
 
     def last_action(self):
         return self._actions[-1] if len(self._actions) > 0 else None
@@ -479,7 +527,6 @@ class SwapCards(object):
         # validate input
         if not all([isinstance(ct, Card_To) and isinstance(ct.card, Card) and ct.to in range(4) for ct in swapcards]):
             raise ValueError("The card_toX must be instance of Card_To and card must be instance of Card and 'to' must be in range(4).")
-        from tichu.players.abstract_tichuplayer import TichuPlayer  # TODO FIX
         if not isinstance(player, TichuPlayer):
             raise ValueError("The players must be instance of TichuPlayer, but was {}".format(repr(player)))
         if player.position in [sc.to for sc in swapcards]:
