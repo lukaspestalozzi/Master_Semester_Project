@@ -1,16 +1,19 @@
-from collections import abc
+from collections import abc as collectionsabc
+import abc
 from collections import defaultdict
 from enum import Enum
+
+import itertools
 
 from tichu.cards.card import Card, CardSuit
 from tichu.cards.partition import Partition
 from tichu.exceptions import LogicError
-from tichu.utils import raiser, assert_
+from tichu.utils import raiser, assert_, try_ignore
 
 __author__ = 'Lukas Pestalozzi'
 
 
-class ImmutableCards(abc.Collection):
+class ImmutableCards(collectionsabc.Collection):
     _card_val_to_sword_card = {
         2: Card.TWO_SWORD,
         3: Card.THREE_SWORD,
@@ -128,7 +131,7 @@ class ImmutableCards(abc.Collection):
 
         return final_partitions
 
-    def _value_dict(self):
+    def value_dict(self):
         """
         :return: a dict mapping the card_values appearing in self._cards to the list of corresponding cards.
         """
@@ -145,27 +148,31 @@ class ImmutableCards(abc.Collection):
 
     def all_squarebombs(self):
         squares = set()
-        for l in self._value_dict():
+        for l in self.value_dict():
             if len(l) == 4:
-                squares.add(Combination(l))
+                squares.add(SquareBomb(l))
         return squares
 
     def all_straightbombs(self):
-        return {comb for comb in self.all_straights(ignore_phoenix=True) if comb.is_bomb()}
+        s_bombs = set()
+        for st in self.all_straights(ignore_phoenix=True):
+            sb = try_ignore(lambda: StraightBomb(st))
+            s_bombs.add(sb) if sb else None  # one line :)
+        return s_bombs
 
     def all_pairs(self, ignore_phoenix=False):
         # TODO speed, sort and then iterate? probably not worth it.
         pairs = set()
         if not ignore_phoenix and Card.PHOENIX in self._cards:
             for c in self._cards:
-                pairs.add(Combination([c, Card.PHOENIX]))
+                pairs.add(Pair(c, Card.PHOENIX))
 
         for c1 in self._cards:
             for c2 in self._cards:
                 if c1 is c2:
                     continue
                 elif c1.card_value is c2.card_value:
-                    pairs.add(Combination([c1, c2]))
+                    pairs.add(Pair(c1, c2))
 
         return pairs
 
@@ -174,16 +181,16 @@ class ImmutableCards(abc.Collection):
         trios = set()
         if not ignore_phoenix and Card.PHOENIX in self._cards:
             for p in self.all_pairs(ignore_phoenix=True):
-                trios.add(Combination(p.cards_list + [Card.PHOENIX]))
+                trios.add(Trio(Card.PHOENIX, *p.cards))
 
-        for l in self._value_dict():
+        for l in self.value_dict():
             if len(l) == 3:
                 trios.add(Combination(l))
             elif len(l) == 4:
-                trios.add(Combination(l[:3]))  # 0, 1, 2
-                trios.add(Combination(l[1:]))  # 1, 2, 3
-                trios.add(Combination(l[2:] + l[:1]))  # 2, 3, 0
-                trios.add(Combination(l[3:] + l[:2]))  # 3, 0, 1
+                trios.add(Trio(*l[:3]))  # 0, 1, 2
+                trios.add(Trio(*l[1:]))  # 1, 2, 3
+                trios.add(Trio(*l[2:], *l[:1]))  # 2, 3, 0
+                trios.add(Trio(*l[3:], *l[:2]))  # 3, 0, 1
 
         return trios
 
@@ -204,9 +211,9 @@ class ImmutableCards(abc.Collection):
 
         def all_straights_rec(remaining, acc_straight, last_height, ph_in_acc=None):
             if length is None and len(acc_straight) >= 5:
-                straights.add(Combination(acc_straight, phoenix_as=ph_in_acc))
+                straights.add(Straight(acc_straight, phoenix_as=ph_in_acc))
             elif length is not None and len(acc_straight) == length:
-                straights.add(Combination(acc_straight, phoenix_as=ph_in_acc))
+                straights.add(Straight(acc_straight, phoenix_as=ph_in_acc))
                 return None  # no longer straights are searched
 
             if len(remaining) == 0:
@@ -248,7 +255,7 @@ class ImmutableCards(abc.Collection):
             for st in straights:
                 l_card = st.lowest_card
                 if Card.PHOENIX not in st and l_card.card_height > 2:
-                    phoenix_prepended.add(Combination([Card.PHOENIX] + st.cards_list,
+                    phoenix_prepended.add(Straight([Card.PHOENIX] + st.cards_list,
                                                       phoenix_as=ImmutableCards._card_val_to_sword_card[
                                                           l_card.card_height - 1]))
             straights.update(phoenix_prepended)
@@ -262,7 +269,7 @@ class ImmutableCards(abc.Collection):
         for t in trios:
             for p in pairs:
                 if not (t.contains_phoenix() and p.contains_phoenix()):  # only one phoenix is allowed
-                    fullhouses.add(Combination(t.cards_list + p.cards_list))
+                    fullhouses.add(FullHouse(pair=p, trio=t))
         return fullhouses
 
     def all_pairsteps(self, ignore_phoenix=False):
@@ -274,7 +281,7 @@ class ImmutableCards(abc.Collection):
         for p1 in pairs_s:
             for p2 in pairs_s:
                 if p1 != p2 and abs(p1.value_height - p2.value_height) == 1:
-                    new_ps.add(Combination(p1.cards_list + p2.cards_list))
+                    new_ps.add(PairSteps((p1, p2)))
 
         # find all longer pairsteps
         while len(new_ps):
@@ -302,15 +309,17 @@ class ImmutableCards(abc.Collection):
             combs.update(self.all_pairsteps(ignore_phoenix=ignore_phoenix))
         elif isinstance(played_on, Combination):
             combs.update([b for b in self.all_bombs() if played_on < b])
-            if played_on.ispair():
+            if isinstance(played_on, Single):
+                combs.update([c for c in self._cards if played_on < c])
+            elif isinstance(played_on, Pair):
                 combs.update([c for c in self.all_pairs() if played_on < c])
-            if played_on.ispairstep():
+            elif isinstance(played_on, PairSteps):
                 combs.update([c for c in self.all_pairsteps() if played_on < c])
-            if played_on.istrio():
+            elif isinstance(played_on, Trio):
                 combs.update([c for c in self.all_trios() if played_on < c])
-            if played_on.isstraight():
-                combs.update([c for c in self.all_straights(length=played_on.length()) if played_on < c])
-            if played_on.isfullhouse():
+            elif isinstance(played_on, Straight):
+                combs.update([c for c in self.all_straights(length=len(played_on)) if played_on < c])
+            elif isinstance(played_on, FullHouse):
                 combs.update([c for c in self.all_fullhouses() if played_on < c])
 
         return combs
@@ -416,7 +425,8 @@ class CombinationType(Enum):
         return "CombinationType({}({}))".format(self.name, self.value)
 
 
-class Combination(ImmutableCards):
+class Combination_old(object):
+
     def __init__(self, cards, phoenix_as=None):
         """
         :param cards: an iterable of Card instances.
@@ -709,33 +719,325 @@ class Combination(ImmutableCards):
         return Combination.is_straight(cards) and all([c.suit == suit for c in cards])
 
 
+class Combination(metaclass=abc.ABCMeta):
+
+    def __init__(self, cards):
+        assert_(all((isinstance(card, Card) for card in cards)))
+        self._cards = tuple(cards)
+
+    @property
+    def cards(self):
+        return self._cards
+
+    @abc.abstractproperty
+    def height(self):
+        raise NotImplementedError()
+
+    @staticmethod
+    def make(cards):
+        """
+        makes a combiantion out of the given cards
+        :param cards: the cards
+        :return: the Combination
+        :raise ValueError: if cards don't make a valid combination
+        """
+        nbr_cards = len(cards)
+        err = None
+        try:
+            assert_(0 < nbr_cards <= 15)
+            if nbr_cards == 1:
+                return Single(*cards)
+
+            if nbr_cards == 2:
+                return Pair(*cards)
+
+            if nbr_cards == 3:
+                return Trio(*cards)
+
+            if nbr_cards == 4:
+                return SquareBomb(*cards)
+
+            if nbr_cards % 2 == 0:
+                ss = try_ignore(lambda: PairSteps.from_cards(cards))
+                if ss:
+                    return ss
+
+            if nbr_cards == 5:
+                fh = try_ignore(lambda: FullHouse.from_cards(cards))
+                if fh:
+                    return fh
+
+            if nbr_cards >= 5:
+                st = try_ignore(lambda: Straight(cards))
+                sb = try_ignore(lambda: StraightBomb(st))
+                if sb:
+                    return sb
+                if st:
+                    return st
+
+        except Exception as e:
+            err = e
+        raise ValueError("Is no combination: {}\ncards: {}".format(err, str(cards)))
+
+    def _cant_compare_error(self, other, raise_=False):
+        e = ValueError("Can't compare {} to {}.".format(self.__repr__(), other.__repr__()))
+        if raise_:
+            raise e
+        return e
+
+    def contains_phoenix(self):
+        return self.__contains__(Card.PHOENIX)
+
+    def __iter__(self):
+        return iter(self._cards)
+
+    def __eq__(self, other):
+        return self.__class__ is other.__class__ and self.cards == other.cards
+
+    def __len__(self):
+        return len(self._cards)
+
+    def __contains__(self, other):
+        return self._cards.__contains__(other)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __le__(self, other):
+        return self.__lt__(other) or self.__eq__(other)
+
+    def __ge__(self, other):
+        return self.__gt__(other) or self.__eq__(other)
+
+    def __gt__(self, other):
+        return not self.__le__(other)
+
+    def __lt__(self, other):
+        assert_(isinstance(other, (type(self), Bomb)), self._cant_compare_error(other))
+        return self.height < other.height
+
+
 class Single(Combination):
-    pass  # TODO
+
+    def __init__(self, card):
+        super().__init__((card, ))
+        self._card = card
+
+    @property
+    def card(self):
+        return self._card
+
+    @property
+    def height(self):
+        return self._card.card_height
+
+    def __lt__(self, other):
+        """
+        IMPORTANT: Phoenix on left hand side is always smaller, but phoenix on right hand side is always bigger.
+        So 'Phoenix < single card' is always True, but 'single card < Phoenix' is also always True.
+        """
+        if isinstance(other, Bomb):
+            return True
+        assert_(isinstance(other, Single), self._cant_compare_error(other))
+        assert_(self.card is not Card.DOG and other.card is not Card.DOG)  # dog can't be compared
+        if self.card is Card.DRAGON:
+            return False  # dragon is the highest single card
+        if self._card is Card.PHOENIX or other.card is Card.PHOENIX or other.card is Card.DRAGON or self.card is Card.MAHJONG:
+            # Phoenix on left is smaller, phoenix on right is bigger, dragon is always biggest, mahjong is always smallest
+            return True
+        return self.height < other.height
+
+    def __contains__(self, item):
+        return self._card is item
 
 
 class Pair(Combination):
-    pass  # TODO
+
+    def __init__(self, card1, card2):
+        assert_(card1 is not card2)  # different cards
+        super().__init__((card1, card2))
+
+        if Card.PHOENIX in self._cards:
+            if card1 is Card.PHOENIX:
+                card1, card2 = card2, card1  # make sure card1 is not Phoenix
+            assert_(card1.suit is not CardSuit.SPECIAL)
+        else:
+            assert_(card1.card_value is card2.card_value)  # same value
+
+        self._height = card1.card_height
+        self._card_value = card1.card_value
+
+    @property
+    def height(self):
+        return self._height
 
 
 class Trio(Combination):
-    pass  # TODO
+
+    def __init__(self, card1, card2, card3):
+        assert_(card1 is not card2 and card1 is not card3 and card2 is not card3)  # 3 different cards
+        super().__init__((card1, card2, card3))
+
+        if Card.PHOENIX in self._cards:
+            if card1 is Card.PHOENIX:
+                card1, card2 = card2, card1  # make sure card1 is not Phoenix
+            assert_(card1.suit is not CardSuit.SPECIAL)
+        else:
+            assert_(card1.card_value is card2.card_value is card3.card_value)  # same values
+
+        self._height = card1.card_height
+        self._card_value = card1.card_value
+
+    @property
+    def height(self):
+        return self._height
 
 
 class FullHouse(Combination):
-    pass  # TODO
+
+    def __init__(self, pair, trio):
+        assert_(isinstance(pair, Pair))
+        assert_(isinstance(trio, Trio))
+        assert_(not(pair.contains_phoenix() and trio.contains_phoenix()))  # phoenix can only be used once
+        super().__init__(pair.cards + trio.cards)
+        self._height = trio.height
+
+    @property
+    def height(self):
+        return self._height
+
+    @classmethod
+    def from_cards(cls, cards):
+        assert_(len(cards) == 5)
+        pair = None
+        trio = None
+        for cs in ImmutableCards(cards).value_dict().values():
+            if len(cs) == 2:
+                pair = Pair(*cs)
+            if len(cs) == 3:
+                trio = Trio(*cs)
+            assert_(len(cs) == 0)
+        return cls(pair, trio)
 
 
 class PairSteps(Combination):
-    pass  # TODO
+
+    def __init__(self, pairs):
+        assert_(len(pairs) >= 2)
+        assert_(all((isinstance(p, Pair) for p in pairs)))
+        pairheights = {p.height for p in pairs}
+        assert_(len(pairheights) == len(pairs))  # all pairs have different height
+        assert_(max(pairheights) - min(pairheights) + 1 == len(pairs))  # pairs are consecutive
+        assert_(sum([p.contains_phoenix() for p in pairs]) <= 1)  # phoenix can only be used once
+
+        super().__init__(itertools.chain((p.cards for p in pairs)))
+        self._height = max(pairheights)
+        self._lowest_pair_height = min(pairheights)
+        self._pairs = pairs
+
+    @property
+    def height(self):
+        return self._height
+
+    @classmethod
+    def from_cards(cls, cards):
+        assert_(len(cards) >= 4 and len(cards) % 2 == 0)
+        pairs = []
+        for cs in ImmutableCards(cards).value_dict().values():
+            if len(cs) == 2:
+                pairs.append(Pair(*cs))
+            assert_(len(cs) == 0)
+        return cls(pairs)
+
+    def extend(self, pair):
+        return PairSteps(self._pairs + [pair])
+
+    def can_add(self, pair):
+        return (isinstance(pair, Pair)
+                and not(pair.contains_phoenix() and self.contains_phoenix())
+                and (pair.height + 1 == self._lowest_pair_height or pair.height - 1 == self._height))
+
+    def __lt__(self, other):
+        assert_(len(other) == len(self), self._cant_compare_error(other))
+        return super().__lt__(other)
 
 
 class Straight(Combination):
-    pass  # TODO
+
+    def __init__(self, cards, phoenix_as=None):
+        assert_(len(cards) >= 5)
+        if Card.PHOENIX in cards:
+            assert_(isinstance(phoenix_as, Card))
+            assert_(phoenix_as not in cards)
+            assert_(phoenix_as.suit is not CardSuit.SPECIAL)
+
+        cards_phoenix_replaced = [c for c in cards if c is not Card.PHOENIX] + [phoenix_as]
+        assert_(len([c.card_value for c in cards_phoenix_replaced]) == len(cards_phoenix_replaced))  # different card values
+        cardheights = [c.card_height for c in cards_phoenix_replaced]
+        assert_(max(cardheights) - min(cardheights) + 1 == len(cards_phoenix_replaced))  # cards are consecutive
+
+        super().__init__(cards)
+        self._height = max(cardheights)
+
+    @property
+    def height(self):
+        return self._height
+
+    def __lt__(self, other):
+        assert_(len(other) == len(self), self._cant_compare_error(other))
+        return super().__lt__(other)
 
 
-class SquareBomb(Combination):
-    pass  # TODO
+class Bomb(Combination):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 
-class StraightBomb(Combination):
-    pass  # TODO
+class SquareBomb(Bomb):
+
+    def __init__(self, card1, card2, card3, card4):
+        super().__init__((card1, card2, card3, card4))
+        assert_(len(set(self.cards)) == 4)  # all cards are different
+        # all cards have same card_value (takes also care of the phoenix)
+        assert_(len({c.card_value for c in self.cards}) == 1)
+        self._height = card1.card_height + 500  # 500 to make sure it is higher than any other non bomb combination
+
+    @property
+    def height(self):
+        return self._height
+
+    @classmethod
+    def from_cards(cls, cards):
+        return cls(*cards)
+
+    def __lt__(self, other):
+        if isinstance(other, StraightBomb):
+            return True
+        else:
+            return self.height < other.height
+
+
+class StraightBomb(Bomb):
+
+    def __init__(self, straight):
+        assert_(isinstance(straight, Straight))
+        assert_(len({c.suit for c in straight}) == 1)  # only one suit (takes also care of the phoenix)
+        super().__init__(straight.cards)
+        self._height = straight.height + 1000  # 1000 to make sure it is higher than any other non straightbomb
+
+    @property
+    def height(self):
+        return self._height
+
+    @classmethod
+    def from_cards(cls, cards):
+        return cls(Straight(cards))
+
+    def __lt__(self, other):
+        if isinstance(other, StraightBomb):
+            if len(self) < len(other):
+                return True
+            elif len(self) == len(other):
+                return self.height < other.height
+        return False

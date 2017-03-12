@@ -19,6 +19,18 @@ def assert_(expr, e=AssertionError("personal assert_ failed")):
     bool(expr) or raiser(e)
 
 
+def try_ignore(fun_to_call, *args, **kwargs):
+    """
+    callf fun_to_call with the args and kwargs. If an exeption occures, then ignores it and returns None
+    :param fun_to_call: a function to be called
+    :return: the result of the function call or None if an exception was thrown
+    """
+    try:
+        res = fun_to_call(*args, **kwargs)
+        return res
+    except Exception:
+        return None
+
 class Final(type):
     """
     Class that can not be subclassed.
