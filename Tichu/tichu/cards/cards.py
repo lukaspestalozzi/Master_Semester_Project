@@ -3,8 +3,9 @@ from collections import defaultdict
 from enum import Enum
 
 from tichu.cards.card import Card, CardSuit
+from tichu.cards.partition import Partition
 from tichu.exceptions import LogicError
-from tichu.utils import raiser
+from tichu.utils import raiser, assert_
 
 __author__ = 'Lukas Pestalozzi'
 
@@ -101,24 +102,31 @@ class ImmutableCards(abc.Collection):
         """
         :return: a set of partitions of the cards
         """
-        # TODO speed, use other algorithm
-        # TODO implement
+        # TODO test
+        # remove PHOENIX
+        no_phoenix_cards = [c for c in self._cards if c is not Card.PHOENIX]
 
-        def powerset(seq):
-            """
-            Returns all the possible combinations of this set. This is a generator.
-            """
-            if len(seq) <= 1:
-                yield seq  # single combination
-                yield []
-            else:
-                for item in powerset(seq[1:]):
-                    # item is a list of cards.
-                    # cards_seq[0] is a single card.
-                    yield [seq[0]] + item
-                    yield item
+        # replace Phoenix once with all cards not in cards
+        # TODO handle phoenix
 
-        raise NotImplementedError()
+        # store 'all single' partition
+        final_partitions = set()
+        open_partitions = set()
+        open_partitions.add(Partition([Combination([c]) for c in no_phoenix_cards]))
+
+        done = {}
+
+        # repeat "evolve" until no new partitions are generated
+        while len(open_partitions) > 0:  # for pton in final_partitions:
+            pton = open_partitions.pop()
+            if pton not in done:
+                res = pton.evolve()
+                if len(res) > 0:
+                    open_partitions.update(res)
+                done[pton] = res
+            final_partitions.add(pton)  # TODO question, can be put in if clause?
+
+        return final_partitions
 
     def _value_dict(self):
         """
@@ -129,6 +137,8 @@ class ImmutableCards(abc.Collection):
         for c in self._cards:
             val_dict[c.card_value].append(c)
         return val_dict
+
+    # TODO cache the results -> (only in immutable cards)
 
     def all_bombs(self):
         return self.all_squarebombs().union(self.all_straightbombs())
@@ -141,7 +151,7 @@ class ImmutableCards(abc.Collection):
         return squares
 
     def all_straightbombs(self):
-        return {comb for comb in self.all_straights() if comb.is_bomb()}
+        return {comb for comb in self.all_straights(ignore_phoenix=True) if comb.is_bomb()}
 
     def all_pairs(self, ignore_phoenix=False):
         # TODO speed, sort and then iterate? probably not worth it.
@@ -177,16 +187,27 @@ class ImmutableCards(abc.Collection):
 
         return trios
 
-    def all_straights(self, ignore_phoenix=False):
-        if len(self._cards) < 5:
+    def all_straights(self, length=None, ignore_phoenix=False):
+        """
+
+        :param length: Integer (defualt None), If not None, returns only straights of the given length (must be >=5)
+        :param ignore_phoenix:
+        :return:
+        """
+        assert_(length is None or length >= 5, ValueError("length must be None or >=5, but was: " + str(length)))
+
+        if len(self._cards) < (5 if length is None else length):  # if not enough cards are available, return empty set
             return set()
 
         phoenix = not ignore_phoenix and Card.PHOENIX in self._cards
         straights = set()
 
         def all_straights_rec(remaining, acc_straight, last_height, ph_in_acc=None):
-            if len(acc_straight) >= 5:
+            if length is None and len(acc_straight) >= 5:
                 straights.add(Combination(acc_straight, phoenix_as=ph_in_acc))
+            elif length is not None and len(acc_straight) == length:
+                straights.add(Combination(acc_straight, phoenix_as=ph_in_acc))
+                return None  # no longer straights are searched
 
             if len(remaining) == 0:
                 return None
@@ -200,12 +221,14 @@ class ImmutableCards(abc.Collection):
 
             # same height as last added card
             elif c_height == last_height:
-                all_straights_rec(remaining[1:], acc_straight[:-1] + [cc], c_height, ph_in_acc=ph_in_acc)  # remove last and take cc instead
+                all_straights_rec(remaining[1:], acc_straight[:-1] + [cc], c_height,
+                                  ph_in_acc=ph_in_acc)  # remove last and take cc instead
                 all_straights_rec(remaining[1:], acc_straight, last_height, ph_in_acc=ph_in_acc)  # don't take cc
 
             all_straights_rec(remaining[1:], list(), None, ph_in_acc=None)  # start new straight
 
-            if phoenix and not ph_in_acc and len(acc_straight) > 0 and last_height < 14:  # the phoenix is not yet used and can be used
+            if phoenix and not ph_in_acc and len(
+                    acc_straight) > 0 and last_height < 14:  # the phoenix is not yet used and can be used
                 # take phoenix instead of any other card
                 all_straights_rec(remaining, acc_straight + [Card.PHOENIX], last_height + 1,
                                   ph_in_acc=ImmutableCards._card_val_to_sword_card[last_height + 1])
@@ -219,22 +242,84 @@ class ImmutableCards(abc.Collection):
         all_straights_rec(s_cards, list(), None, ph_in_acc=None)
 
         # append phoenix at the beginning of each straight
+        # TODO integrate into recursion (ie, with each new card > 2 start new straight with [phoenix, card]
         phoenix_prepended = set()
         if phoenix:
             for st in straights:
                 l_card = st.lowest_card
                 if Card.PHOENIX not in st and l_card.card_height > 2:
                     phoenix_prepended.add(Combination([Card.PHOENIX] + st.cards_list,
-                                                      phoenix_as=ImmutableCards._card_val_to_sword_card[l_card.card_height-1]))
+                                                      phoenix_as=ImmutableCards._card_val_to_sword_card[
+                                                          l_card.card_height - 1]))
             straights.update(phoenix_prepended)
 
         return straights
 
+    def all_fullhouses(self, ignore_phoenix=False):
+        pairs = self.all_pairs(ignore_phoenix=ignore_phoenix)
+        trios = self.all_trios(ignore_phoenix=ignore_phoenix)
+        fullhouses = set()
+        for t in trios:
+            for p in pairs:
+                if not (t.contains_phoenix() and p.contains_phoenix()):  # only one phoenix is allowed
+                    fullhouses.add(Combination(t.cards_list + p.cards_list))
+        return fullhouses
+
+    def all_pairsteps(self, ignore_phoenix=False):
+        pairs_s = sorted(list(self.all_pairs(ignore_phoenix=ignore_phoenix)))
+        # TODO speed, may be faster
+        psteps = set()
+        new_ps = set()
+        # find all pairsteps of length 2
+        for p1 in pairs_s:
+            for p2 in pairs_s:
+                if p1 != p2 and abs(p1.value_height - p2.value_height) == 1:
+                    new_ps.add(Combination(p1.cards_list + p2.cards_list))
+
+        # find all longer pairsteps
+        while len(new_ps):
+            ps = new_ps.pop()
+            if ps not in psteps:
+                for pair in pairs_s:
+                    if ps.can_add(pair):
+                        new_ps.add(ps.extend(pair))
+                psteps.add(ps)
+
+        return psteps
+
+    def all_combinations(self, played_on=None, ignore_phoenix=False):
+        """
+        :return: a set of all possible combinations appearing in this cards instance
+        """
+        combs = set()
+        if played_on is None:
+            combs.update([Combination([c]) for c in self._cards])  # single cards
+            combs.update(self.all_bombs())
+            combs.update(self.all_pairs(ignore_phoenix=ignore_phoenix))
+            combs.update(self.all_trios(ignore_phoenix=ignore_phoenix))
+            combs.update(self.all_straights(ignore_phoenix=ignore_phoenix))
+            combs.update(self.all_fullhouses(ignore_phoenix=ignore_phoenix))
+            combs.update(self.all_pairsteps(ignore_phoenix=ignore_phoenix))
+        elif isinstance(played_on, Combination):
+            combs.update([b for b in self.all_bombs() if played_on < b])
+            if played_on.ispair():
+                combs.update([c for c in self.all_pairs() if played_on < c])
+            if played_on.ispairstep():
+                combs.update([c for c in self.all_pairsteps() if played_on < c])
+            if played_on.istrio():
+                combs.update([c for c in self.all_trios() if played_on < c])
+            if played_on.isstraight():
+                combs.update([c for c in self.all_straights(length=played_on.length()) if played_on < c])
+            if played_on.isfullhouse():
+                combs.update([c for c in self.all_fullhouses() if played_on < c])
+
+        return combs
+
     def __str__(self):
-        return type(self).__name__+self._str
+        return type(self).__name__ + self._str
 
     def __repr__(self):
-        return type(self).__name__+self._repr
+        return type(self).__name__ + self._repr
 
     def __len__(self):
         return len(self._cards)
@@ -332,7 +417,6 @@ class CombinationType(Enum):
 
 
 class Combination(ImmutableCards):
-
     def __init__(self, cards, phoenix_as=None):
         """
         :param cards: an iterable of Card instances.
@@ -342,20 +426,24 @@ class Combination(ImmutableCards):
         """
         has_phoenix = Card.PHOENIX in cards
         if has_phoenix:
-            if len(cards) == 1:   # A phoenix played alone is a valid combination. But the phoenix counts 1/2 higher than the last played combination.
+            if len(
+                    cards) == 1:  # A phoenix played alone is a valid combination. But the phoenix counts 1/2 higher than the last played combination.
                 phoenix_as = Card.PHOENIX
             elif phoenix_as is None:
                 raise ValueError("When The phoenix appears in the cards, then phoenix_as must be a Card.")
             elif not isinstance(phoenix_as, Card):
                 raise ValueError("The phoenix_as must be a Card.")
             elif phoenix_as in cards:
-                raise ValueError("The phoenix can't take on a card already in the combination. \ncards:{} \nphoenix: {}".format(cards, phoenix_as))
+                raise ValueError(
+                    "The phoenix can't take on a card already in the combination. \ncards:{} \nphoenix: {}".format(
+                        cards, phoenix_as))
             elif phoenix_as.suit is CardSuit.SPECIAL:
                 raise ValueError("The phoenix can't take on a special card.")
 
         super().__init__(cards)
         self._phoenix = phoenix_as if has_phoenix else None
-        self._cards_with_phoenix_replaced = frozenset([c for c in self._cards if c is not Card.PHOENIX] + [self._phoenix]) if self._phoenix else self._cards
+        self._cards_with_phoenix_replaced = frozenset(
+            [c for c in self._cards if c is not Card.PHOENIX] + [self._phoenix]) if self._phoenix else self._cards
         self._comb_type = self._find_combination_type()
         if self._comb_type is None:
             raise ValueError("This is no valid combination {}.".format(str(sorted(cards))))
@@ -373,7 +461,8 @@ class Combination(ImmutableCards):
     @property
     def short_string(self):
         # TODO precompute
-        return "{} ({})".format(self.type, ', '.join(["{}_{}".format(c.card_value.name, c.suit.shortname) for c in self._cards]))
+        return "{} ({})".format(self.type,
+                                ', '.join(["{}_{}".format(c.card_value.name, c.suit.shortname) for c in self._cards]))
 
     @property
     def card_value_tuple(self):
@@ -453,7 +542,8 @@ class Combination(ImmutableCards):
             # a straight is strictly higher if it is longer.
             # combination value + length (-5 because it is at least 5 long) + height of lowest card
             assert len(self._cards) >= 5
-            return self._comb_type.numeric_value + 20 * (len(self._cards) - 5) + min(self._cards, key=lambda x: x.card_height).card_height
+            return self._comb_type.numeric_value + 20 * (len(self._cards) - 5) + min(self._cards, key=lambda
+                x: x.card_height).card_height
 
         else:  # in all other cases, the highest card counts.
             return self._comb_type.numeric_value + max(self._cards, key=lambda x: x.card_height).card_height
@@ -461,7 +551,8 @@ class Combination(ImmutableCards):
     def __str__(self):
         # TODO speed, precompute this string
         cards_str = '; '.join([str(c) for c in self._cards])
-        return "Comb({}, height:{}, phoenix: {}, cards:[{}])".format(str(self.type.name), str(self.height), str(self._phoenix), cards_str)
+        return "Comb({}, height:{}, phoenix: {}, cards:[{}])".format(str(self.type.name), str(self.height),
+                                                                     str(self._phoenix), cards_str)
 
     def __lt__(self, other):
         # TODO Test!!
@@ -480,7 +571,9 @@ class Combination(ImmutableCards):
             raise TypeError("Can't compare {} to {}, must be the same class".format(self.__repr__(), other.__repr__()))
 
         elif self.type is CombinationType.DOG or other.type is CombinationType.DOG:
-            raise TypeError("Can't compare {} to {}, Dog can't be compared to any other combination.".format(self.__repr__(), other.__repr__()))
+            raise TypeError(
+                "Can't compare {} to {}, Dog can't be compared to any other combination.".format(self.__repr__(),
+                                                                                                 other.__repr__()))
 
         elif self.is_bomb() and other.is_bomb():
             # same type -> height decides; self is SQUAREBOMB other is STRAIGHTBOMB -> True; self is STRAIGHTBOMB other is SQUAREBOMB -> False
@@ -493,7 +586,8 @@ class Combination(ImmutableCards):
             return True
 
         elif self.type is CombinationType.SINGLE_MAHJONG:
-            return other.type in {CombinationType.SINGLE_PHOENIX, CombinationType.SINGLE_CARD, CombinationType.DRAGON} or other.is_bomb() or raiser(cant_compare_ex)
+            return other.type in {CombinationType.SINGLE_PHOENIX, CombinationType.SINGLE_CARD,
+                                  CombinationType.DRAGON} or other.is_bomb() or raiser(cant_compare_ex)
 
         elif self.type is CombinationType.SINGLE_PHOENIX:
             return (False if other.type is CombinationType.SINGLE_MAHJONG else
@@ -507,14 +601,16 @@ class Combination(ImmutableCards):
                     else raiser(cant_compare_ex))
 
         elif self.type is CombinationType.DRAGON:
-            return (False if other.type in {CombinationType.SINGLE_CARD, CombinationType.SINGLE_PHOENIX, CombinationType.SINGLE_MAHJONG}
+            return (False if other.type in {CombinationType.SINGLE_CARD, CombinationType.SINGLE_PHOENIX,
+                                            CombinationType.SINGLE_MAHJONG}
                     else raiser(cant_compare_ex))
 
         elif self.type is CombinationType.PAIR or self.type is CombinationType.TRIO or self.type is CombinationType.FULLHOUSE:
             return self.height < other.height if other.type is self.type else raiser(cant_compare_ex)
 
         elif self.type is CombinationType.PAIR_STEPS or self.type is CombinationType.STRAIGHT:
-            return self.height < other.height if other.type is self.type and len(self) == len(other) else raiser(cant_compare_ex)
+            return self.height < other.height if other.type is self.type and len(self) == len(other) else raiser(
+                cant_compare_ex)
 
     def __le__(self, other):
         return self.__lt__(other) or self.__eq__(other)
@@ -575,7 +671,7 @@ class Combination(ImmutableCards):
     def is_fullhouse(cards):
         if len(cards) != 5:
             return False
-        d = defaultdict(lambda : 0)
+        d = defaultdict(lambda: 0)
         for c in cards:
             d[c.card_value] += 1
         return len(d) == 2 and 2 in d.values() and 3 in d.values()
@@ -587,10 +683,10 @@ class Combination(ImmutableCards):
         sorted_cards = sorted(cards)
         k = 0
         min_height = min([c.card_height for c in cards])
-        cardrange = range(min_height, min_height + len(cards)//2)
+        cardrange = range(min_height, min_height + len(cards) // 2)
         while k < len(sorted_cards):
             if (sorted_cards[k].card_height not in cardrange
-                    or not Combination.is_pair(sorted_cards[k:k + 2])):
+                or not Combination.is_pair(sorted_cards[k:k + 2])):
                 return False
             k += 2
         return True
@@ -613,4 +709,33 @@ class Combination(ImmutableCards):
         return Combination.is_straight(cards) and all([c.suit == suit for c in cards])
 
 
+class Single(Combination):
+    pass  # TODO
 
+
+class Pair(Combination):
+    pass  # TODO
+
+
+class Trio(Combination):
+    pass  # TODO
+
+
+class FullHouse(Combination):
+    pass  # TODO
+
+
+class PairSteps(Combination):
+    pass  # TODO
+
+
+class Straight(Combination):
+    pass  # TODO
+
+
+class SquareBomb(Combination):
+    pass  # TODO
+
+
+class StraightBomb(Combination):
+    pass  # TODO

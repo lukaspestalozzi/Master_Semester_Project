@@ -92,7 +92,7 @@ class Partition(abc.Collection):
             for comb2 in self._combs:
                 # print("comb1:", comb1)
                 # print("comb2:", comb2)
-                if comb2 == comb1:
+                if comb2 == comb1 or comb1.is_dog() or comb1.is_dragon() or comb2.is_dog() or comb2.is_dragon():
                     # print("-> same, continue")
                     continue
                 t1 = comb1.type
