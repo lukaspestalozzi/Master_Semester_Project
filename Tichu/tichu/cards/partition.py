@@ -1,7 +1,10 @@
 from collections import abc
 
-from tichu.cards.cards import ImmutableCards
-from tichu.cards.cards import Combination, CombinationType
+from tichu.cards.cards import Single, Trio, Pair, Straight, StraightBomb, PairSteps, ImmutableCards
+from tichu.cards.cards import Combination
+
+__author__ = 'Lukas Pestalozzi'
+__all__ = ['Partition']
 
 
 class Partition(abc.Collection):
@@ -39,34 +42,25 @@ class Partition(abc.Collection):
         """
         :param combs: The combs must occure in this Partition and must constitute a valid combination when merged
         :return: Returns a Partition with the two combs merged.
-        try:
-            l = []
-            for comb in combs:
-                l.extend(comb.cards_list)
-            return Partition(self._combs.difference(set(combs)).union({Combination(l)}))
-        except Exception as e:
-            raise ValueError("Cant merge those combs in this Partition, {}".format(e))
         """
         l = []
         for comb in combs:
             l.extend(comb.cards_list)
-        return Partition(self._combs.difference(set(combs)).union({Combination(l)}))
+        return Partition(self._combs.difference(set(combs)).union({Combination.make(l)}))
 
     def find_all_straights(self):
         """
-
         :return: all possible Partitions created from merging single combinations to a straight
         """
 
-        single_cards = ImmutableCards([comb.any_card for comb in self._combs if comb.type is CombinationType.SINGLE_CARD
-                        or comb.type is CombinationType.SINGLE_MAHJONG])
+        single_cards = ImmutableCards([comb.card for comb in self._combs if isinstance(comb, Single)])
         if len(single_cards) < 5:
             return set()
 
         straights = single_cards.all_straights()
         partitions = set()
         for st in straights:
-            stcombs = [Combination([s]) for s in st]
+            stcombs = [Straight(*s) for s in st]
             partitions.add(self.merge(stcombs))
 
         return partitions
@@ -79,14 +73,6 @@ class Partition(abc.Collection):
         # TODO only look at card values -> handle straightbomb
         # TODO handle phoenix
 
-        def single_same_valued(val_single1, val_comb2, type2):
-            return (val_single1 is val_comb2 and (type2 is CombinationType.SINGLE_CARD
-                                               or type2 is CombinationType.PAIR
-                                               or type2 is CombinationType.TRIO))
-
-        def single_step(height_single, min_height2, max_height2):
-            return height_single - 1 == max_height2 or height_single + 1 == min_height2
-
         new_partitions = set()
         for comb1 in self._combs:
             for comb2 in self._combs:
@@ -95,32 +81,28 @@ class Partition(abc.Collection):
                 if comb2 == comb1 or comb1.is_dog() or comb1.is_dragon() or comb2.is_dog() or comb2.is_dragon():
                     # print("-> same, continue")
                     continue
-                t1 = comb1.type
-                t2 = comb2.type
-                any_card1 = comb1.any_card
 
                 # single + single, pair, trio
-                if t1 is CombinationType.SINGLE_CARD and single_same_valued(any_card1.card_value, comb2.any_card.card_value, t2):
+                if isinstance(comb1, Single) and isinstance(comb2, (Single, Pair, Trio)) and comb1.height == comb2.height:
                     # print("-> single + single, pair, trio")
                     new_partitions.add(self.merge([comb1, comb2]))
 
                 # single + straight -> longer straight
-                if ((t1 is CombinationType.SINGLE_CARD or t1 is CombinationType.SINGLE_MAHJONG) and (t2 is CombinationType.STRAIGHT or t2 is CombinationType.STRAIGHTBOMB)
-                        and single_step(any_card1.card_height, comb2.lowest_card.card_height, comb2.highest_card.card_height)):
+                if isinstance(comb1, Single) and isinstance(comb2, (Straight, StraightBomb)) and comb2.can_add(comb1):
                     # print("-> single + straight -> longer straight")
                     new_partitions.add(self.merge([comb1, comb2]))
 
-                if t1 is CombinationType.PAIR:
-                    if t2 is t1 and (any_card1.card_value is comb2.any_card.card_value or abs(any_card1.card_height - comb2.any_card.card_height) == 1):
-                        # Pair + Pair -> squarebomb or pairstep
+                if isinstance(comb1, Pair):
+                    if isinstance(comb2, Pair) and abs(comb1.height - comb2.height) <= 1:
+                        # Pair + Pair -> squarebomb (diff is 0) or pairstep (diff is 1)
                         # print("-> Pair + Pair -> squarebomb or pairstep")
                         new_partitions.add(self.merge([comb1, comb2]))
 
-                    if t2 is CombinationType.TRIO:  # Pair + Trio -> Fullhouse
+                    if isinstance(comb2, Trio):  # Pair + Trio -> Fullhouse
                         # print("-> Pair + Trio -> Fullhouse")
                         new_partitions.add(self.merge([comb1, comb2]))
 
-                    if t2 is CombinationType.PAIR_STEPS and single_step(any_card1.card_height, comb2.lowest_card.card_height, comb2.highest_card.card_height):
+                    if isinstance(comb2, PairSteps) and comb2.can_add(comb1):
                         # Pair + Pairsteps -> pairstep
                         # print("-> Pair + Pairsteps -> pairstep")
                         new_partitions.add(self.merge([comb1, comb2]))

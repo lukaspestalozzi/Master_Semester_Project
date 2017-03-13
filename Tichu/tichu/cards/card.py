@@ -1,5 +1,8 @@
 from enum import Enum
 
+__author__ = 'Lukas Pestalozzi'
+__all__ = ['CardValue', 'CardSuit', 'Card']
+
 
 class ComparableEnum(Enum):
     """
@@ -52,13 +55,13 @@ class CardValue(ComparableEnum):
     DOG = 0
 
     def __init__(self, _):
-        if self.value is 5:
+        if self.value == 5:
             self._points = 5
         elif self.value in [10, 13]:
             self._points = 10
-        elif self.value is 15:
+        elif self.value == 15:
             self._points = 25
-        elif self.value is 1.5:
+        elif self.value == 1.5:
             self._points = -25
         else:
             self._points = 0
@@ -178,8 +181,8 @@ class Card(ComparableEnum):
 
         # precompute strings and hashe
         self._hash = hash((cardvalue, cardsuit))
-        self._str = "Card({}, {})".format(str(self._cardvalue.name), str(self._suit.shortname))
-        self._repr = self._str  # "Card({}, {})".format(repr(self._cardvalue), repr(self._suit))
+        self._str = "<{}, {}>".format(str(self._cardvalue.name), str(self._suit.shortname))
+        self._repr = "Card({}, {})".format(repr(self._cardvalue), repr(self._suit))
 
     @property
     def suit(self):

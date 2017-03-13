@@ -1,8 +1,8 @@
 import random
 
 from tichu.agents.abstractagent import BaseAgent
-from tichu.cards.card import Card, CardValue
-from tichu.cards.cards import Combination
+from tichu.cards.card import CardValue
+from tichu.cards.cards import Single
 from tichu.game.gameutils import Card_To
 
 
@@ -31,7 +31,7 @@ class PassingAgent(BaseAgent):
 
     def play_first(self, hand_cards, round_history):
         card = next(iter(hand_cards))
-        comb = Combination(cards=[card], phoenix_as=Card.PHOENIX)
+        comb = Single(card)
         return comb
 
     def swap_cards(self, hand_cards):

@@ -8,7 +8,7 @@ def raiser(ex):
     raise ex
 
 
-def assert_(expr, e=AssertionError("personal assert_ failed")):
+def assert_(expr, e=None, msg="personal assert_ failed"):
     """
     Raises an Exception when expr evaluates to False.
 
@@ -16,7 +16,7 @@ def assert_(expr, e=AssertionError("personal assert_ failed")):
     :param e: (default AssertionError) exception to raise.
     :return: None
     """
-    bool(expr) or raiser(e)
+    bool(expr) or raiser(AssertionError(msg) if not e else e)
 
 
 def try_ignore(fun_to_call, *args, **kwargs):

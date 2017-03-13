@@ -4,7 +4,7 @@ from tichu.cards.card import Card
 from tichu.cards.cards import ImmutableCards, Cards
 from tichu.exceptions import IllegalActionException
 from tichu.players.tichuplayers import PlayerAction, TichuPlayer
-from tichu.utils import assert_, raiser
+from tichu.utils import assert_
 
 
 class Team(namedtuple("T", ["player1", "player2"])):
@@ -318,6 +318,10 @@ class RoundState(object):
         else:
             return self._current_trick.last_combination()
 
+    @property
+    def last_finished_trick(self):
+        return self._tricks_handcards[-1].trick if len(self._tricks_handcards) > 0 else None
+
     # ###### Tichus #######
     def announce_grand_tichu(self, player_id):
         self._announced_grand_tichus.add(player_id)
@@ -368,8 +372,10 @@ class RoundState(object):
             rs._announced_tichus = self.announced_tichus
             rs._tricks_handcards = [TrickHandcards(trick=t_h.trick, handcards=t_h.handcards.copy(save=save))
                                     for t_h in self._tricks_handcards]
+            rs._current_trick = self._current_trick.finish()
             rs._ranking = self.ranking
             rs._points = self._points
+            return rs
         else:
             raise ValueError("save must be one of [False, 0, 1, 2, 3] but was: "+str(save))
 
@@ -410,12 +416,7 @@ class TichuRoundHistory(namedtuple("RoundHistory", ["initial_points", "final_poi
         super().__init__()
 
     def last_combination(self):
-        k = len(self.actions) - 1
-        ac = self.actions[k]
-        while ac.is_pass() and k >= 0:
-            k -= 1
-            ac = self.actions[k]
-        return ac
+        return self.tricks[-1].last_combinaion if len(self.tricks) > 0 else None
 
     def copy(self, save=False):
         """
@@ -437,8 +438,9 @@ class TichuRoundHistory(namedtuple("RoundHistory", ["initial_points", "final_poi
                                      self.complete_hands.copy(save=save), self.announced_grand_tichus, self.announced_tichus, self.tricks,
                                      tuple([hc.copy(save=save) for hc in self.handcards]), self.ranking)
 
+
 class Trick(object):
-    """ List of PlayerActions """
+    """ (Immutable) List of PlayerActions """
 
     def __init__(self, actions):
         assert_(all([isinstance(a, PlayerAction) for a in actions]))
@@ -450,6 +452,10 @@ class Trick(object):
     def combinations(self):
         return [a.combination for a in self._actions if not a.is_pass()]
 
+    @property
+    def points(self):
+        return self.sum_points()
+
     def is_dragon_trick(self):
         return Card.DRAGON in self.last_combination()
 
@@ -460,7 +466,7 @@ class Trick(object):
         return self._actions[-1] if len(self._actions) > 0 else None
 
     def sum_points(self):
-        return sum([comb.count_points() for comb in self.combinations])
+        return sum([comb.points for comb in self.combinations])
 
     def copy(self):
         return Trick(self._actions)

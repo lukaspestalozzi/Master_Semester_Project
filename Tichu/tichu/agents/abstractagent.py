@@ -52,7 +52,7 @@ class BaseAgent(metaclass=abc.ABCMeta):
         # TODO describe
 
     @abc.abstractmethod
-    def play_first(self, hand_cards, round_history):
+    def play_first(self, hand_cards, round_history, wish):
         """
 
         :param round_history:

@@ -11,7 +11,7 @@ from tichu.exceptions import IllegalActionException, LogicError
 from tichu.game.gameutils import GameState, Team, HandCardSnapshot, SwapCards
 from tichu.utils import assert_
 
-GameOutcome = namedtuple("GameOutcome", ['team1', 'team2', 'points', 'game_history'])
+GameOutcome = namedtuple("GameOutcome", ['points', 'team1', 'team2', 'game_history'])
 
 
 class TichuGame(object):
@@ -33,14 +33,14 @@ class TichuGame(object):
         # init logger # TODO log to file and init logger from json file
         logging.basicConfig(format='%(levelname)s [%(module)s]:%(message)s',
                             datefmt='%Y.%m.%d %H:%M:%S',
-                            level=logging.DEBUG)  # TODO logging; filename='example.log',
+                            level=logging.INFO)  # TODO logging; filename='example.log',
 
     def start_game(self):
         """
         Starts the tichu
         Returns a tuple containing the two teams, the winner team, and the tichu history
         """
-        logging.debug("Start game...")
+        logging.info("Starting game...")
 
         for k in range(4):
             self._players[k].new_game(k, (k+2) % 4)
@@ -61,7 +61,7 @@ class TichuGame(object):
                               points=final_points,
                               game_history=self._history.build())
 
-        logging.debug("Game ended: "+str(outcome))
+        logging.info("Game ended: {go.points}".format(go=outcome))
 
         return outcome
 
@@ -69,7 +69,7 @@ class TichuGame(object):
         # TODO what to do when both teams may win in this round.
 
         roundstate = self._history.start_new_round()
-        logging.debug("Start round, with points: "+str(roundstate.initial_points))
+        logging.info("Start round, with points: "+str(roundstate.initial_points))
 
         # inform players about new round
         for player in self._players:
@@ -91,9 +91,10 @@ class TichuGame(object):
         # round-loop
         leading_player = self._mahjong_player()
 
-        while len(roundstate.ranking) < 3:  # while more than 1 player has cards left
-            leading_player = self._run_trick(leading_player=leading_player)
-            # TODO update round history
+        wish = None
+        # trick's loop
+        while len(roundstate.ranking) < 3 and not roundstate.is_double_win():
+            leading_player, wish = self._run_trick(leading_player=leading_player, wish=wish)
 
             if leading_player.has_finished:  # if the leading player has already finished
                 leading_player = self._next_to_play(leading_player.position)
@@ -103,9 +104,12 @@ class TichuGame(object):
 
         roundstate.points = (score_t1, score_t2)
 
+        logging.info("Round ends, with points: {}".format(roundstate.points))
+        logging.debug("------------------------------------------------------------")
+
         return (score_t1, score_t2)
 
-    def _run_trick(self, leading_player):
+    def _run_trick(self, leading_player, wish):
         """
         Leads through a trick (and updates the tichu state accordingly)
         :param leading_player: the Player to  play first.
@@ -113,23 +117,25 @@ class TichuGame(object):
         """
 
         rs = self._history.current_round  # current round state
-        logging.debug("run trick..., points: {}".format(rs.points))
+        logging.info("start trick...")
 
         trick_ended = False
         next_to_play = leading_player
         nbr_pass = 0
-        wish = None
-        while nbr_pass < 3 and not trick_ended:
+        while not trick_ended:
             assert not next_to_play.has_finished
+            logging.info("Next to play -> {}.".format(next_to_play.name))
             played_action = None
             if rs.current_trick.is_empty():  # first play of the trick
-                played_action = next_to_play.play_first(game_history=self._history)
+                played_action = next_to_play.play_first(game_history=self._history, wish=wish)
             else:
                 played_action = next_to_play.play_combination(game_history=self._history, wish=wish)
 
             if played_action.is_pass():
+                logging.info("[PASS] {}.".format(next_to_play.name))
                 nbr_pass += 1
             else:  # if trick
+                logging.info("[PLAY] {}: {}.".format(next_to_play.name, played_action.combination))
                 # handle tichu
                 if played_action.is_tichu() and next_to_play.can_announce_tichu():
                     rs.announce_tichu(next_to_play.position)
@@ -143,25 +149,30 @@ class TichuGame(object):
                 nbr_pass = 0
 
                 # verify wish
-                if wish is not None and not played_action.is_pass() and wish in {c.card_value for c in played_action.combination}:
+                if wish is not None and not played_action.is_pass() and played_action.combination.fulfills_wish(wish):
                     wish = None  # wish is satisfied
 
                 # handle Mahjong (ask for wish)
                 if Card.MAHJONG in played_action.combination:
                     wish = next_to_play.wish(game_history=self._history)
+                    logging.info("[WISH] {}: {}".format(next_to_play.name, wish))
 
                 # if the players finished with this move
                 if next_to_play.has_finished:
                     rs.ranking_append_player(next_to_play.position)
+                    logging.info("[FINISH] {}.".format(next_to_play.name))
 
                     # test doppelsieg
-                    trick_ended = rs.is_double_win() or trick_ended
+                    if rs.is_double_win():
+                        trick_ended = True
 
                     # test whether 3rd players to win and thus ends the trick.
                     # (3rd to win automatically gets the last trick)
                     if len(rs.ranking) == 3:
                         rs.ranking_append_player(self._next_to_play(next_to_play.position).position)  # add last players
                         trick_ended = True
+
+                    logging.debug("Ranking: {}".format(rs.ranking))
 
                 # handle dog
                 if Card.DOG in played_action.combination:
@@ -175,17 +186,23 @@ class TichuGame(object):
                 bomb_action = self._ask_for_bomb(next_to_play.position)
                 while bomb_action is not None:
                     bomb_player = bomb_action.player
+                    logging.info("[BOMB] {}: {}.".format(bomb_player.name, bomb_action.combination))
                     rs.current_trick.add(bomb_action)  # update the trick on the table
                     leading_player = bomb_player  # update the leading players
                     next_to_play = self._next_to_play(bomb_player.position)
                     nbr_pass = 0
+                    trick_ended = True  # can only play bombs on a bomb
                     # ask again for bomb
                     bomb_action = self._ask_for_bomb(next_to_play.position)
 
             # determine the next player to play
             next_to_play = self._next_to_play(next_to_play.position)
 
-        # end-while
+            # test the pass count
+            if nbr_pass >= 3:
+                trick_ended = True
+
+            # end-while
 
         # give the trick to the correct player.
         receiving_player = leading_player
@@ -193,12 +210,14 @@ class TichuGame(object):
             receiving_player = self._players[leading_player.give_dragon_away(self._history)]
 
         # give trick to the receiving player
-        receiving_player.tricks.append(rs.current_trick.finish())
+        receiving_player.add_trick(rs.current_trick.finish())
 
         rs.finish_trick(self.make_handcards_snapshot())
 
-        # return the leading player
-        return leading_player
+        logging.info("[WIN TRICK] {}: {}".format(next_to_play.name, rs.last_finished_trick))
+
+        # return the leading player and the wish
+        return leading_player, wish
 
     def make_handcards_snapshot(self):
         return HandCardSnapshot(*[ImmutableCards(pl.hand_cards) for pl in self._players])
@@ -219,32 +238,44 @@ class TichuGame(object):
         :return a tuple (points of team 1, points of team 2) ie. (point of players 0 and 2, point of players 1 and 3)
         """
         rs = self._history.current_round
+        logging.info("Finishing Round, ranking: {}".format(rs.ranking))
 
         winner_pos = rs.ranking[0]
         # grand + normal tichu
         points = self._calculate_tichu_points()
+        logging.debug("points after tichu: {}".format(points))
 
         # doppelsieg
         if rs.is_double_win():
+            logging.info("[DOUBLE WIN]")
             points[winner_pos] += 200
         else:
+            logging.info("No double win")
             loosing_pos = rs.ranking[-1]
             # last players gives hand_card points to enemy ...
             loosing_handcard_points = self._players[loosing_pos].remove_hand_cards().count_points()
             points[(loosing_pos+1) % 4] += loosing_handcard_points
 
+            logging.debug("points after hands to enemy: {}; {}+={}".format(points, (loosing_pos+1) % 4, loosing_handcard_points))
+
             # ... and tricks to first players
-            loosing_trick_points = sum([trick.sum_points() for trick in self._players[loosing_pos].remove_tricks()])
+            loosing_trick_points = self._players[loosing_pos].count_points_in_tricks()
             points[winner_pos] += loosing_trick_points
+            self._players[loosing_pos].remove_tricks()
+
+            logging.debug("points after tricks to first: {}; {}+={}".format(points, winner_pos, loosing_trick_points))
 
             # count points in tricks
             for player_pos in range(4):
-                points[player_pos] += sum([trick.sum_points() for trick in self._players[player_pos].tricks])
+                points[player_pos] += self._players[player_pos].count_points_in_tricks()
+            logging.debug("points after trick counting: {}".format(points))
 
-            # remove handcards and tricks
-            for player in self._players:
-                player.remove_hand_cards()
-                player.remove_tricks()
+        # remove handcards and tricks
+        for player in self._players:
+            player.remove_hand_cards()
+            player.remove_tricks()
+
+        logging.debug("points: {}".format(points))
 
         return (points[0] + points[2], points[1] + points[3])
 
