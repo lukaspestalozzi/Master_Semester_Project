@@ -67,7 +67,7 @@ class CardValue(ComparableEnum):
             self._points = 0
 
         self._repr = "CardValue({} {})".format(self.name, self.value)
-        self._str = self.name
+        self._str = self.name if self.value > 10 else str(self.value)
 
     @property
     def height(self):
@@ -78,7 +78,7 @@ class CardValue(ComparableEnum):
         return self._points
 
     def __repr__(self):
-        return self._repr
+        return self._str
 
     def __str__(self):
         return self._str
@@ -181,7 +181,7 @@ class Card(ComparableEnum):
 
         # precompute strings and hashe
         self._hash = hash((cardvalue, cardsuit))
-        self._str = "<{}, {}>".format(str(self._cardvalue.name), str(self._suit.shortname))
+        self._str = "<{}, {}>".format(str(self._cardvalue), str(self._suit.shortname))
         self._repr = "Card({}, {})".format(repr(self._cardvalue), repr(self._suit))
 
     @property
@@ -211,7 +211,7 @@ class Card(ComparableEnum):
         return not self.__eq__(other)
 
     def __repr__(self):
-        return self._repr
+        return self._str
 
     def __str__(self):
         return self._str

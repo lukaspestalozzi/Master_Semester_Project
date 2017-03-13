@@ -137,56 +137,106 @@ class ImmutableCards(collectionsabc.Collection):
     # TODO cache the results -> (only in immutable cards)
 
     def all_bombs(self):
-        return self.all_squarebombs().union(self.all_straightbombs())
+        return itertools.chain(self.all_squarebombs(), self.all_straightbombs())
 
     def all_squarebombs(self):
-        squares = set()
         for l in self.value_dict().values():
             if len(l) == 4:
-                squares.add(SquareBomb(*l))
-        return squares
+                yield SquareBomb(*l)
 
     def all_straightbombs(self):
-        s_bombs = set()
         for st in self.all_straights(ignore_phoenix=True):
             sb = try_ignore(lambda: StraightBomb(st))
-            s_bombs.add(sb) if sb else None  # one line :)
-        return s_bombs
+            if sb:
+                yield sb
 
     def all_pairs(self, ignore_phoenix=False):
         # TODO speed, sort and then iterate? probably not worth it.
-        pairs = set()
         if not ignore_phoenix and Card.PHOENIX in self._cards:
             for c in self._cards:
                 if c.suit is not CardSuit.SPECIAL:
-                    pairs.add(Pair(c, Card.PHOENIX))
+                    yield Pair(c, Card.PHOENIX)
 
         for c1 in self._cards:
             for c2 in self._cards:
-                if c1 is c2:
-                    continue
-                elif c1.card_value is c2.card_value:
-                    pairs.add(Pair(c1, c2))
-
-        return pairs
+                if c1 is not c2 and c1.card_value is c2.card_value:
+                    yield Pair(c1, c2)
 
     def all_trios(self, ignore_phoenix=False):
         # TODO speed, but probably not worth it.
-        trios = set()
         if not ignore_phoenix and Card.PHOENIX in self._cards:
             for p in self.all_pairs(ignore_phoenix=True):
-                trios.add(Trio(Card.PHOENIX, *p.cards))
+                yield Trio(Card.PHOENIX, *p.cards)
 
         for l in self.value_dict().values():
             if len(l) == 3:
-                trios.add(Trio(*l))
+                yield Trio(*l)
             elif len(l) == 4:
-                trios.add(Trio(*l[:3]))  # 0, 1, 2
-                trios.add(Trio(*l[1:]))  # 1, 2, 3
-                trios.add(Trio(*l[2:], *l[:1]))  # 2, 3, 0
-                trios.add(Trio(*l[3:], *l[:2]))  # 3, 0, 1
+                yield Trio(*l[:3])  # 0, 1, 2
+                yield Trio(*l[1:])  # 1, 2, 3
+                yield Trio(*l[2:], *l[:1])  # 2, 3, 0
+                yield Trio(*l[3:], *l[:2])  # 3, 0, 1
 
-        return trios
+    def all_straights_gen(self, length=None, ignore_phoenix=False):
+        assert_(length is None or length >= 5, msg="length must be None or >=5, but was: " + str(length))
+
+        if len(self._cards) < (5 if length is None else length):
+            # if not enough cards are available, return.
+            return
+        else:
+            sorted_cards = sorted([c for c in self._cards
+                                   if c is not Card.PHOENIX and c is not Card.DOG and c is not Card.DRAGON],
+                                  key=lambda c: c.card_value)
+
+            next_c = defaultdict(lambda: [])  # card val height -> list of cards
+            for c in sorted_cards:
+                next_c[c.card_height - 1].append(c)
+
+            def gen_from(card, remlength, ph):
+                if remlength <= 1:
+                    yield [card]  # finish a straight with this card
+
+                # a straight for all possible continuations
+                for nc in next_c[card.card_height]:
+                    for st in gen_from(nc, remlength - 1, ph=ph):
+                        yield [card] + st
+
+                # Phoenix:
+                if ph is None and not ignore_phoenix:
+                    if remlength <= 2 and card.card_value is not CardValue.A:
+                        phoenix_as = ImmutableCards._card_val_to_sword_card[card.card_height + 1]
+                        yield [card, (Card.PHOENIX, phoenix_as)]  # finish the straight with the Phoenix
+
+                    # take phoenix instead of card
+                    if card is not Card.MAHJONG:
+                        for nc in next_c[card.card_height]:
+                            for st in gen_from(nc, remlength - 1, ph=card):
+                                yield [(Card.PHOENIX, card)] + st
+
+                    # take phoenix to jump a value
+                    phoenix_as = ImmutableCards._card_val_to_sword_card[card.card_height + 1]
+                    for nc in next_c[card.card_height+1]:
+                        for st in gen_from(nc, remlength - 2, ph=phoenix_as):
+                            yield [card, (Card.PHOENIX, phoenix_as)] + st
+
+            def gen_all_straights():
+                for c in sorted_cards:
+                    if c.card_value <= CardValue.TEN:
+                        yield from gen_from(c, 5, ph=None)  # all straights starting with normal card
+                        if c.card_value > CardValue.TWO and not ignore_phoenix:
+                            # all straights starting with the Phoenix
+                            phoenix = ImmutableCards._card_val_to_sword_card[c.card_height - 1]
+                            for st in gen_from(c, 4, ph=phoenix):
+                                yield [(Card.PHOENIX, phoenix)] + st
+
+            for st in gen_all_straights():
+                try:
+                    (phoenix, phoenix_as) = next(elem for elem in st if isinstance(elem, tuple))
+                    st.remove((phoenix, phoenix_as))  # TODO switch to dictionaries {card->card, phoenix->card ...}
+                    st.append(phoenix)
+                    yield Straight(st, phoenix_as=phoenix_as)
+                except StopIteration:
+                    yield Straight(st)
 
     def all_straights(self, length=None, ignore_phoenix=False):
         """
@@ -251,16 +301,12 @@ class ImmutableCards(collectionsabc.Collection):
         return straights
 
     def all_fullhouses(self, ignore_phoenix=False):
-        pairs = self.all_pairs(ignore_phoenix=ignore_phoenix)
-        trios = self.all_trios(ignore_phoenix=ignore_phoenix)
-        fullhouses = set()
-        for t in trios:
-            for p in pairs:
+        for t in self.all_trios(ignore_phoenix=ignore_phoenix):
+            for p in self.all_pairs(ignore_phoenix=ignore_phoenix):
                 try:
-                    fullhouses.add(FullHouse(pair=p, trio=t))
+                    yield FullHouse(pair=p, trio=t)
                 except Exception:
                     pass
-        return fullhouses
 
     def all_pairsteps(self, ignore_phoenix=False, length=None):
         assert_(length is None or length > 0)
@@ -551,7 +597,7 @@ class Combination(metaclass=abc.ABCMeta):
         return iter(self._cards)
 
     def __eq__(self, other):
-        return self.__class__ is other.__class__ and self.cards == other.cards
+        return self.__class__ is other.__class__ and self.cards == other.cards and self.height == other.height
 
     def __hash__(self):
         return hash(self._cards)
@@ -742,7 +788,7 @@ class Straight(Combination):
         if Card.PHOENIX in cards:
             assert_(isinstance(phoenix_as, Card))
             assert_(phoenix_as not in cards)
-            assert_(phoenix_as.suit is not CardSuit.SPECIAL)
+            assert_(phoenix_as.suit is not CardSuit.SPECIAL, msg="But was "+str(phoenix_as))
 
         cards_phoenix_replaced = [c for c in cards if c is not Card.PHOENIX] + [phoenix_as] if phoenix_as else cards
         assert_(len({c.card_value for c in cards_phoenix_replaced}) == len(cards_phoenix_replaced),
@@ -769,6 +815,11 @@ class Straight(Combination):
         assert_(isinstance(other, Straight) and len(other) == len(self), self._cant_compare_error(other))
         return self.height < other.height
 
+    def __eq__(self, other):
+        return super().__eq__(other) and self.lowest_card == other.lowest_card
+
+    def __hash__(self):
+        return hash((self._cards, self.height, self.lowest_card))
 
 class Bomb(Combination):
 
