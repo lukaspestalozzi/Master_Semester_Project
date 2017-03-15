@@ -33,7 +33,7 @@ def run_scraper(n_games, filename):
 
 def get_game_urls(url, n):
     """
-    Return the n most recent game urls from the most recent games log page.
+    Return the n most recent tichu urls from the most recent games log page.
     Will open a Firefox window.
 
     url: string
@@ -67,7 +67,7 @@ def get_game_urls(url, n):
 
 def scrape_game(game_url):
     """
-    Given a game page url, scrape relevant information from each game round.
+    Given a tichu page url, scrape relevant information from each tichu round.
 
     game_url: string
 
@@ -92,7 +92,7 @@ def scrape_game(game_url):
 
 def find_rounds(game_url):
     """
-    Given a game url, return a BeautifulSoup object containing the game rounds.
+    Given a tichu url, return a BeautifulSoup object containing the tichu rounds.
 
     game_url: string
 
@@ -107,7 +107,7 @@ def find_rounds(game_url):
 
 def get_player_elos(game_url):
     """
-    Find ELO rankings of players in the game.
+    Find ELO rankings of players in the tichu.
 
     game_url: string
 
@@ -136,7 +136,7 @@ def get_player_elos(game_url):
 
 def find_round_results(single_round):
     """
-    Given a BeautifulSoup object containing a single game round, find for
+    Given a BeautifulSoup object containing a single tichu round, find for
     each players:
         - players name
         - grand tichu cards
@@ -163,7 +163,7 @@ def find_round_results(single_round):
 
 def get_player_names(single_round):
     """
-    Find names of players in a single game round.
+    Find names of players in a single tichu round.
 
     single_round: BS object
 
@@ -178,7 +178,7 @@ def get_player_names(single_round):
 
 def get_gt_cards(single_round):
     """
-    Find grand tichu cards of players in a single game round.
+    Find grand tichu cards of players in a single tichu round.
 
     single_round: BS object
 
@@ -197,7 +197,7 @@ def get_gt_cards(single_round):
 
 def get_gt_calls(single_round):
     """
-    Find grand tichu calls of players in a single game round.
+    Find grand tichu calls of players in a single tichu round.
 
     single_round: BS object
 
@@ -215,7 +215,7 @@ def get_gt_calls(single_round):
 
 def get_final_cards(single_round):
     """
-    Find grand tichu cards of players in a single game round.
+    Find grand tichu cards of players in a single tichu round.
 
     single_round: BS object
 
@@ -233,7 +233,7 @@ def get_final_cards(single_round):
 
 def get_tichu_calls(single_round, player_names):
     """
-    Find tichu calls of players in a single game round.
+    Find tichu calls of players in a single tichu round.
 
     single_round: BS object
     player_names: list
@@ -253,7 +253,7 @@ def get_tichu_calls(single_round, player_names):
 
 def get_out_first(single_round, player_names):
     """
-    Find if players went out first in a single game round.
+    Find if players went out first in a single tichu round.
 
     single_round: BS object
     player_names: list
