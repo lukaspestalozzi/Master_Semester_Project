@@ -1,9 +1,10 @@
 from collections import namedtuple
+from enum import Enum
 
 from tichu.cards.card import Card
-from tichu.cards.cards import ImmutableCards, Cards
+from tichu.cards.cards import ImmutableCards, Cards, Combination, Bomb
 from tichu.exceptions import IllegalActionException
-from tichu.players.tichuplayers import PlayerAction, TichuPlayer
+from tichu.players.tichuplayers import TichuPlayer
 from tichu.utils import assert_
 
 
@@ -80,18 +81,20 @@ class GameState(object):
     def current_round(self):
         return self._current_round
 
+    @property
+    def last_combination(self):
+        return self._current_round.last_combination if self._current_round else None
+
     def start_new_round(self):
+        curr_p = self.points
         if self._current_round:
             self.append_round(self._current_round.build())
-        self._current_round = RoundState(initial_points=self.points)
+        self._current_round = RoundState(initial_points=curr_p)
         return self._current_round
 
     def append_round(self, tichu_round):
         assert_(isinstance(tichu_round, TichuRoundHistory))
         self._rounds.append(tichu_round)
-
-    def last_combination(self):
-        return self._current_round.last_combination if self._current_round else None
 
     def copy(self, save=False):
         """
@@ -173,7 +176,14 @@ class TichuGameHistory(namedtuple("TGH", ["team1", "team2", "winner_team", "poin
         return self.points[1]
 
     def last_combination(self):
-        return self.rounds[-1].last_combination()
+        return self.rounds[-1].last_combination
+
+    def nice_string(self, indent=0):
+        ind_str = "".join(" " for _ in range(1))
+        rounds_str = ("\n"+ind_str).join(r.nice_string(indent=1) for r in self.rounds)
+        s = ("{ind_str}game result: {gh.points[0]}:{gh.points[1]}\n{ind_str}number of rounds: {nbr_rounds}\n{ind_str}----------- Rounds  -----------------\n{ind_str}{rrs}"
+             .format(gh=self, nbr_rounds=len(self.rounds), rrs=rounds_str, ind_str=ind_str))
+        return s
 
 
 class TrickHandcards(namedtuple("AH", ["trick", "handcards"])):
@@ -314,9 +324,9 @@ class RoundState(object):
     @property
     def last_combination(self):
         if len(self._current_trick) == 0:
-            return self._tricks_handcards[-1].trick.last_combination() if len(self._tricks_handcards) > 0 else None
+            return self._tricks_handcards[-1].trick.last_combination if len(self._tricks_handcards) > 0 else None
         else:
-            return self._current_trick.last_combination()
+            return self._current_trick.last_combination
 
     @property
     def last_finished_trick(self):
@@ -350,48 +360,51 @@ class RoundState(object):
     def rank_of(self, player_pos):
         return self._ranking.index(player_pos) + 1 if player_pos in self._ranking else None
 
-    # ###### Copy & Build #######
-    def copy(self, save=False):
-        """
-        Makes a copy of this instance
-        :param save: (default False)
-         - an integer (in range(4)) then the copy will only contain information as seen by the player at this position.
-         - False, it is a complete copy.
+    # ###### Build #######
+    def build(self, save=False):
+        tks = tuple([t_h.trick.copy(save=save) for t_h in self._tricks_handcards])
+        if len(self._current_trick) > 0:
+            tks += (self._current_trick.finish(save=True),)
+        if save:
+            return SaveTichuRoundHistory(
+                points=self.points,
+                announced_grand_tichus=self.announced_grand_tichus,
+                announced_tichus=self.announced_tichus,
+                tricks=tks,
+                ranking=self.ranking
+            )
 
-        :return: a copy of this instance
-        """
-
-        if (save is not True and save in range(4)) or save is False:
-            rs = RoundState(self.initial_points)
-            rs._grand_tichu_hands = self.grand_tichu_hands.copy(save=save) if self.grand_tichu_hands else None
-            rs._before_swap_hands = self.before_swap_hands.copy(save=save) if self.before_swap_hands else None
-            rs._card_swaps = (self._swaps if save is False or self._swaps is None
-                              else tuple([(cs if save == i else None) for i, cs in enumerate(self._swaps)]))
-            rs._complete_hands = self.complete_hands.copy(save=save) if self.complete_hands else None
-            rs._announced_grand_tichus = self.announced_grand_tichus if self.announced_grand_tichus else None
-            rs._announced_tichus = self.announced_tichus
-            rs._tricks_handcards = [TrickHandcards(trick=t_h.trick, handcards=t_h.handcards.copy(save=save))
-                                    for t_h in self._tricks_handcards]
-            rs._current_trick = self._current_trick.finish()
-            rs._ranking = self.ranking
-            rs._points = self._points
-            return rs
         else:
-            raise ValueError("save must be one of [False, 0, 1, 2, 3] but was: "+str(save))
+            return TichuRoundHistory(initial_points=self.initial_points,
+                                     final_points=self.final_points,
+                                     points=self.points,
+                                     grand_tichu_hands=self.grand_tichu_hands,
+                                     before_swap_hands=self.before_swap_hands,
+                                     card_swaps=self.card_swaps,
+                                     complete_hands=self.complete_hands,
+                                     announced_grand_tichus=self.announced_grand_tichus,
+                                     announced_tichus=self.announced_tichus,
+                                     tricks=tks,
+                                     handcards=tuple([t_h.handcards for t_h in self._tricks_handcards]),
+                                     ranking=self.ranking)
 
-    def build(self):
-        return TichuRoundHistory(initial_points=self.initial_points,
-                                 final_points=self.final_points,
-                                 points=self.points,
-                                 grand_tichu_hands=self.grand_tichu_hands,
-                                 before_swap_hands=self.before_swap_hands,
-                                 card_swaps=self.card_swaps,
-                                 complete_hands=self.complete_hands,
-                                 announced_grand_tichus=self.announced_grand_tichus,
-                                 announced_tichus=self.announced_tichus,
-                                 tricks=tuple([t_h.trick for t_h in self._tricks_handcards]),
-                                 handcards=tuple([t_h.handcards for t_h in self._tricks_handcards]),
-                                 ranking=self.ranking)
+
+class SaveTichuRoundHistory(namedtuple("STRH", ["points", "announced_grand_tichus", "announced_tichus", "tricks", "ranking"])):
+
+    def __init__(self, points, announced_grand_tichus, announced_tichus, tricks, ranking):
+        super().__init__()
+
+    @property
+    def last_combination(self):
+        return self.tricks[-1].last_combination if len(self.tricks) > 0 else None
+
+
+    def nice_string(self, indent=0):
+        ind_str = "".join("\t" for _ in range(1))
+        tricks_str = ("\n"+ind_str).join(t.nice_string(indent=2) for t in self.tricks)
+        s = ("{ind_str}round result: {rh.points[0]}:{rh.points[1]}\n{ind_str}number of Tricks: {nbr_tricks}\n{ind_str}--- Tricks ---\n{ind_str}{ts}"
+             .format(rh=self, nbr_tricks=len(self.tricks), ts=tricks_str, ind_str=ind_str))
+        return s
 
 
 class TichuRoundHistory(namedtuple("RoundHistory", ["initial_points", "final_points", "points",
@@ -415,28 +428,28 @@ class TichuRoundHistory(namedtuple("RoundHistory", ["initial_points", "final_poi
 
         super().__init__()
 
+    @property
     def last_combination(self):
         return self.tricks[-1].last_combinaion if len(self.tricks) > 0 else None
 
     def copy(self, save=False):
-        """
-        Makes a copy of this instance
-        :param save: (default False)
-         - an integer (in range(4)) then the copy will only contain information as seen by the player at this position.
-         - False, it is a complete copy.
-
-        :return: a copy of this instance
-        """
-        if save is False:
-            return TichuRoundHistory(self.initial_points, self.final_points, self.points, self.grand_tichu_hands,
-                                     self.before_swap_hands, self.card_swaps, self.complete_hands,
-                                     self.announced_grand_tichus, self.announced_tichus, self.tricks, self.handcards, self.ranking)
+        if save:
+            return SaveTichuRoundHistory(
+                    points=self.points,
+                    announced_grand_tichus=self.announced_grand_tichus,
+                    announced_tichus=self.announced_tichus,
+                    tricks=tuple([t.copy(save=True) for t in self.tricks]),
+                    ranking=self.ranking
+                )
         else:
-            return TichuRoundHistory(self.initial_points, self.final_points, self.points, self.grand_tichu_hands.copy(save=save),
-                                     self.before_swap_hands.copy(save=save),
-                                     tuple([(cs if save == i else None) for i, cs in enumerate(self.card_swaps)]),
-                                     self.complete_hands.copy(save=save), self.announced_grand_tichus, self.announced_tichus, self.tricks,
-                                     tuple([hc.copy(save=save) for hc in self.handcards]), self.ranking)
+            return self
+
+    def nice_string(self, indent=0):
+        ind_str = "".join("\t" for _ in range(1))
+        tricks_str = ("\n"+ind_str).join(t.nice_string(indent=2) for t in self.tricks)
+        s = ("{ind_str}round result: {rh.points[0]}:{rh.points[1]}\n{ind_str}number of Tricks: {nbr_tricks}\n{ind_str}--- Tricks ---\n{ind_str}{ts}"
+             .format(rh=self, nbr_tricks=len(self.tricks), ts=tricks_str, ind_str=ind_str))
+        return s
 
 
 class Trick(object):
@@ -456,11 +469,12 @@ class Trick(object):
     def points(self):
         return self.sum_points()
 
-    def is_dragon_trick(self):
-        return Card.DRAGON in self.last_combination()
-
+    @property
     def last_combination(self):
         return self.combinations[-1] if len(self._actions) > 0 else None
+
+    def is_dragon_trick(self):
+        return Card.DRAGON in self.last_combination
 
     def last_action(self):
         return self._actions[-1] if len(self._actions) > 0 else None
@@ -468,8 +482,15 @@ class Trick(object):
     def sum_points(self):
         return sum([comb.points for comb in self.combinations])
 
-    def copy(self):
-        return Trick(self._actions)
+    def copy(self, save=False):
+        if save:
+            return SaveTrick(self._actions)
+        else:
+            return Trick(self._actions)
+
+    def nice_string(self, indent=0):
+        ind_str = "".join("\t" for _ in range(1))
+        return "{ind_str}Trick[{winner}]: {trickstr}".format(trickstr=' -> '.join([ac.nice_string() for ac in self._actions]), ind_str=ind_str, winner=self._actions[-1].player_name)
 
     def __len__(self):
         return len(self._actions)
@@ -479,6 +500,16 @@ class Trick(object):
 
     def __iter__(self):
         return self._actions.__iter__()
+
+
+class SaveTrick(Trick):
+    """
+    Immutable Trick containing only save PlayerActions (no information about the player except the name)
+    """
+
+    def __init__(self, actions):
+        save_actions = [SavePlayerAction.from_playeraction(a) for a in actions]
+        super().__init__(save_actions)
 
 
 class UnfinishedTrick(Trick):
@@ -506,20 +537,193 @@ class UnfinishedTrick(Trick):
         if check_validity:
             assert_(not (self.is_empty() and action.is_pass()),
                     ValueError("Cant add a pass action on an empty trick. ({}) -> ({})".format(action, self.__repr__())))
-            assert_(self.is_empty() or action.can_be_played_on(self.last_combination()),
+            assert_(self.is_empty() or action.can_be_played_on(self.last_combination),
                     ValueError("Cant play {} on {}.".format(action, self.__repr__())))
         self._actions.append(action)
         return self
 
-    def finish(self):
+    def finish(self, save=False):
         """
         :return: An (immutable) Trick
         """
-        return Trick(actions=self._actions)
+        if save:
+            return SaveTrick(actions=self._actions)
+        else:
+            return Trick(actions=self._actions)
 
 
 Card_To = namedtuple("Card_To", ["card", "to"])
 SwapCard = namedtuple("SwapCard", ["card", "from_", "to"])
+
+
+class PlayerActionType(Enum):
+    PASS = 0
+    COMBINATION = 1
+    COMBINATION_TICHU = 2
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return self.__str__()
+
+
+class PlayerAction(object):
+    """
+    Encodes the players action.
+    The Action may be:
+    - The pass action
+    - A combination of cards
+    - May include a Tichu announcement
+
+    It is guaranteed that:
+    - It is either a Pass-action or a Combination
+    - If it is a Combination, it is a valid Combination (according to the Tichu rules)
+    -
+    """
+
+    def __init__(self, player, combination=None, pass_=True, tichu=False):
+        """
+        Note that PlayerAction() denotes the Pass-action by default.
+        :param player: The players playing the action.
+        :param combination: Combination (default None); The combination the players wants to play, or False when players wants to pass.
+        :param pass_: boolean (default True); True when the players wants to pass (Pass-action). Ignored when combination is not None
+        :param tichu: boolean (default False); flag if the players wants to announce a Tichu with this action. Ignored when pass_=True and combination=False
+        """
+        # check params
+        assert_(isinstance(player, TichuPlayer), msg="Player must be instance of TichuPlayer, but was {}".format(player.__class__))
+        assert_(combination or pass_)
+        assert_(pass_ or isinstance(combination, Combination))
+
+        self._player = player
+        self._comb = combination if combination else None
+        self._tichu = bool(tichu)
+
+        # determine type
+        self._type = PlayerActionType.PASS
+        if combination:
+            if tichu:
+                self._type = PlayerActionType.COMBINATION_TICHU
+            else:
+                self._type = PlayerActionType.COMBINATION
+
+        assert self._type is PlayerActionType.PASS or combination is not None, "comb: {}".format(combination)
+
+    @property
+    def type(self):
+        return self._type
+
+    @property
+    def player(self):
+        return self._player
+
+    @property
+    def player_name(self):
+        return self._player.name
+
+    @property
+    def combination(self):
+        """
+        :return: The combination of the Action. May be None
+        """
+        return self._comb
+
+    def nice_string(self):
+        if self.is_pass():
+            return "{}[PASS]".format(self.player_name)
+        else:
+            s = "{}: {comb}".format(self.player_name, comb=str(self._comb))
+            if self._tichu:
+                s += " and [TICHU]"
+            return s
+
+    def __str__(self):
+        return ("Action[{}](player: {})".format(self._type, self._player.name)
+                if self.is_pass()
+                else "Action[{}](player: {}, tichu:{}, comb:{})".format(self._type, self._player.name, self._tichu, self._comb))
+
+    def __repr__(self):
+        return "Action[{}](player: {}, tichu:{}, comb:{})".format(self._type, self._player.name, self._tichu, self._comb)
+
+    def is_combination(self):
+        return self._type is PlayerActionType.COMBINATION or self._type is PlayerActionType.COMBINATION_TICHU
+
+    def is_tichu(self):
+        return self._type is PlayerActionType.COMBINATION_TICHU
+
+    def is_pass(self):
+        return self._type is PlayerActionType.PASS
+
+    def is_bomb(self):
+        return not self.is_pass() and isinstance(self.combination, Bomb)
+
+    def check(self, played_on=False, has_cards=None, not_pass=False, is_bomb=False, raise_exception=False):
+        """
+        Checks the following propperties when the argument is not False:
+        :param played_on: Combination, wheter the action can be played on the combination
+        :param has_cards: Player, whether the player has the cards to play this action
+        :param not_pass: bool, whether the action can be pass or not. (not_pass = True, -> action must not be pass action)
+        :param is_bomb: bool, whether the action must be a bomb or not.
+        :param raise_exception: if true, raises an IllegalActionException instead of returning False.
+        :return: True if all checks succeed, False otherwise
+        """
+        def return_or_raise(check):
+            if raise_exception:
+                raise IllegalActionException("Action Check ('{}') failed on {}".format(check, repr(self)))
+            else:
+                return None
+        # fed
+
+        if played_on and not self.can_be_played_on(played_on):
+            return return_or_raise("played on "+str(played_on))
+        if has_cards and not self.does_player_have_cards(player=has_cards, raise_exception=False):
+            return return_or_raise("has cards: "+str(has_cards))
+        if not_pass and self.is_pass():
+            return return_or_raise("not pass, but was Pass")
+        if is_bomb and not self.is_bomb():
+            return return_or_raise("must be bomb")
+        return True
+
+    def can_be_played_on(self, comb):
+        """
+        Checks whether this action can be played on the given combination.
+        That means in particular:
+        - if the Action is a Pass-action, check succeeds
+        - else, the Actions combination must be playable on the given comb
+        :param comb: the Combination
+        :return: True iff this check succeeds, False otherwise
+        """
+        return self._type is PlayerActionType.PASS or self._comb.can_be_played_on(comb)
+
+    def does_player_have_cards(self, player, raise_exception=False):
+        """
+        :param player: TichuPlayer; the players whose hand_cards are to be tested.
+        :param raise_exception: boolean (default False); if True, instead of returning False, raises an IllegalActionError.
+        :return: True iff the Actions combination is a subset of the players hand_cards. False otherwise.
+        """
+        res = self._type is PlayerActionType.PASS or self._comb.issubset(player.hand_cards)
+        if not res and raise_exception:
+            raise IllegalActionException("Player {} does not have the right cards for {}".format(player, self._comb))
+        return res
+
+
+class SavePlayerAction(PlayerAction):
+
+    def __init__(self, player, combination=None, pass_=True, tichu=False):
+        super().__init__(player, combination=combination, pass_=pass_, tichu=tichu)
+        self._player = player.name
+        self._playername = player.name
+
+    @property
+    def player_name(self):
+        return self._playername
+
+    @classmethod
+    def from_playeraction(cls, playeraction):
+        return cls(playeraction.player,
+                   playeraction.combination,
+                   playeraction.is_pass(),
+                   playeraction.is_tichu())
 
 
 class SwapCards(object):

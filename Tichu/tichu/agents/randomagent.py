@@ -28,8 +28,8 @@ class RandomAgent(BaseAgent):
         return wish
 
     def play_combination(self, wish, hand_cards, round_history):
-        possible_combs = hand_cards.all_combinations(round_history.last_combination)
-        comb = random.choice(list(possible_combs)) if len(possible_combs) > 0 else None
+        possible_combs = list(hand_cards.all_combinations(round_history.last_combination))
+        comb = random.choice(possible_combs) if len(possible_combs) > 0 else None
 
         # try to fulfill wish:
         w = self._play_wish(hand_cards, possible_combs, wish)
@@ -79,7 +79,6 @@ class RandomAgent(BaseAgent):
 
     def _play_wish(self, hand_cards, possible_combs, wish):
         """
-
         :param hand_cards:
         :param possible_combs:
         :param wish:
@@ -87,7 +86,7 @@ class RandomAgent(BaseAgent):
         """
         # verify wish
         if wish and wish in (c.card_value for c in hand_cards):
-            pcombs = (comb for comb in possible_combs if wish in (c for c in comb))
+            pcombs = (comb for comb in possible_combs if comb.contains_cardval(wish))
             try:
                 return next(pcombs)  # Take the first combination fulfilling the wish
             except StopIteration:

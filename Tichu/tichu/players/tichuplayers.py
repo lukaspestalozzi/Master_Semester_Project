@@ -1,15 +1,14 @@
 import abc
 import logging
 import uuid
-from enum import Enum
 
-import itertools
 
 from tichu.agents.abstractagent import BaseAgent
 from tichu.cards.card import CardValue
-from tichu.cards.cards import Cards, Combination, Bomb, ImmutableCards
+from tichu.cards.cards import Cards, ImmutableCards, Single
 from tichu.exceptions import IllegalActionException
 from tichu.utils import assert_
+from tichu.game import gameutils as gutils
 
 
 class TichuPlayer(metaclass=abc.ABCMeta):
@@ -22,7 +21,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param name: string, the name of the players, it is preferable that this is a unique name.
         :param agent: Agent, the agent deciding the players moves.
         """
-        # TODO check arguments
+
         if not isinstance(agent, BaseAgent):
             raise ValueError("agent must inherit from BaseAgent")
         self._name = str(name)
@@ -31,7 +30,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         self._position = None
         self._hand_cards = Cards(cards=list())
         self._tricks = list()  # list of won tricks
-        self._team_mate_pos = None  # id of the teammate
+        self._teammate_pos = None  # position of the teammate
 
     @property
     def name(self):
@@ -54,12 +53,12 @@ class TichuPlayer(metaclass=abc.ABCMeta):
 
     @property
     def team_mate(self):
-        return self._team_mate_pos
+        return self._teammate_pos
 
     @team_mate.setter
     def team_mate(self, player_pos):
         assert player_pos in range(4) and player_pos != self.position
-        self._team_mate_pos = player_pos
+        self._teammate_pos = player_pos
 
     @property
     def has_finished(self):
@@ -113,7 +112,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
     def new_game(self, new_position, teammate):
         assert new_position in range(4) and teammate in range(4) and (new_position + 2) % 4 == teammate
         self._position = new_position
-        self._team_mate_pos = teammate
+        self._teammate_pos = teammate
         self.remove_tricks()
         self.remove_hand_cards()
         self._agent.position = new_position
@@ -173,11 +172,13 @@ class TichuPlayer(metaclass=abc.ABCMeta):
 
     def announce_tichu_or_not(self, announced_tichu, announced_grand_tichu, game_history):
         """
+        :param game_history:
         :param announced_tichu: a list of integers (in range(0, 4)), denoting playerIDs that already have announced a Tichu.
         :param announced_grand_tichu: a list of integers (in range(0, 4)), denoting playerIDs that already have announced a grand Tichu.
         :return True if this players announces a normal Tichu, False otherwise.
         """
-        nt = self._agent.announce_tichu(announced_tichu, announced_grand_tichu, round_history=game_history.current_round.copy(save=self.position))
+        nt = self._agent.announce_tichu(announced_tichu, announced_grand_tichu,
+                                        round_history=game_history.current_round.build(save=True))
         return bool(nt)
 
     def players_announced_tichus(self, tichu=list(), grand_tichu=list()):
@@ -198,11 +199,12 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         """
         assert len(self._hand_cards) > 0
         comb = self._agent.play_first(hand_cards=self.hand_cards,
-                                      round_history=game_history.current_round.copy(save=self.position),
+                                      round_history=game_history.current_round.build(save=True),
                                       wish=wish)
-        action = PlayerAction(self, combination=comb)
+
+        action = gutils.PlayerAction(self, combination=comb)
         action.check(has_cards=self, not_pass=True, raise_exception=True)
-        TichuPlayer._check_wish(game_history.last_combination, action, self.hand_cards, wish)
+        TichuPlayer._check_wish(game_history.current_round.last_combination, action, self.hand_cards, wish)
         self._hand_cards.remove_all(action.combination.cards)
         self._log_remaining_handcards()
         return action
@@ -210,16 +212,18 @@ class TichuPlayer(metaclass=abc.ABCMeta):
     def play_combination(self, game_history, wish):
         """
         Called by the the tichu manager to request a move.
-        :param game_history: The history of the tichu so far.
+        :param game_history: The history of the tichu game so far.
         :param wish: The CardValue beeing wished, None if no wish is present
         :return: pass, or the combination the players wants to play as PlayerAction.
         """
         assert len(self._hand_cards) > 0
         comb = self._agent.play_combination(wish=wish, hand_cards=self.hand_cards,
-                                            round_history=game_history.current_round.copy(save=self.position))
-        action = PlayerAction(self, combination=comb)
-        action.check(played_on=game_history.last_combination(), has_cards=self, raise_exception=True)
-        TichuPlayer._check_wish(game_history.last_combination, action, self.hand_cards, wish)
+                                            round_history=game_history.current_round.build(save=True))
+        if isinstance(comb, Single) and comb.is_phoenix():
+            comb.set_phoenix_height(game_history.current_round.last_combination.height + 0.5)
+        action = gutils.PlayerAction(self, combination=comb)
+        action.check(played_on=game_history.current_round.last_combination, has_cards=self, raise_exception=True)
+        TichuPlayer._check_wish(game_history.current_round.last_combination, action, self.hand_cards, wish)
 
         if not action.is_pass():
             self._hand_cards.remove_all(action.combination.cards)
@@ -240,13 +244,13 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         """
         if wish:  # there is a wish
             if action.is_pass() or not action.combination.fulfills_wish(wish):  # player did not fulfill wish
-                if wish in {c.card_value for c in hand_cards}:  # player has wish in handcards
+                if wish in (c.card_value for c in hand_cards):  # player has wish in handcards
                     # look if the player could have fulfilled the wish
-                    possible_combs = hand_cards.all_combinations(played_on, contains_value=wish)
+                    possible_combs = list(hand_cards.all_combinations(played_on, contains_value=wish))
                     if len(possible_combs) > 0:
-                        raise IllegalActionException("""Could have played the wish, but did not. wish: {} \n
-                                                        handcards: {}, \n
-                                                        possible combs:{}""".format(wish, hand_cards, possible_combs))
+                        raise IllegalActionException(
+                                "Could have played the wish, but did not. wish: {}, played {}, handcards: {}, possible combs:{}, comb on table: {}"
+                                .format(wish, action.combination, hand_cards, possible_combs, played_on))
         return True
 
     def play_bomb_or_not(self, game_history):
@@ -255,11 +259,11 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param game_history:The history of the tichu so far.
         :return: the bomb (as PlayerAction) if the players wants to play a bomb. False or None otherwise
         """
-        bomb_comb = self._agent.play_bomb(hand_cards=self.hand_cards, round_history=game_history.current_round.copy(save=self.position))
+        bomb_comb = self._agent.play_bomb(hand_cards=self.hand_cards, round_history=game_history.current_round.build(save=True))
         bomb_action = False
         if bomb_comb:
-            bomb_action = PlayerAction(self, combination=bomb_comb)
-            bomb_action.check(played_on=game_history.last_combination(), has_cards=self, is_bomb=True, raise_exception=True)
+            bomb_action = gutils.PlayerAction(self, combination=bomb_comb)
+            bomb_action.check(played_on=game_history.current_round.last_combination, has_cards=self, is_bomb=True, raise_exception=True)
             self._hand_cards.remove_all(bomb_action.combination.cards)
             self._log_remaining_handcards()
         return bomb_action
@@ -269,7 +273,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param game_history:The history of the tichu so far.
         :return: id of the players to give the trick to.
         """
-        pos = self._agent.give_dragon_away(hand_cards=self.hand_cards, round_history=game_history.current_round.copy(save=self.position))
+        pos = self._agent.give_dragon_away(hand_cards=self.hand_cards, round_history=game_history.current_round.build(save=True))
         assert_(pos in range(4) and pos != self.position and pos != self.team_mate)
         return pos
 
@@ -278,7 +282,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param game_history:The history of the tichu so far.
         :return: The CardValue to be wished
         """
-        w = self._agent.wish(self.hand_cards, game_history.current_round.copy(save=self.position))
+        w = self._agent.wish(self.hand_cards, game_history.current_round.build(save=True))
         assert_(isinstance(w, CardValue) and w not in {CardValue.PHOENIX, CardValue.DRAGON, CardValue.DOG, CardValue.MAHJONG},
                 IllegalActionException("The wish must be a CardValue and not a special card, but was "+repr(w)))
         return w
@@ -297,158 +301,4 @@ class TichuPlayer(metaclass=abc.ABCMeta):
 
     def __repr__(self):
         return "{}(\n\tname: {}, pos: {}, \n\thandcards:{}, \n\ttricks:{}\n)".format(str(self.__class__), str(self.name), str(self.position), str(self._hand_cards), str(self.tricks))
-
-
-class PlayerActionType(Enum):
-    PASS = 0
-    COMBINATION = 1
-    COMBINATION_TICHU = 2
-
-    def __str__(self):
-        return self.name
-
-    def __repr__(self):
-        return self.__str__()
-
-
-class PlayerAction(object):
-    """
-    Encodes the players action.
-    The Action may be:
-    - The pass action
-    - A combination of cards
-    - May include a Tichu announcement
-
-    It is guaranteed that:
-    - It is either a Pass-action or a Combination
-    - If it is a Combination, it is a valid Combination (according to the Tichu rules)
-    -
-    """
-
-    def __init__(self, player, combination=None, pass_=True, tichu=False):
-        """
-        Note that PlayerAction() denotes the Pass-action by default.
-        :param player: The players playing the action.
-        :param combination: Combination (default None); The combination the players wants to play, or False when players wants to pass.
-        :param pass_: boolean (default True); True when the players wants to pass (Pass-action). Ignored when combination is not None
-        :param tichu: boolean (default False); flag if the players wants to announce a Tichu with this action. Ignored when pass_=True and combination=False
-        """
-        # check params
-        assert_(isinstance(player, TichuPlayer), msg="Player must be instance of TichuPlayer, but was {}".format(player.__class__))
-        assert_(combination or pass_)
-        assert_(pass_ or isinstance(combination, Combination))
-
-        self._player = player
-        self._comb = combination if combination else None
-        self._tichu = bool(tichu)
-
-        # determine type
-        self._type = PlayerActionType.PASS
-        if combination:
-            if tichu:
-                self._type = PlayerActionType.COMBINATION_TICHU
-            else:
-                self._type = PlayerActionType.COMBINATION
-
-        assert self._type is PlayerActionType.PASS or combination is not None, "comb: {}".format(combination)
-
-    @property
-    def type(self):
-        return self._type
-
-    @property
-    def player(self):
-        return self._player
-
-    @property
-    def combination(self):
-        """
-        :return: The combination of the Action. May be None
-        """
-        return self._comb
-
-    def __str__(self):
-        return ("Action[{}](player: {})".format(self._type, self._player.name)
-                if self.is_pass()
-                else "Action[{}](player: {}, tichu:{}, comb:{})".format(self._type, self._player.name, self._tichu, self._comb))
-
-    def __repr__(self):
-        return "Action[{}](player: {}, tichu:{}, comb:{})".format(self._type, self._player.name, self._tichu, self._comb)
-
-    def is_combination(self):
-        return self._type is PlayerActionType.COMBINATION or self._type is PlayerActionType.COMBINATION_TICHU
-
-    def is_tichu(self):
-        return self._type is PlayerActionType.COMBINATION_TICHU
-
-    def is_pass(self):
-        return self._type is PlayerActionType.PASS
-
-    def is_bomb(self):
-        return not self.is_pass() and isinstance(self.combination, Bomb)
-
-    def check(self, played_on=False, has_cards=None, not_pass=False, is_bomb=False, raise_exception=False):
-        """
-        Checks the following propperties when the argument is not False:
-        :param played_on: Combination, wheter the action can be played on the combination
-        :param has_cards: Player, whether the player has the cards to play this action
-        :param not_pass: bool, whether the action can be pass or not. (not_pass = True, -> action must not be pass action)
-        :param is_bomb: bool, whether the action must be a bomb or not.
-        :param raise_exception: if true, raises an IllegalActionException instead of returning False.
-        :return: True if all checks succeed, False otherwise
-        """
-        def return_or_raise(check):
-            if raise_exception:
-                raise IllegalActionException("Action Check ('{}') failed on {}".format(check, repr(self)))
-            else:
-                return None
-        # fed
-
-        if played_on and not self.can_be_played_on(played_on, raise_exception=False):
-            return return_or_raise("played on "+str(played_on))
-        if has_cards and not self.does_player_have_cards(has_cards, raise_exception=False):
-            return return_or_raise("has cards: "+str(has_cards))
-        if not_pass and self.is_pass():
-            return return_or_raise("not pass, but was Pass")
-        if is_bomb and not self.is_bomb():
-            return return_or_raise("must be bomb")
-        return True
-
-    def can_be_played_on(self, comb, raise_exception=False):
-        """
-        Checks whether this action can be played on the given combination.
-        That means in particular:
-        - if the Action is a Pass-action, check succeeds
-        - else, the Actions combination must be playable on the given comb
-        :param comb: the Combination
-        :param raise_exception: boolean (default False); if True, instead of returning False, raises an IllegalActionError.
-        :return: True iff this check succeeds, False otherwise
-        """
-        if comb is None:
-            return True
-        try:
-            res = self._type is PlayerActionType.PASS or comb < self._comb  # Do not change < (or a single phoenix does not work anymore.)
-            if not res and raise_exception:
-                raise IllegalActionException("{} can not be played on {}".format(self._comb, comb))
-        except ValueError as ve:
-            res = False
-        except TypeError as te:
-            res = False
-
-        return res
-
-    def does_player_have_cards(self, player=None, raise_exception=False):
-        """
-        :param player: TichuPlayer (default None); the players whose hand_cards are to be tested. If is None, then the players playing the Action is taken.
-        :param raise_exception: boolean (default False); if True, instead of returning False, raises an IllegalActionError.
-        :return: True iff the Actions combination is a subset of the players hand_cards. False otherwise.
-        """
-        if player is None:
-            player = self.player
-        res = self._type is PlayerActionType.PASS or self._comb.issubset(player.hand_cards)
-        if not res and raise_exception:
-            raise IllegalActionException("Player {} does not have the right cards for {}".format(player, self._comb))
-        return res
-
-
 

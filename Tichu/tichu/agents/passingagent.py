@@ -1,5 +1,7 @@
 import random
 
+import logging
+
 from tichu.agents.abstractagent import BaseAgent
 from tichu.cards.card import CardValue
 from tichu.cards.cards import Single
@@ -24,14 +26,29 @@ class PassingAgent(BaseAgent):
         return wish
 
     def play_combination(self, wish, hand_cards, round_history):
+        if wish and wish in (c.card_value for c in hand_cards):
+            try:
+                comb = next((c for c in hand_cards.all_combinations(round_history.last_combination) if c.contains_cardval(wish)))
+                return comb
+            except StopIteration:
+                pass
         return None
 
     def play_bomb(self, hand_cards, round_history):
         return False
 
-    def play_first(self, hand_cards, round_history):
+    def play_first(self, hand_cards, round_history, wish):
         card = next(iter(hand_cards))
+        if wish:
+            try:
+                card = next((c for c in hand_cards if c.card_value is wish))
+            except StopIteration:
+                pass
+
         comb = Single(card)
+        logging.debug("hand cards: {}".format(hand_cards))
+        logging.debug("Agent plays first: " + str(comb))
+
         return comb
 
     def swap_cards(self, hand_cards):

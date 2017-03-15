@@ -1,5 +1,6 @@
 import random
 import uuid
+import warnings
 from collections import abc as collectionsabc
 import abc
 from collections import defaultdict
@@ -149,6 +150,9 @@ class ImmutableCards(collectionsabc.Collection):
             sb = try_ignore(lambda: StraightBomb(st))
             if sb:
                 yield sb
+
+    def all_singles(self):
+        return (Single(c) for c in self._cards)
 
     def all_pairs(self, ignore_phoenix=False):
         # TODO speed, sort and then iterate? probably not worth it.
@@ -301,103 +305,102 @@ class ImmutableCards(collectionsabc.Collection):
         return straights
 
     def all_fullhouses(self, ignore_phoenix=False):
-        for t in self.all_trios(ignore_phoenix=ignore_phoenix):
-            for p in self.all_pairs(ignore_phoenix=ignore_phoenix):
+        trios = list(self.all_trios(ignore_phoenix=ignore_phoenix))
+        pairs = list(self.all_pairs(ignore_phoenix=ignore_phoenix))
+        for t in trios:
+            for p in pairs:
                 try:
-                    yield FullHouse(pair=p, trio=t)
+                    fh = FullHouse(pair=p, trio=t)
+                    yield fh
                 except Exception:
                     pass
 
     def all_pairsteps(self, ignore_phoenix=False, length=None):
         assert_(length is None or length > 0)
-        pairs_s = sorted(list(self.all_pairs(ignore_phoenix=ignore_phoenix)))
-        # TODO speed, may be faster
+        pairs_s = sorted(self.all_pairs(ignore_phoenix=ignore_phoenix))
 
-        new_ps = set()
-        # find all pairsteps of length 2
-        for p1 in pairs_s:
-            for p2 in pairs_s:
-                if p1 != p2 and abs(p1.height - p2.height) == 1 and not(p1.contains_phoenix() and p2.contains_phoenix()):
-                    new_ps.add(PairSteps([p1, p2]))
+        if len(pairs_s) < 2:
+            return
 
-        psteps = set()
-        # find all longer pairsteps
-        while len(new_ps):
-            ps = new_ps.pop()
-            if ps not in psteps:
-                for pair in pairs_s:
+        def ps_len2():
+            # find all pairsteps of length 2
+            for p1 in pairs_s:
+                for p2 in pairs_s:
                     try:
-                        res = ps.extend(pair)
-                        new_ps.add(res)
+                        yield PairSteps([p1, p2])
                     except Exception:
                         pass
-                psteps.add(ps)
+
+        def ps_len_le_than(l):
+            if l <= 2:
+                yield from ps_len2()
+            else:
+                for ps in ps_len_le_than(l-1):
+                    for p in pairs_s:
+                        try:
+                            yield ps.extend(p)
+                        except Exception:
+                            pass
+
         if length is not None:
-            return {ps for ps in psteps if len(ps) == length}
+            yield from (ps for ps in ps_len_le_than(length) if len(ps) == length)
         else:
-            return psteps
+            yield from ps_len_le_than(len(pairs_s))
 
     def all_combinations(self, played_on=None, ignore_phoenix=False, contains_value=None):
         """
         :return: a set of all possible combinations appearing in this cards instance
         """
-        combs = set()
-        if played_on is None:
-            combs.update([Single(c) for c in self._cards])  # single cards
-            combs.update(self.all_bombs())
-            combs.update(self.all_pairs(ignore_phoenix=ignore_phoenix))
-            combs.update(self.all_trios(ignore_phoenix=ignore_phoenix))
-            combs.update(self.all_straights(ignore_phoenix=ignore_phoenix))
-            combs.update(self.all_fullhouses(ignore_phoenix=ignore_phoenix))
-            combs.update(self.all_pairsteps(ignore_phoenix=ignore_phoenix))
-        if isinstance(played_on, Combination):
+        # TODO speed, maybe cache result -> only possible for ImmutableCards
+        if isinstance(contains_value, CardValue):
+            yield from (comb for comb in self.all_combinations(played_on=played_on, ignore_phoenix=ignore_phoenix)
+                        if comb.contains_cardval(contains_value))
+
+        elif played_on is None:
+            yield from itertools.chain(
+                    self.all_singles(),
+                    self.all_bombs(),
+                    self.all_pairs(ignore_phoenix=ignore_phoenix),
+                    self.all_trios(ignore_phoenix=ignore_phoenix),
+                    self.all_straights(ignore_phoenix=ignore_phoenix),
+                    self.all_fullhouses(ignore_phoenix=ignore_phoenix),
+                    self.all_pairsteps(ignore_phoenix=ignore_phoenix)
+                )
+        elif isinstance(played_on, Combination):
             if Card.DOG in played_on:
                 assert len(played_on) == 1
-                return set()  # it is not possible to play on the dog
+                return   # it is not possible to play on the dog
 
-            combs.update([b for b in self.all_bombs() if played_on < b])
+            if isinstance(played_on, Bomb):
+                yield from (b for b in self.all_bombs() if b.can_be_played_on(played_on))  # only higher bombs
+            else:
+                yield from self.all_bombs()  # all bombs
+
             if Card.DRAGON in played_on:
                 assert len(played_on) == 1
-                return combs  # only bombs can beat the Dragon
-
-            elif isinstance(played_on, Single) and Card.MAHJONG in played_on:
-                assert len(played_on) == 1
-                # all single cards except dog
-                combs.update({Single(c) for c in self._cards if c is not Card.DOG})
-
-            elif isinstance(played_on, Single) and Card.PHOENIX in played_on:
-                assert len(played_on) == 1
-                # all single cards except dog and Mahjong
-                combs.update({Single(c) for c in self._cards if c is not Card.DOG and c is not Card.MAHJONG})
+                return  # only bombs can beat the Dragon
 
             elif isinstance(played_on, Single):
-                # all single cards higher than the played_on.any_card
-                combs.update({Single(c) for c in self._cards if played_on.height < c.card_height})
+                # all single cards higher than the played_on
+                yield from (single for single in self.all_singles() if single.can_be_played_on(played_on))
 
             elif isinstance(played_on, Pair):
                 # all pairs higher than the played_on.any_card
-                pairs = self.all_pairs()
-                combs.update({pair for pair in pairs if played_on < pair})
+                yield from (pair for pair in self.all_pairs() if pair.can_be_played_on(played_on))
 
             elif isinstance(played_on, Trio):
                 # all trios higher than the played_on.any_card
-                trios = self.all_trios()
-                combs.update({trio for trio in trios if played_on < trio})
+                yield from (trio for trio in self.all_trios() if trio.can_be_played_on(played_on))
 
             elif isinstance(played_on, PairSteps):
                 # all higher pairsteps
-                pairsteps = self.all_pairsteps(length=len(played_on))
-                combs.update({ps for ps in pairsteps if played_on < ps})
+                yield from (ps for ps in self.all_pairsteps(length=len(played_on)) if ps.can_be_played_on(played_on))
 
             elif isinstance(played_on, Straight):
                 # all higher straights
-                straights = self.all_straights(length=len(played_on))
-                combs.update({st for st in straights if played_on < st})
-
-        if contains_value:
-            return {comb for comb in combs if contains_value in (c.card_value for c in comb)}
+                yield from (st for st in self.all_straights(length=len(played_on)) if st.can_be_played_on(played_on))
         else:
-            return combs
+            raise ValueError("Wrong arguments! (played_on was {})".format(played_on))
 
     def random_cards(self, n=1):
         """
@@ -575,6 +578,12 @@ class Combination(metaclass=abc.ABCMeta):
             err = e
         raise ValueError("Is no combination: {}\ncards: {}".format(err, str(cards)))
 
+    def to_json(self):
+        return {
+            "name": self.__class__.__name__,
+            "cards": self._cards.to_json(),
+        }
+
     def _cant_compare_error(self, other, raise_=False):
         e = ValueError("Can't compare {} to {}.".format(self.__repr__(), other.__repr__()))
         if raise_:
@@ -592,6 +601,15 @@ class Combination(metaclass=abc.ABCMeta):
 
     def fulfills_wish(self, wish):
         return wish in (c.card_value for c in self._cards)
+
+    def contains_cardval(self, cardval):
+        return cardval in (c.card_value for c in self._cards)
+
+    def can_be_played_on(self, other_comb):
+        try:
+            return other_comb < self
+        except Exception:
+            return False
 
     def __iter__(self):
         return iter(self._cards)
@@ -636,6 +654,7 @@ class Single(Combination):
     def __init__(self, card):
         super().__init__((card, ))
         self._card = card
+        self._height = self._card.card_height
 
     @property
     def card(self):
@@ -643,22 +662,37 @@ class Single(Combination):
 
     @property
     def height(self):
-        return self._card.card_height
+        return self._height
+
+    def set_phoenix_height(self, newheight):
+        """
+        Set the height of tis single to the given height ONLY IF the Phoenix is the card of this single.
+        Otherwise the call is ignored and a warning is printed.
+        :param newheight:
+        :return: the height of the single after this call
+        """
+        if self._card is Card.PHOENIX:
+            self._height = newheight
+        else:
+            warnings.warn("Tried to set the height of a non-phoenix single. The height was not set.")
+        return self.height
+
+    def is_phoenix(self):
+        return self._card is Card.PHOENIX
+
+    def contains_cardval(self, cardval):
+        return cardval is self._card.card_value
 
     def __lt__(self, other):
-        """
-        IMPORTANT: Phoenix on left hand side is always smaller, but phoenix on right hand side is always bigger.
-        So 'Phoenix < single card' is always True, but 'single card < Phoenix' is also always True.
-        """
         if isinstance(other, Bomb):
             return True
         assert_(isinstance(other, Single), self._cant_compare_error(other))
         assert_(self.card is not Card.DOG and other.card is not Card.DOG)  # dog can't be compared
         if self.card is Card.DRAGON:
             return False  # dragon is the highest single card
-        if self._card is Card.PHOENIX or other.card is Card.PHOENIX or other.card is Card.DRAGON or self.card is Card.MAHJONG:
-            # Phoenix on left is smaller, phoenix on right is bigger, dragon is always biggest, mahjong is always smallest
-            return True
+        if other.is_phoenix() and other.height == Card.PHOENIX.card_height:
+            return True  # if the phoenix is on the right hand side of '<' and its value has not been changed, return True
+
         return self.height < other.height
 
     def __contains__(self, item):
@@ -820,6 +854,7 @@ class Straight(Combination):
 
     def __hash__(self):
         return hash((self._cards, self.height, self.lowest_card))
+
 
 class Bomb(Combination):
 

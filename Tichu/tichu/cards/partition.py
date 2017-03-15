@@ -32,6 +32,11 @@ class Partition(abc.Collection):
     def combinations_list(self):
         return list(self._combs)
 
+    def to_json(self):
+        return {
+            "combinations": [comb.to_json() for comb in self._combs]
+        }
+
     def contains_card(self, card):
         for comb in self._combs:
             if card in comb:

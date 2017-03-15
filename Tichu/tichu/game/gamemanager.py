@@ -1,22 +1,23 @@
 
-# TODO integrate Logging
 import logging
 from collections import defaultdict
-from collections import namedtuple
+from time import time
 
-from tichu.cards.card import Card
-from tichu.cards.cards import ImmutableCards
 from tichu.cards.deck import Deck
-from tichu.exceptions import IllegalActionException, LogicError
-from tichu.game.gameutils import GameState, Team, HandCardSnapshot, SwapCards
+from tichu.exceptions import LogicError
+from tichu.game.gameutils import *
 from tichu.utils import assert_
-
-GameOutcome = namedtuple("GameOutcome", ['points', 'team1', 'team2', 'game_history'])
 
 
 class TichuGame(object):
 
-    def __init__(self, team1, team2, target_points):
+    def __init__(self, team1, team2, target_points=1000):
+        """
+
+        :param team1:
+        :param team2:
+        :param target_points: (integer > 0, default=1000) The game ends when one team reaches this amount of points
+        """
         assert_(isinstance(team1, Team) and isinstance(team2, Team))
         assert_(target_points > 0)
 
@@ -30,16 +31,12 @@ class TichuGame(object):
         self._target_points = target_points
         self._history = GameState(team1, team2, target_points=target_points)
 
-        # init logger # TODO log to file and init logger from json file
-        logging.basicConfig(format='%(levelname)s [%(module)s]:%(message)s',
-                            datefmt='%Y.%m.%d %H:%M:%S',
-                            level=logging.INFO)  # TODO logging; filename='example.log',
-
     def start_game(self):
         """
         Starts the tichu
         Returns a tuple containing the two teams, the winner team, and the tichu history
         """
+        start_t = time()
         logging.info("Starting game...")
 
         for k in range(4):
@@ -56,17 +53,15 @@ class TichuGame(object):
         else:
             self._history.winner_team = self._history.team2
 
-        outcome = GameOutcome(team1=self._teams[0],
-                              team2=self._teams[1],
-                              points=final_points,
-                              game_history=self._history.build())
+        outcome = self._history.build()
 
-        logging.info("Game ended: {go.points}".format(go=outcome))
+        logging.warning("Game ended: {go.points} (time: {time} sec)".format(time=time()-start_t, go=outcome))
 
         return outcome
 
     def _start_round(self):
         # TODO what to do when both teams may win in this round.
+        start_t = time()
 
         roundstate = self._history.start_new_round()
         logging.info("Start round, with points: "+str(roundstate.initial_points))
@@ -104,7 +99,8 @@ class TichuGame(object):
 
         roundstate.points = (score_t1, score_t2)
 
-        logging.info("Round ends, with points: {}".format(roundstate.points))
+        logging.warning("Round ends, with points: {rs.points[0]}:{rs.points[1]} -> {rs.final_points[0]}:{rs.final_points[1]} (time: {time:.2f} sec)"
+                        .format(time=time()-start_t, rs=roundstate))
         logging.debug("------------------------------------------------------------")
 
         return (score_t1, score_t2)
