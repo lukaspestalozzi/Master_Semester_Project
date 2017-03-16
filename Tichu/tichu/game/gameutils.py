@@ -178,9 +178,9 @@ class TichuGameHistory(namedtuple("TGH", ["team1", "team2", "winner_team", "poin
     def last_combination(self):
         return self.rounds[-1].last_combination
 
-    def nice_string(self, indent=0):
+    def pretty_string(self, indent=0):
         ind_str = "".join(" " for _ in range(1))
-        rounds_str = ("\n"+ind_str).join(r.nice_string(indent=1) for r in self.rounds)
+        rounds_str = ("\n"+ind_str).join(r.pretty_string(indent=1) for r in self.rounds)
         s = ("{ind_str}game result: {gh.points[0]}:{gh.points[1]}\n{ind_str}number of rounds: {nbr_rounds}\n{ind_str}----------- Rounds  -----------------\n{ind_str}{rrs}"
              .format(gh=self, nbr_rounds=len(self.rounds), rrs=rounds_str, ind_str=ind_str))
         return s
@@ -401,7 +401,7 @@ class SaveTichuRoundHistory(namedtuple("STRH", ["points", "announced_grand_tichu
 
     def nice_string(self, indent=0):
         ind_str = "".join("\t" for _ in range(1))
-        tricks_str = ("\n"+ind_str).join(t.nice_string(indent=2) for t in self.tricks)
+        tricks_str = ("\n"+ind_str).join(t.pretty_string(indent=2) for t in self.tricks)
         s = ("{ind_str}round result: {rh.points[0]}:{rh.points[1]}\n{ind_str}number of Tricks: {nbr_tricks}\n{ind_str}--- Tricks ---\n{ind_str}{ts}"
              .format(rh=self, nbr_tricks=len(self.tricks), ts=tricks_str, ind_str=ind_str))
         return s
@@ -444,9 +444,9 @@ class TichuRoundHistory(namedtuple("RoundHistory", ["initial_points", "final_poi
         else:
             return self
 
-    def nice_string(self, indent=0):
+    def pretty_string(self, indent=0):
         ind_str = "".join("\t" for _ in range(1))
-        tricks_str = ("\n"+ind_str).join(t.nice_string(indent=2) for t in self.tricks)
+        tricks_str = ("\n"+ind_str).join(t.pretty_string(indent=2) for t in self.tricks)
         s = ("{ind_str}round result: {rh.points[0]}:{rh.points[1]}\n{ind_str}number of Tricks: {nbr_tricks}\n{ind_str}--- Tricks ---\n{ind_str}{ts}"
              .format(rh=self, nbr_tricks=len(self.tricks), ts=tricks_str, ind_str=ind_str))
         return s
@@ -488,9 +488,9 @@ class Trick(object):
         else:
             return Trick(self._actions)
 
-    def nice_string(self, indent=0):
+    def pretty_string(self, indent=0):
         ind_str = "".join("\t" for _ in range(1))
-        return "{ind_str}Trick[{winner}]: {trickstr}".format(trickstr=' -> '.join([ac.nice_string() for ac in self._actions]), ind_str=ind_str, winner=self._actions[-1].player_name)
+        return "{ind_str}Trick[{winner}]: {trickstr}".format(trickstr=' -> '.join([ac.pretty_string() for ac in self._actions]), ind_str=ind_str, winner=self._actions[-1].player_name)
 
     def __len__(self):
         return len(self._actions)
@@ -628,7 +628,7 @@ class PlayerAction(object):
         """
         return self._comb
 
-    def nice_string(self):
+    def pretty_string(self):
         if self.is_pass():
             return "{}[PASS]".format(self.player_name)
         else:
@@ -677,7 +677,7 @@ class PlayerAction(object):
         if played_on and not self.can_be_played_on(played_on):
             return return_or_raise("played on "+str(played_on))
         if has_cards and not self.does_player_have_cards(player=has_cards, raise_exception=False):
-            return return_or_raise("has cards: "+str(has_cards))
+            return return_or_raise("has cards check; handcards: "+str(has_cards.hand_cards))
         if not_pass and self.is_pass():
             return return_or_raise("not pass, but was Pass")
         if is_bomb and not self.is_bomb():

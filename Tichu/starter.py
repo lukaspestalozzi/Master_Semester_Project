@@ -17,10 +17,10 @@ if __name__ == "__main__":
     ]
     team1 = Team(player1=players[0], player2=players[2])
     team2 = Team(player1=players[1], player2=players[3])
-    GM = TichuGame(team1, team2, target_points=1000)
+    GM = TichuGame(team1, team2, target_points=10000)
     res = GM.start_game()
 
-    res_string = res.nice_string()
+    res_string = res.pretty_string()
     print(res_string)
 
     with open("./logs/game_res.log", "a") as f:

@@ -13,11 +13,11 @@ from tichu.cards.card import Card, CardSuit, CardValue
 from tichu.utils import assert_, try_ignore
 
 __author__ = 'Lukas Pestalozzi'
-__all__ = ['ImmutableCards', 'Cards', 'Combination',
-           'Single', 'Pair', 'Trio', 'SquareBomb', 'Straight', 'StraightBomb', 'PairSteps', 'FullHouse']
 
 
 class ImmutableCards(collectionsabc.Collection):
+    # TODO change all "isinstance(x, ImmutableClass)" to "self.__class__ == x.__class__"
+
     _card_val_to_sword_card = {
         2: Card.TWO_SWORD,
         3: Card.THREE_SWORD,
@@ -125,34 +125,64 @@ class ImmutableCards(collectionsabc.Collection):
 
         return final_partitions
 
-    def value_dict(self):
+    def value_dict(self, include_special=True):
         """
+        :type include_special: bool: if False, the special cards are not in the dict
         :return: a dict mapping the card_values appearing in self._cards to the list of corresponding cards.
         """
         # TODO precompute, -> must be overridden by mutable subclasses
         val_dict = defaultdict(lambda: [])
         for c in self._cards:
-            val_dict[c.card_value].append(c)
+            if include_special or c.suit is not CardSuit.SPECIAL:
+                val_dict[c.card_value].append(c)
         return val_dict
 
     # TODO cache the results -> (only in immutable cards)
 
-    def all_bombs(self):
-        return itertools.chain(self.all_squarebombs(), self.all_straightbombs())
+    def all_bombs(self, contains_value=None):
+        return itertools.chain(self.all_squarebombs(contains_value=contains_value),
+                               self.all_straightbombs(contains_value=contains_value))
 
-    def all_squarebombs(self):
+    def all_squarebombs(self, contains_value=None):
+        must_contain_val = isinstance(contains_value, CardValue)
         for l in self.value_dict().values():
             if len(l) == 4:
-                yield SquareBomb(*l)
+                b = SquareBomb(*l)
+                if not must_contain_val or (must_contain_val and b.contains_cardval(contains_value)):
+                    yield b
 
-    def all_straightbombs(self):
-        for st in self.all_straights(ignore_phoenix=True):
-            sb = try_ignore(lambda: StraightBomb(st))
-            if sb:
-                yield sb
+    def all_straightbombs(self, contains_value=None):
+        # TODO speed, maybe precompute suitdict
+        must_contain_val = isinstance(contains_value, CardValue)
+        # group by card suit
+        suitdict = defaultdict(lambda: [])
+        for c in self._cards:
+            suitdict[c.suit].append(c)
+        # look only at cards of same suit
+        for suit, cards in suitdict.items():
+            if len(cards) >= 5:  # must be at least 5 to be a straight
+                cards_s = sorted(cards)
+                curr_straight = []
+                last_h = -10  # some number < -1
+                for card in cards_s:
+                    if card.card_height == last_h + 1:
+                        # continue straight
+                        curr_straight.append(card)
+                        if len(curr_straight) >= 5:  # there is a straightbomb
+                            stbomb = StraightBomb.from_cards(list(curr_straight))
+                            if not must_contain_val or (must_contain_val and stbomb.contains_cardval(contains_value)):
+                                yield stbomb
+                    else:
+                        # start new straight
+                        curr_straight = [card]
+                    last_h = card.card_height
 
-    def all_singles(self):
-        return (Single(c) for c in self._cards)
+    def all_singles(self, contains_value=None):
+        sgls = (Single(c) for c in self._cards)
+        if isinstance(contains_value, CardValue):
+            return (s for s in sgls if s.contains_cardval(contains_value))
+        else:
+            return sgls
 
     def all_pairs(self, ignore_phoenix=False):
         # TODO speed, sort and then iterate? probably not worth it.
@@ -166,8 +196,29 @@ class ImmutableCards(collectionsabc.Collection):
                 if c1 is not c2 and c1.card_value is c2.card_value:
                     yield Pair(c1, c2)
 
+    def all_different_pairs(self, ignore_phoenix=False, contains_value=None):
+        valdict = self.value_dict(include_special=False)
+
+        # if contains_value is specified, filter all other values out
+        if isinstance(contains_value, CardValue):
+            valdict = {k: v for k, v in valdict.items() if k is contains_value}
+
+        # phoenix
+        if not ignore_phoenix and Card.PHOENIX in self._cards:
+            for l in valdict.values():
+                assert len(l) > 0
+                yield Pair(l[0], Card.PHOENIX)
+
+        # normal pairs
+        for l in valdict.values():
+            if len(l) >= 2:
+                # 2 or more same valued cards -> take 2 of them
+                yield Pair(l[0], l[1])
+            if len(l) == 4:
+                # 4 same valued cards -> make 2 different pairs (l[0] and l[1] already yielded)
+                yield Pair(l[2], l[3])
+
     def all_trios(self, ignore_phoenix=False):
-        # TODO speed, but probably not worth it.
         if not ignore_phoenix and Card.PHOENIX in self._cards:
             for p in self.all_pairs(ignore_phoenix=True):
                 yield Trio(Card.PHOENIX, *p.cards)
@@ -180,6 +231,24 @@ class ImmutableCards(collectionsabc.Collection):
                 yield Trio(*l[1:])  # 1, 2, 3
                 yield Trio(*l[2:], *l[:1])  # 2, 3, 0
                 yield Trio(*l[3:], *l[:2])  # 3, 0, 1
+
+    def all_different_trios(self, ignore_phoenix=False, contains_value=None):
+        valdict = self.value_dict()
+        # if contains_value is specified, filter all other values out
+        if isinstance(contains_value, CardValue):
+            valdict = {valdict[k] for k in valdict if k is contains_value}
+
+        # phoenix
+        if not ignore_phoenix and Card.PHOENIX in self._cards:
+            for l in valdict.values():
+                if len(l) >= 3:
+                    yield Trio(l[0], l[1], Card.PHOENIX)
+
+        # normal pairs
+        for l in valdict.values():
+            if len(l) >= 3:
+                # 3 or more same valued cards -> take 2 of them
+                yield Trio(l[0], l[1], l[2])
 
     def all_straights_gen(self, length=None, ignore_phoenix=False):
         assert_(length is None or length >= 5, msg="length must be None or >=5, but was: " + str(length))
@@ -219,7 +288,7 @@ class ImmutableCards(collectionsabc.Collection):
 
                     # take phoenix to jump a value
                     phoenix_as = ImmutableCards._card_val_to_sword_card[card.card_height + 1]
-                    for nc in next_c[card.card_height+1]:
+                    for nc in next_c[card.card_height + 1]:
                         for st in gen_from(nc, remlength - 2, ph=phoenix_as):
                             yield [card, (Card.PHOENIX, phoenix_as)] + st
 
@@ -242,13 +311,84 @@ class ImmutableCards(collectionsabc.Collection):
                 except StopIteration:
                     yield Straight(st)
 
-    def all_straights(self, length=None, ignore_phoenix=False):
-        """
+    def all_different_straights(self, length=None, ignore_phoenix=False, contains_value=None):
+        assert_(length is None or length >= 5, msg="length must be None or >=5, but was: " + str(length))
 
-        :param length: Integer (defualt None), If not None, returns only straights of the given length (must be >=5)
-        :param ignore_phoenix:
-        :return:
-        """
+        can_use_phoenix = not ignore_phoenix and Card.PHOENIX in self._cards
+
+        if len(self._cards) < (5 if length is None else length):
+            # if not enough cards are available -> return.
+            return
+        elif isinstance(contains_value, CardValue) and contains_value not in (c.card_value for c in self._cards):
+            # does not contain the 'contains_value' card -> return
+            return
+        else:
+            sorted_cards = sorted([c for c in self._cards
+                                   if c is not Card.PHOENIX and c is not Card.DOG and c is not Card.DRAGON],
+                                  key=lambda c: c.card_value)
+
+            next_c = defaultdict(lambda: [])  # card val height -> list of cards with height 1 higher
+            for c in sorted_cards:
+                next_c[c.card_height - 1].append(c)
+
+            def gen_from(card, remlength, ph):
+                if remlength <= 1:
+                    yield [card]  # finish a straight with this card
+
+                # a straight for one possible continuation
+                next_cards = next_c[card.card_height]
+                if len(next_cards) > 0:
+                    for st in gen_from(next_cards[0], remlength - 1, ph=ph):
+                        yield [card] + st
+
+                # Phoenix:
+                if ph is None and can_use_phoenix:
+                    if remlength <= 2 and card.card_value is not CardValue.A:
+                        phoenix_as = ImmutableCards._card_val_to_sword_card[card.card_height + 1]
+                        yield [card, (Card.PHOENIX, phoenix_as)]  # finish the straight with the Phoenix
+
+                    # take phoenix instead of card
+                    if card is not Card.MAHJONG:
+                        if len(next_cards) > 0:
+                            for st in gen_from(next_cards[0], remlength - 1, ph=card):
+                                yield [(Card.PHOENIX, card)] + st
+
+                    # take phoenix to jump a value
+                    if card.card_value < CardValue.K:  # can not jump the As
+                        after_next_cards = next_c[card.card_height + 1]
+                        if len(after_next_cards) > 0:
+                            phoenix_as = ImmutableCards._card_val_to_sword_card[card.card_height + 1]
+                            for st in gen_from(after_next_cards[0], remlength - 2, ph=phoenix_as):
+                                yield [card, (Card.PHOENIX, phoenix_as)] + st
+
+            def gen_all_straights():
+                """ Take all possible starting cards and generate straights from them """
+                max_card_val = CardValue.TEN  # there is no possible straight starting from J (must have length 5)
+                if isinstance(contains_value, CardValue):
+                    max_card_val = min(max_card_val, contains_value)  # straight starting from a higher value than contains_val, can not contain that val
+
+                for c in sorted_cards:
+                    if c.card_value <= max_card_val:
+                        yield from gen_from(c, 5, ph=None)  # all straights starting with normal card
+                        if can_use_phoenix and c.card_value > CardValue.TWO:
+                            # all straights starting with the Phoenix
+                            phoenix = ImmutableCards._card_val_to_sword_card[c.card_height - 1]
+                            for st in gen_from(c, 4, ph=phoenix):
+                                yield [(Card.PHOENIX, phoenix)] + st
+
+            # make the Straights
+            for st in gen_all_straights():
+                # TODO speed, make more efficient
+                try: # raises Stop Iteration when phoenix is not in the straight
+                    (phoenix, phoenix_as) = next(elem for elem in st if isinstance(elem, tuple))
+                    st.remove((phoenix, phoenix_as))  # TODO switch to dictionaries {card->card, phoenix->card ...}
+                    st.append(phoenix)
+                    yield Straight(st, phoenix_as=phoenix_as)
+                except StopIteration:
+                    yield Straight(st)
+    """
+    def all_straights(self, length=None, ignore_phoenix=False):
+
         assert_(length is None or length >= 5, ValueError("length must be None or >=5, but was: " + str(length)))
 
         if len(self._cards) < (5 if length is None else length):  # if not enough cards are available, return empty set
@@ -303,6 +443,7 @@ class ImmutableCards(collectionsabc.Collection):
         all_straights_rec(s_cards, list(), None, ph_in_acc=None)
 
         return straights
+    """
 
     def all_fullhouses(self, ignore_phoenix=False):
         trios = list(self.all_trios(ignore_phoenix=ignore_phoenix))
@@ -314,6 +455,29 @@ class ImmutableCards(collectionsabc.Collection):
                     yield fh
                 except Exception:
                     pass
+
+    def all_different_fullhouses(self, ignore_phoenix=False, contains_value=None):
+
+        trios = list(self.all_different_trios(ignore_phoenix=ignore_phoenix))
+        pairs = list(self.all_different_pairs(ignore_phoenix=ignore_phoenix))
+        if isinstance(contains_value, CardValue):
+            for t in trios:
+                t_contains = t.contains_cardval(contains_value)
+                for p in pairs:
+                    if t_contains or p.contains_cardval(contains_value):
+                        try:
+                            fh = FullHouse(pair=p, trio=t)
+                            yield fh
+                        except Exception:
+                            pass
+        else:
+            for t in trios:
+                for p in pairs:
+                    try:
+                        fh = FullHouse(pair=p, trio=t)
+                        yield fh
+                    except Exception:
+                        pass
 
     def all_pairsteps(self, ignore_phoenix=False, length=None):
         assert_(length is None or length > 0)
@@ -335,7 +499,7 @@ class ImmutableCards(collectionsabc.Collection):
             if l <= 2:
                 yield from ps_len2()
             else:
-                for ps in ps_len_le_than(l-1):
+                for ps in ps_len_le_than(l - 1):
                     for p in pairs_s:
                         try:
                             yield ps.extend(p)
@@ -347,24 +511,53 @@ class ImmutableCards(collectionsabc.Collection):
         else:
             yield from ps_len_le_than(len(pairs_s))
 
-    def all_combinations(self, played_on=None, ignore_phoenix=False, contains_value=None):
-        """
-        :return: a set of all possible combinations appearing in this cards instance
-        """
-        # TODO speed, maybe cache result -> only possible for ImmutableCards
-        if isinstance(contains_value, CardValue):
-            yield from (comb for comb in self.all_combinations(played_on=played_on, ignore_phoenix=ignore_phoenix)
-                        if comb.contains_cardval(contains_value))
+    def all_different_pairsteps(self, ignore_phoenix=False, length=None, contains_value=None):
+        assert_(length is None or length > 0)
+        pairs_s = sorted(self.all_different_pairs(ignore_phoenix=ignore_phoenix))
 
-        elif played_on is None:
+        if len(pairs_s) < 2:
+            return
+
+        def ps_len2():
+            # find all pairsteps of length 2
+            for p1 in pairs_s:
+                for p2 in pairs_s:
+                    try:
+                        yield PairSteps([p1, p2])
+                    except Exception:
+                        pass
+
+        ps_length2 = list(ps_len2())
+
+        def ps_len_le_than(l):
+            if l <= 2:
+                yield from ps_length2
+            else:
+                for ps in ps_len_le_than(l - 1):
+                    for p in pairs_s:
+                        try:
+                            yield ps.extend(p)
+                        except Exception:
+                            pass
+
+        gen = (ps for ps in ps_len_le_than(length) if len(ps) == length) if length is not None else ps_len_le_than(len(pairs_s))
+        if isinstance(contains_value, CardValue):
+            yield from (ps for ps in gen if ps.contains_cardval(contains_value))
+        else:
+            yield from gen
+
+    def all_combinations(self, played_on=None, ignore_phoenix=False, contains_value=None):
+        assert_(contains_value is None or isinstance(contains_value, CardValue))
+
+        if played_on is None:
             yield from itertools.chain(
-                    self.all_singles(),
-                    self.all_bombs(),
-                    self.all_pairs(ignore_phoenix=ignore_phoenix),
-                    self.all_trios(ignore_phoenix=ignore_phoenix),
-                    self.all_straights(ignore_phoenix=ignore_phoenix),
-                    self.all_fullhouses(ignore_phoenix=ignore_phoenix),
-                    self.all_pairsteps(ignore_phoenix=ignore_phoenix)
+                    self.all_singles(contains_value=contains_value),
+                    self.all_bombs(contains_value=contains_value),
+                    self.all_different_pairs(ignore_phoenix=ignore_phoenix, contains_value=contains_value),
+                    self.all_different_trios(ignore_phoenix=ignore_phoenix, contains_value=contains_value),
+                    self.all_different_straights(ignore_phoenix=ignore_phoenix, contains_value=contains_value),
+                    self.all_different_fullhouses(ignore_phoenix=ignore_phoenix, contains_value=contains_value),
+                    self.all_different_pairsteps(ignore_phoenix=ignore_phoenix, contains_value=contains_value)
                 )
         elif isinstance(played_on, Combination):
             if Card.DOG in played_on:
@@ -372,9 +565,9 @@ class ImmutableCards(collectionsabc.Collection):
                 return   # it is not possible to play on the dog
 
             if isinstance(played_on, Bomb):
-                yield from (b for b in self.all_bombs() if b.can_be_played_on(played_on))  # only higher bombs
+                yield from (b for b in self.all_bombs(contains_value=contains_value) if b.can_be_played_on(played_on))  # only higher bombs
             else:
-                yield from self.all_bombs()  # all bombs
+                yield from self.all_bombs(contains_value=contains_value)  # all bombs
 
             if Card.DRAGON in played_on:
                 assert len(played_on) == 1
@@ -382,23 +575,23 @@ class ImmutableCards(collectionsabc.Collection):
 
             elif isinstance(played_on, Single):
                 # all single cards higher than the played_on
-                yield from (single for single in self.all_singles() if single.can_be_played_on(played_on))
+                yield from (single for single in self.all_singles(contains_value=contains_value) if single.can_be_played_on(played_on))
 
             elif isinstance(played_on, Pair):
                 # all pairs higher than the played_on.any_card
-                yield from (pair for pair in self.all_pairs() if pair.can_be_played_on(played_on))
+                yield from (pair for pair in self.all_different_pairs(contains_value=contains_value) if pair.can_be_played_on(played_on))
 
             elif isinstance(played_on, Trio):
                 # all trios higher than the played_on.any_card
-                yield from (trio for trio in self.all_trios() if trio.can_be_played_on(played_on))
+                yield from (trio for trio in self.all_different_trios(contains_value=contains_value) if trio.can_be_played_on(played_on))
 
             elif isinstance(played_on, PairSteps):
                 # all higher pairsteps
-                yield from (ps for ps in self.all_pairsteps(length=len(played_on)) if ps.can_be_played_on(played_on))
+                yield from (ps for ps in self.all_different_pairsteps(length=len(played_on), contains_value=contains_value) if ps.can_be_played_on(played_on))
 
             elif isinstance(played_on, Straight):
                 # all higher straights
-                yield from (st for st in self.all_straights(length=len(played_on)) if st.can_be_played_on(played_on))
+                yield from (st for st in self.all_different_straights(length=len(played_on), contains_value=contains_value) if st.can_be_played_on(played_on))
         else:
             raise ValueError("Wrong arguments! (played_on was {})".format(played_on))
 
@@ -578,12 +771,6 @@ class Combination(metaclass=abc.ABCMeta):
             err = e
         raise ValueError("Is no combination: {}\ncards: {}".format(err, str(cards)))
 
-    def to_json(self):
-        return {
-            "name": self.__class__.__name__,
-            "cards": self._cards.to_json(),
-        }
-
     def _cant_compare_error(self, other, raise_=False):
         e = ValueError("Can't compare {} to {}.".format(self.__repr__(), other.__repr__()))
         if raise_:
@@ -643,7 +830,7 @@ class Combination(metaclass=abc.ABCMeta):
         return self.height < other.height
 
     def __str__(self):
-        return "{}{}".format(self.__class__.__name__.upper(), str(self._cards))
+        return "{}({})".format(self.__class__.__name__.upper(), ",".join(str(c) for c in sorted(self._cards)))
 
     def __repr__(self):
         return self.__str__()

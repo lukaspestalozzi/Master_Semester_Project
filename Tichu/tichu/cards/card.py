@@ -86,31 +86,37 @@ class CardValue(ComparableEnum):
 
 
 class CardSuit(ComparableEnum):
-    SWORD = 'Black'
-    PAGODA = 'Red'
-    HOUSE = 'Blue'
-    JADE = 'Green'
-    SPECIAL = 'Special'
+    SWORD = u'\u2660'
+    PAGODA = u'\u2665'
+    HOUSE = u'\u2666'
+    JADE = u'\u2663'
+    SPECIAL = u'\u1f0cf'
 
-    def __init__(self, color):
+    def __init__(self, unicode):
         self._value_ = self._name_
-        self._color = color
+        self._unicode = unicode
         self._shortname = self._name_[:2]
         self._repr = "Suit({})".format(self.name)
 
     @property
-    def color(self):
-        return self._color
+    def unicode(self):
+        return self._unicode
 
     @property
     def shortname(self):
         return self._shortname
 
+    def __unicode__(self):
+        return self._unicode
+
+    def  pretty_string(self):
+        return self._unicode
+
     def __repr__(self):
         return self._repr
 
     def __str__(self):
-        return self._shortname
+        return self.unicode
 
 
 class Card(ComparableEnum):
@@ -178,11 +184,10 @@ class Card(ComparableEnum):
     def __init__(self, cardvalue, cardsuit):
         self._suit = cardsuit
         self._cardvalue = cardvalue
-        self._color = cardsuit.color
 
         # precompute strings and hashe
         self._hash = hash((cardvalue, cardsuit))
-        self._str = ("{}{}".format(str(self._cardvalue), str(self._suit).lower()[0]) if self._suit is not CardSuit.SPECIAL
+        self._str = ("{}{}".format(str(self._cardvalue), self._suit.pretty_string()) if self._suit is not CardSuit.SPECIAL
                      else "{}".format(str(self._cardvalue)))
         self._repr = "Card({}, {})".format(repr(self._cardvalue), repr(self._suit))
 
@@ -197,10 +202,6 @@ class Card(ComparableEnum):
     @property
     def card_height(self):
         return self._cardvalue.height
-
-    @property
-    def color(self):
-        return self._color
 
     @property
     def points(self):
