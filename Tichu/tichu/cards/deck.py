@@ -4,7 +4,6 @@ from tichu.cards.cards import ImmutableCards
 import random as rnd
 
 __author__ = 'Lukas Pestalozzi'
-__all__ = ['Deck']
 
 
 class Deck(ImmutableCards):

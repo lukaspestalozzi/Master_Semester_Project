@@ -7,7 +7,7 @@ from tichu.agents.abstractagent import BaseAgent
 from tichu.cards.card import CardValue
 from tichu.cards.cards import Cards, ImmutableCards, Single
 from tichu.exceptions import IllegalActionException
-from tichu.utils import assert_
+from tichu.utils import check_true, check_isinstance
 from tichu.game import gameutils as gutils
 
 
@@ -16,7 +16,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
     'Save' Tichu Player. Checks whether it's agent moves are legal.
     """
 
-    def __init__(self, name, agent):
+    def __init__(self, name, agent, perfect_information_mode=False):
         """
         :param name: string, the name of the players, it is preferable that this is a unique name.
         :param agent: Agent, the agent deciding the players moves.
@@ -31,6 +31,8 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         self._hand_cards = Cards(cards=list())
         self._tricks = list()  # list of won tricks
         self._teammate_pos = None  # position of the teammate
+        self._pi_mode = perfect_information_mode
+        self._copy_savely = not perfect_information_mode
 
     @property
     def name(self):
@@ -178,7 +180,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :return True if this players announces a normal Tichu, False otherwise.
         """
         nt = self._agent.announce_tichu(announced_tichu, announced_grand_tichu,
-                                        round_history=game_history.current_round.build(save=True))
+                                        round_history=game_history.current_round.build(save=self._copy_savely))
         return bool(nt)
 
     def players_announced_tichus(self, tichu=list(), grand_tichu=list()):
@@ -199,7 +201,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         """
         assert len(self._hand_cards) > 0
         comb = self._agent.play_first(hand_cards=self.hand_cards,
-                                      round_history=game_history.current_round.build(save=True),
+                                      round_history=game_history.current_round.build(save=self._copy_savely),
                                       wish=wish)
 
         action = gutils.PlayerAction(self, combination=comb)
@@ -218,7 +220,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         """
         assert len(self._hand_cards) > 0
         comb = self._agent.play_combination(wish=wish, hand_cards=self.hand_cards,
-                                            round_history=game_history.current_round.build(save=True))
+                                            round_history=game_history.current_round.build(save=self._copy_savely))
         if isinstance(comb, Single) and comb.is_phoenix():
             comb.set_phoenix_height(game_history.current_round.last_combination.height + 0.5)
         action = gutils.PlayerAction(self, combination=comb)
@@ -259,7 +261,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param game_history:The history of the tichu so far.
         :return: the bomb (as PlayerAction) if the players wants to play a bomb. False or None otherwise
         """
-        bomb_comb = self._agent.play_bomb(hand_cards=self.hand_cards, round_history=game_history.current_round.build(save=True))
+        bomb_comb = self._agent.play_bomb(hand_cards=self.hand_cards, round_history=game_history.current_round.build(save=self._copy_savely))
         bomb_action = False
         if bomb_comb:
             bomb_action = gutils.PlayerAction(self, combination=bomb_comb)
@@ -273,8 +275,8 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param game_history:The history of the tichu so far.
         :return: id of the players to give the trick to.
         """
-        pos = self._agent.give_dragon_away(hand_cards=self.hand_cards, round_history=game_history.current_round.build(save=True))
-        assert_(pos in range(4) and pos != self.position and pos != self.team_mate)
+        pos = self._agent.give_dragon_away(hand_cards=self.hand_cards, round_history=game_history.current_round.build(save=self._copy_savely))
+        check_true(pos in range(4) and pos != self.position and pos != self.team_mate, ex=IllegalActionException, msg="Can't give the Dragon to teammate")
         return pos
 
     def wish(self, game_history):
@@ -282,9 +284,9 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param game_history:The history of the tichu so far.
         :return: The CardValue to be wished
         """
-        w = self._agent.wish(self.hand_cards, game_history.current_round.build(save=True))
-        assert_(isinstance(w, CardValue) and w not in {CardValue.PHOENIX, CardValue.DRAGON, CardValue.DOG, CardValue.MAHJONG},
-                IllegalActionException("The wish must be a CardValue and not a special card, but was "+repr(w)))
+        w = self._agent.wish(self.hand_cards, game_history.current_round.build(save=self._copy_savely))
+        w is None or check_isinstance(w, CardValue)
+        check_true(w not in {CardValue.PHOENIX, CardValue.DRAGON, CardValue.DOG, CardValue.MAHJONG}, ex=IllegalActionException, msg="The wish must be a CardValue and not a special card, but was "+repr(w))
         return w
 
     def _log_remaining_handcards(self):

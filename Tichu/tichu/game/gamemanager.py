@@ -6,7 +6,7 @@ from time import time
 from tichu.cards.deck import Deck
 from tichu.exceptions import LogicError
 from tichu.game.gameutils import *
-from tichu.utils import assert_
+from tichu.utils import *
 
 
 class TichuGame(object):
@@ -18,8 +18,9 @@ class TichuGame(object):
         :param team2:
         :param target_points: (integer > 0, default=1000) The game ends when one team reaches this amount of points
         """
-        assert_(isinstance(team1, Team) and isinstance(team2, Team))
-        assert_(target_points > 0)
+        check_isinstance(team1, Team)
+        check_isinstance(team2, Team)
+        check_param(target_points > 0)
 
         self._teams = (team1, team2)
 
@@ -81,10 +82,19 @@ class TichuGame(object):
         # card swaps
         swapped_cards = self._swap_cards()
         roundstate.card_swaps = tuple(swapped_cards)
-        roundstate.complete_hands = self.make_handcards_snapshot()
+
 
         # round-loop
         leading_player = self._mahjong_player()
+
+        # ##################### TEST TODO remove later
+        nbr_remove = 11
+        for pl in self._players:
+            pl._hand_cards.remove_all(pl.hand_cards.random_cards(nbr_remove))  # remove some random cards to make game shorter
+            assert len(pl.hand_cards) == 14-nbr_remove
+        # #################### END TEST
+
+        roundstate.complete_hands = self.make_handcards_snapshot()
 
         wish = None
         # trick's loop

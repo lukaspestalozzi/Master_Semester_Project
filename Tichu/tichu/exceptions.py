@@ -1,6 +1,6 @@
 
 
-class ExceptionWithMessage(Exception):
+class ExceptionWithMessage(BaseException):
     """
     Exception that contains a message
     """
@@ -10,6 +10,7 @@ class ExceptionWithMessage(Exception):
 
     def __str__(self):
         return repr(self.message)
+
 
 class LogicError(ExceptionWithMessage):
     """
@@ -26,6 +27,7 @@ class IllegalActionException(ExceptionWithMessage):
     """
     def __init__(self, message):
         super().__init__(message)
+
 
 class PlayerException(ExceptionWithMessage):
     """

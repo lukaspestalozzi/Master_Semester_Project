@@ -1,7 +1,6 @@
 from enum import Enum
 
 __author__ = 'Lukas Pestalozzi'
-__all__ = ['CardValue', 'CardSuit', 'Card']
 
 
 class ComparableEnum(Enum):
@@ -87,9 +86,9 @@ class CardValue(ComparableEnum):
 
 class CardSuit(ComparableEnum):
     SWORD = u'\u2660'
+    JADE = u'\u2663'
     PAGODA = u'\u2665'
     HOUSE = u'\u2666'
-    JADE = u'\u2663'
     SPECIAL = u'\u1f0cf'
 
     def __init__(self, unicode):

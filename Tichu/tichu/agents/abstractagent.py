@@ -96,7 +96,7 @@ class BaseAgent(metaclass=abc.ABCMeta):
         """
 
         :param hand_cards:
-        :param param:
         :return:
         """
+
 

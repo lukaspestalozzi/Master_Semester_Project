@@ -1,10 +1,11 @@
 from collections import abc
 
-from tichu.cards.cards import Single, Trio, Pair, Straight, StraightBomb, PairSteps, ImmutableCards
+from tichu.cards.cards import Single, Trio, Pair, Straight, StraightBomb, PairSteps, ImmutableCards, SquareBomb, \
+    FullHouse
 from tichu.cards.cards import Combination
+from tichu.utils import check_isinstance
 
 __author__ = 'Lukas Pestalozzi'
-__all__ = ['Partition']
 
 
 class Partition(abc.Collection):
@@ -43,15 +44,15 @@ class Partition(abc.Collection):
                 return True
         return False
 
-    def merge(self, combs):
+    def merge(self, combs, target_comb):
         """
-        :param combs: The combs must occure in this Partition and must constitute a valid combination when merged
-        :return: Returns a Partition with the two combs merged.
+
+        :param combs: the combinations that merged
+        :param target_comb: the combination resulting from the merge
+        :return: Returns a Partition with combs removed and the target added
         """
-        l = []
-        for comb in combs:
-            l.extend(comb.cards_list)
-        return Partition(self._combs.difference(set(combs)).union({Combination.make(l)}))
+        check_isinstance(target_comb, Combination)
+        return Partition(self._combs.difference(set(combs)).union({target_comb}))
 
     def find_all_straights(self):
         """
@@ -62,11 +63,11 @@ class Partition(abc.Collection):
         if len(single_cards) < 5:
             return set()
 
-        straights = single_cards.all_straights()
+        straights = single_cards.straights()
         partitions = set()
         for st in straights:
-            stcombs = [Straight(*s) for s in st]
-            partitions.add(self.merge(stcombs))
+            singles = [Single(c) for c in st]
+            partitions.add(self.merge(singles, st))
 
         return partitions
 
@@ -90,27 +91,43 @@ class Partition(abc.Collection):
                 # single + single, pair, trio
                 if isinstance(comb1, Single) and isinstance(comb2, (Single, Pair, Trio)) and comb1.height == comb2.height:
                     # print("-> single + single, pair, trio")
-                    new_partitions.add(self.merge([comb1, comb2]))
+                    if isinstance(comb2, Single):
+                        new_partitions.add(self.merge({comb1, comb2}, Pair(comb1.card, comb2.card)))
+                    elif isinstance(comb2, Pair):
+                        new_partitions.add(self.merge({comb1, comb2}, Trio(*comb1.cards.union(comb2.cards))))
+                    elif isinstance(comb2, Trio):
+                        new_partitions.add(self.merge({comb1, comb2}, SquareBomb(*comb1.cards.union(comb2.cards))))
 
                 # single + straight -> longer straight
                 if isinstance(comb1, Single) and isinstance(comb2, (Straight, StraightBomb)) and comb2.can_add(comb1):
                     # print("-> single + straight -> longer straight")
-                    new_partitions.add(self.merge([comb1, comb2]))
+                    new_partitions.add(self.merge({comb1, comb2}, Straight(comb1.cards.union(comb2.cards))))
+                    try:
+                        new_partitions.add(self.merge({comb1, comb2}, StraightBomb(comb1.cards.union(comb2.cards))))
+                    except ValueError:
+                        pass
 
                 if isinstance(comb1, Pair):
                     if isinstance(comb2, Pair) and abs(comb1.height - comb2.height) <= 1:
                         # Pair + Pair -> squarebomb (diff is 0) or pairstep (diff is 1)
                         # print("-> Pair + Pair -> squarebomb or pairstep")
-                        new_partitions.add(self.merge([comb1, comb2]))
+                        try:
+                            new_partitions.add(self.merge({comb1, comb2}, SquareBomb(*comb1.cards.union(comb2.cards))))
+                        except ValueError:
+                            pass
+                        try:
+                            new_partitions.add(self.merge({comb1, comb2}, PairSteps({comb1, comb2})))
+                        except ValueError:
+                            pass
 
                     if isinstance(comb2, Trio):  # Pair + Trio -> Fullhouse
                         # print("-> Pair + Trio -> Fullhouse")
-                        new_partitions.add(self.merge([comb1, comb2]))
+                        new_partitions.add(self.merge({comb1, comb2}, FullHouse(pair=comb1, trio=comb2)))
 
                     if isinstance(comb2, PairSteps) and comb2.can_add(comb1):
                         # Pair + Pairsteps -> pairstep
                         # print("-> Pair + Pairsteps -> pairstep")
-                        new_partitions.add(self.merge([comb1, comb2]))
+                        new_partitions.add(self.merge({comb1, comb2}, PairSteps({comb1}.union(comb2.pairs))))
 
             # rof
         # rof

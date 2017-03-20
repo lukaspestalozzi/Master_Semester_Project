@@ -3,15 +3,16 @@ from enum import Enum
 
 from tichu.cards.card import Card
 from tichu.cards.cards import ImmutableCards, Cards, Combination, Bomb
-from tichu.exceptions import IllegalActionException
+from tichu.exceptions import IllegalActionException, LogicError
 from tichu.players.tichuplayers import TichuPlayer
-from tichu.utils import assert_
+from tichu.utils import check_param, check_isinstance, check_all_isinstance, check_true
 
 
 class Team(namedtuple("T", ["player1", "player2"])):
 
     def __init__(self, player1, player2):
-        assert_(isinstance(player1, TichuPlayer) and isinstance(player2, TichuPlayer))
+        check_isinstance(player1, TichuPlayer)
+        check_isinstance(player2, TichuPlayer)
         super(Team, self).__init__()
 
     @property
@@ -35,8 +36,10 @@ class GameState(object):
     """
 
     def __init__(self, team1, team2, target_points=1000):
-        assert_(isinstance(team1, Team) and isinstance(team2, Team))
-        assert_(isinstance(target_points, int) and target_points > 0)
+        check_isinstance(team1, Team)
+        check_isinstance(team2, Team)
+        check_isinstance(target_points, int)
+        check_param(target_points > 0)
 
         self._teams = (team1, team2)
         self._target_points = target_points
@@ -70,7 +73,8 @@ class GameState(object):
 
     @winner_team.setter
     def winner_team(self, t):
-        assert_(isinstance(t, Team) and t in self._teams)
+        check_isinstance(t, Team)
+        check_param(t in self._teams)
         self._winner_team = t
 
     @property
@@ -93,7 +97,7 @@ class GameState(object):
         return self._current_round
 
     def append_round(self, tichu_round):
-        assert_(isinstance(tichu_round, TichuRoundHistory))
+        check_isinstance(tichu_round, TichuRoundHistory)
         self._rounds.append(tichu_round)
 
     def copy(self, save=False):
@@ -135,8 +139,7 @@ class HandCardSnapshot(namedtuple("HCS", ["handcards0", "handcards1", "handcards
     Contains 4 ImmutableCards instances representing the handcards of the 4 players.
     """
     def __init__(self, handcards0, handcards1, handcards2, handcards3):
-        assert_(all([isinstance(cs, ImmutableCards) for cs in [handcards0, handcards1, handcards2, handcards3]]),
-                TypeError("handcards must be ImmutableCards, but were: "+str([type(handcards0), type(handcards1), type(handcards2), type(handcards3)])))
+        check_all_isinstance([handcards0, handcards1, handcards2, handcards3], ImmutableCards)
         super().__init__()
 
     def copy(self, save=False):
@@ -157,14 +160,22 @@ class HandCardSnapshot(namedtuple("HCS", ["handcards0", "handcards1", "handcards
         else:
             raise ValueError("save must be one of [False, 0, 1, 2, 3] but was: " + str(save))
 
+    def __str__(self):
+        return "HCS:\n\t0:{}\n\t1:{}\n\t2:{}\n\t3:{}".format(self.handcards0.pretty_string(),
+                                                             self.handcards1.pretty_string(),
+                                                             self.handcards2.pretty_string(),
+                                                             self.handcards3.pretty_string())
 
 class TichuGameHistory(namedtuple("TGH", ["team1", "team2", "winner_team", "points", "target_points", "rounds"])):
 
     def __init__(self, team1, team2, winner_team, points, target_points, rounds):
-        assert_(isinstance(team1, Team) and isinstance(team2, Team) and isinstance(winner_team, Team))
-        assert_(isinstance(points, tuple) and len(points) == 2)
-        assert_(isinstance(target_points, int))
-        assert_(all([isinstance(r, TichuRoundHistory) for r in rounds]))
+        check_isinstance(team1, Team)
+        check_isinstance(team2, Team)
+        check_isinstance(winner_team, Team)
+        check_isinstance(points, tuple)
+        check_param(len(points) == 2)
+        check_isinstance(target_points, int)
+        check_all_isinstance(rounds, TichuRoundHistory)
         super().__init__()
 
     @property
@@ -179,7 +190,7 @@ class TichuGameHistory(namedtuple("TGH", ["team1", "team2", "winner_team", "poin
         return self.rounds[-1].last_combination
 
     def pretty_string(self, indent=0):
-        ind_str = "".join(" " for _ in range(1))
+        ind_str = "".join(" " for _ in range(indent))
         rounds_str = ("\n"+ind_str).join(r.pretty_string(indent=1) for r in self.rounds)
         s = ("{ind_str}game result: {gh.points[0]}:{gh.points[1]}\n{ind_str}number of rounds: {nbr_rounds}\n{ind_str}----------- Rounds  -----------------\n{ind_str}{rrs}"
              .format(gh=self, nbr_rounds=len(self.rounds), rrs=rounds_str, ind_str=ind_str))
@@ -191,8 +202,8 @@ class TrickHandcards(namedtuple("AH", ["trick", "handcards"])):
     Stores an (Trick, HandCardSnapshot) tuple
     """
     def __init__(self, trick, handcards):
-        assert_(isinstance(trick, Trick))
-        assert_(isinstance(handcards, HandCardSnapshot))
+        check_isinstance(trick, Trick)
+        check_isinstance(handcards, HandCardSnapshot)
         super().__init__()
 
 
@@ -202,15 +213,17 @@ class RoundState(object):
     """
 
     def __init__(self, initial_points):
-        assert_(len(initial_points) == 2 and isinstance(initial_points, tuple))
+        check_param(len(initial_points) == 2)
+        check_isinstance(initial_points, tuple)
 
         self._initial_points = initial_points
 
         # hands
-        self._grand_tichu_hands = None  # A HandCardSnapshot
-        self._before_swap_hands = None  # A HandCardSnapshot
-        self._swaps = None  # tuple of 4 SwapCards instances
-        self._complete_hands = None  # A HandCardSnapshot
+        empty_hcs = HandCardSnapshot(ImmutableCards([]), ImmutableCards([]), ImmutableCards([]), ImmutableCards([]))
+        self._grand_tichu_hands = empty_hcs  # A HandCardSnapshot (initially all hands are empty)
+        self._before_swap_hands = empty_hcs  # A HandCardSnapshot (initially all hands are empty)
+        self._swaps = None  # tuple of 4 SwapCards instances (initially empty)
+        self._complete_hands = empty_hcs  # A HandCardSnapshot (initially all hands are empty)
 
         # tichus
         self._announced_grand_tichus = set()  # set of player_pos that announced grand tichu
@@ -224,7 +237,7 @@ class RoundState(object):
         self._ranking = list()
 
         # points
-        self._points = None
+        self._points = (0, 0)
 
     # ###### Properties #######
     @property
@@ -241,9 +254,9 @@ class RoundState(object):
 
     @points.setter
     def points(self, points):
-        assert_(isinstance(points, tuple))
-        assert_(len(points) == 2)
-        assert_(all([isinstance(p, int) for p in points]))
+        check_isinstance(points, tuple)
+        check_param(len(points) == 2)
+        check_all_isinstance(points, int)
         self._points = points
 
     @property
@@ -252,7 +265,7 @@ class RoundState(object):
 
     @grand_tichu_hands.setter
     def grand_tichu_hands(self, hands):
-        assert_(isinstance(hands, HandCardSnapshot))
+        check_isinstance(hands, HandCardSnapshot)
         self._grand_tichu_hands = hands
 
     @property
@@ -261,7 +274,7 @@ class RoundState(object):
 
     @before_swap_hands.setter
     def before_swap_hands(self, hands):
-        assert_(isinstance(hands, HandCardSnapshot))
+        check_isinstance(hands, HandCardSnapshot)
         self._before_swap_hands = hands
 
     @property
@@ -270,7 +283,7 @@ class RoundState(object):
 
     @card_swaps.setter
     def card_swaps(self, swaps):
-        assert_(all([isinstance(swap, SwapCards) for swap in swaps]), TypeError("Must be SwapCards, but were: "+str(swaps)))
+        check_all_isinstance(swaps, SwapCards)
         self._swaps = swaps
 
     @property
@@ -279,7 +292,7 @@ class RoundState(object):
 
     @complete_hands.setter
     def complete_hands(self, hands):
-        assert_(isinstance(hands, HandCardSnapshot))
+        check_isinstance(hands, HandCardSnapshot)
         self._complete_hands = hands
 
     @property
@@ -305,11 +318,12 @@ class RoundState(object):
     @property
     def current_handcards(self):
         # TODO speed
-        if len(self._current_trick) > 0 and len(self._tricks_handcards) > 0:
-            last_checkpoint = tuple([Cards(hc) for hc in self._tricks_handcards[-1].handcards])
+        if len(self._current_trick) > 0:
+            last_hc = self._tricks_handcards[-1].handcards if len(self._tricks_handcards) > 0 else self._complete_hands
+            last_checkpoint = tuple([Cards(hc) for hc in last_hc])
             for action in self._current_trick:
                 if action.is_combination():
-                    last_checkpoint[action.player.position].remove(action.combination)
+                    last_checkpoint[action.player.position].remove_all(action.combination)
             return HandCardSnapshot(*[ImmutableCards(hc) for hc in last_checkpoint])
 
         if len(self._tricks_handcards) > 0:
@@ -320,6 +334,13 @@ class RoundState(object):
             return self.before_swap_hands
         else:
             return self.grand_tichu_hands
+
+    @property
+    def combination_on_table(self):
+        if self._current_trick is None:
+            return self._tricks_handcards[-1].trick.last_combination if len(self._tricks_handcards) > 0 else None
+        else:
+            return self._current_trick.last_combination
 
     @property
     def last_combination(self):
@@ -343,7 +364,7 @@ class RoundState(object):
 
     # ###### Trick #######
     def finish_trick(self, handcards):
-        assert_(isinstance(handcards, HandCardSnapshot))
+        check_isinstance(handcards, HandCardSnapshot)
         self._tricks_handcards.append(TrickHandcards(self._current_trick.finish(), handcards))
         self._current_trick = UnfinishedTrick()
 
@@ -351,7 +372,7 @@ class RoundState(object):
 
     # ###### Ranking ######
     def ranking_append_player(self, player_pos):
-        assert_(player_pos in range(4) and player_pos not in self._ranking)
+        check_param(player_pos in range(4) and player_pos not in self._ranking)
         self._ranking.append(player_pos)
 
     def is_double_win(self):
@@ -363,8 +384,11 @@ class RoundState(object):
     # ###### Build #######
     def build(self, save=False):
         tks = tuple([t_h.trick.copy(save=save) for t_h in self._tricks_handcards])
+        additional_hcrds = []
         if len(self._current_trick) > 0:
-            tks += (self._current_trick.finish(save=True),)
+            tks += (self._current_trick.finish(save=save),)
+            # calculate updated handards
+            additional_hcrds = [self.current_handcards]
         if save:
             return SaveTichuRoundHistory(
                 points=self.points,
@@ -385,7 +409,7 @@ class RoundState(object):
                                      announced_grand_tichus=self.announced_grand_tichus,
                                      announced_tichus=self.announced_tichus,
                                      tricks=tks,
-                                     handcards=tuple([t_h.handcards for t_h in self._tricks_handcards]),
+                                     handcards=tuple([t_h.handcards for t_h in self._tricks_handcards] + additional_hcrds),
                                      ranking=self.ranking)
 
 
@@ -398,6 +422,9 @@ class SaveTichuRoundHistory(namedtuple("STRH", ["points", "announced_grand_tichu
     def last_combination(self):
         return self.tricks[-1].last_combination if len(self.tricks) > 0 else None
 
+    @property
+    def combination_on_table(self):
+        return self.last_combination
 
     def nice_string(self, indent=0):
         ind_str = "".join("\t" for _ in range(1))
@@ -415,22 +442,65 @@ class TichuRoundHistory(namedtuple("RoundHistory", ["initial_points", "final_poi
 
     def __init__(self, initial_points, final_points, points, grand_tichu_hands, before_swap_hands,
                  card_swaps, complete_hands, announced_grand_tichus, announced_tichus, tricks, handcards, ranking):
-        assert_(isinstance(initial_points, tuple) and isinstance(final_points, tuple) and isinstance(points, tuple)
-                and len(initial_points) == len(final_points) == len(points) == 2)
-        assert_(all([isinstance(hds, HandCardSnapshot) for hds in [grand_tichu_hands, before_swap_hands, complete_hands]]))
-        assert_(isinstance(card_swaps, tuple))
-        assert_(len(card_swaps) == 4)
-        assert_(all([isinstance(cs, SwapCards) or cs is None for cs in card_swaps]))
-        assert_(isinstance(announced_grand_tichus, set) and isinstance(announced_tichus, set))
-        assert_(all([isinstance(t, Trick) for t in tricks]))
-        assert_(all([isinstance(hc, HandCardSnapshot) for hc in handcards]))
-        assert_(isinstance(ranking, list), len(ranking) <= 4)
+        check_isinstance(initial_points, tuple)
+        check_isinstance(final_points, tuple)
+        check_isinstance(points, tuple)
+        check_param(len(initial_points) == len(final_points) == len(points) == 2)
+        check_all_isinstance([grand_tichu_hands, before_swap_hands, complete_hands], HandCardSnapshot)
+        if card_swaps is not None:
+            check_isinstance(card_swaps, tuple)
+            check_param(len(card_swaps) == 4)
+            check_all_isinstance(card_swaps, SwapCards)
+        check_isinstance(announced_grand_tichus, set)
+        check_isinstance(announced_tichus, set)
+        check_all_isinstance(tricks, Trick)
+        check_all_isinstance(handcards, HandCardSnapshot)
+        check_param(len(tricks) == len(handcards))
+        check_isinstance(ranking, list)
+        check_param(len(ranking) <= 4)
 
         super().__init__()
 
     @property
     def last_combination(self):
-        return self.tricks[-1].last_combinaion if len(self.tricks) > 0 else None
+        return self.tricks[-1].last_combination if len(self.tricks) > 0 else None
+
+    @property
+    def combination_on_table(self):
+        return self.last_combination
+
+    @property
+    def last_handcards(self):
+        if len(self.handcards) > 0:
+            return self.handcards[-1]
+        for hnds in [self.complete_hands, self.before_swap_hands, self.grand_tichu_hands]:
+            if hnds is not None:
+                return hnds
+        return None
+
+
+
+    def is_double_win(self):
+        return len(self.ranking) >= 2 and self.ranking[0] == (self.ranking[1] + 2) % 4
+
+    def round_ended(self):
+        """
+        :return True if the round ended (doublewin or only one player has handcards left), False otherwise
+        """
+        res = len(self.ranking) == 4 or self.is_double_win()
+        return res
+
+    def nbr_passed(self):
+        if len(self.tricks) == 0 or self.tricks[-1] is None:
+            return 0
+        else:
+            nbr_passed = 0
+            for i in [-1, -2, -3, -4]:
+                if self.tricks[-1][i].is_pass():
+                    nbr_passed += 1
+                else:
+                    return nbr_passed
+            raise LogicError("Something went wrong. nbr_passed: {}; last_trick: {}".format(nbr_passed, self.tricks[-1]))
 
     def copy(self, save=False):
         if save:
@@ -456,9 +526,9 @@ class Trick(object):
     """ (Immutable) List of PlayerActions """
 
     def __init__(self, actions):
-        assert_(all([isinstance(a, PlayerAction) for a in actions]))
+        check_all_isinstance(actions, PlayerAction)
         if len(actions) > 0:
-            assert_(not actions[0].is_pass())
+            check_true(not actions[0].is_pass())
         self._actions = tuple(actions)
 
     @property
@@ -492,11 +562,17 @@ class Trick(object):
         ind_str = "".join("\t" for _ in range(1))
         return "{ind_str}Trick[{winner}]: {trickstr}".format(trickstr=' -> '.join([ac.pretty_string() for ac in self._actions]), ind_str=ind_str, winner=self._actions[-1].player_name)
 
+    def __getitem__(self, item):
+        return self._actions[item]
+
     def __len__(self):
         return len(self._actions)
 
     def __repr__(self):
-        return "Trick({})".format(' -> '.join([repr(com) for com in self._actions]))
+        return self.__str__()
+
+    def __str__(self):
+        return "{}({})".format(self.__class__.__name__, ' -> '.join([repr(com) for com in self._actions]))
 
     def __iter__(self):
         return self._actions.__iter__()
@@ -533,12 +609,10 @@ class UnfinishedTrick(Trick):
         :raise ValueError: if the action is not a PlayerAction
         """
 
-        assert_(isinstance(action, PlayerAction), ValueError("action must be a PlayerAction"))
+        check_isinstance(action, PlayerAction)
         if check_validity:
-            assert_(not (self.is_empty() and action.is_pass()),
-                    ValueError("Cant add a pass action on an empty trick. ({}) -> ({})".format(action, self.__repr__())))
-            assert_(self.is_empty() or action.can_be_played_on(self.last_combination),
-                    ValueError("Cant play {} on {}.".format(action, self.__repr__())))
+            check_param(not (self.is_empty() and action.is_pass()), msg="Cant add a pass action on an empty trick.")
+            check_param(self.is_empty() or action.can_be_played_on(self.last_combination), param=(self, action))
         self._actions.append(action)
         return self
 
@@ -591,9 +665,9 @@ class PlayerAction(object):
         :param tichu: boolean (default False); flag if the players wants to announce a Tichu with this action. Ignored when pass_=True and combination=False
         """
         # check params
-        assert_(isinstance(player, TichuPlayer), msg="Player must be instance of TichuPlayer, but was {}".format(player.__class__))
-        assert_(combination or pass_)
-        assert_(pass_ or isinstance(combination, Combination))
+        check_isinstance(player, TichuPlayer)
+        check_param(combination or pass_)
+        check_param(pass_ or isinstance(combination, Combination))
 
         self._player = player
         self._comb = combination if combination else None
@@ -643,7 +717,7 @@ class PlayerAction(object):
                 else "Action[{}](player: {}, tichu:{}, comb:{})".format(self._type, self._player.name, self._tichu, self._comb))
 
     def __repr__(self):
-        return "Action[{}](player: {}, tichu:{}, comb:{})".format(self._type, self._player.name, self._tichu, self._comb)
+        return "Action[{}](playername: {}, tichu:{}, comb:{})".format(self._type, self.player_name, self._tichu, self._comb)
 
     def is_combination(self):
         return self._type is PlayerActionType.COMBINATION or self._type is PlayerActionType.COMBINATION_TICHU
