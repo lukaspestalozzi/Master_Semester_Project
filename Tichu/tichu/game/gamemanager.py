@@ -214,13 +214,14 @@ class TichuGame(object):
         receiving_player = leading_player
         if rs.current_trick.is_dragon_trick():  # handle dragon trick
             receiving_player = self._players[leading_player.give_dragon_away(self._history)]
+            logging.info("[GIVE DRAGON TRICK] {} -> {}".format(next_to_play.name, receiving_player.name))
 
         # give trick to the receiving player
         receiving_player.add_trick(rs.current_trick.finish())
 
         rs.finish_trick(self.make_handcards_snapshot())
 
-        logging.info("[WIN TRICK] {}: {}".format(next_to_play.name, rs.last_finished_trick))
+        logging.info("[WIN TRICK] {}: ({})".format(next_to_play.name, rs.last_finished_trick))
 
         # return the leading player and the wish
         return leading_player, wish

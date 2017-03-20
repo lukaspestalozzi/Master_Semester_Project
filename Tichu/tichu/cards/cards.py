@@ -42,7 +42,7 @@ class ImmutableCards(collectionsabc.Collection):
         elif all([isinstance(c, Card) for c in cards]):
             self._cards = frozenset(cards)
         else:
-            raise TypeError("Only instances of 'Card' can be put into 'Cards'.")
+            raise TypeError("Only instances of 'Card' can be put into 'Cards'. But was {}".format(cards))
 
         self._hash = hash(self._cards)
         self._repr = "(len: {}, cards: {})".format(len(self._cards), repr(self._cards))
@@ -88,7 +88,6 @@ class ImmutableCards(collectionsabc.Collection):
         :return the Tichu points in this set of cards.
         """
         pts = sum([c.points for c in self._cards])
-        logging.debug("counting points of cards: {} -> {}".format(self._cards, pts))
         return pts
 
     def issubset(self, other):
@@ -600,10 +599,11 @@ class Cards(ImmutableCards):
         """
         Adds all elements in 'other' to this Cards set.
         :param other: Iterable containing only Card instances.
-        :return Nothing
+        :return self
         """
         for card in other:
             self.add(card)
+        return self
 
     def remove(self, card):
         """
@@ -619,10 +619,11 @@ class Cards(ImmutableCards):
         """
         Removes all elements in 'other' from this Cards set.
         :param other: Iterable containing only Card instances.
-        :return: Nothing
+        :return: self
         """
         for card in other:
             self.remove(card)
+        return self
 
     def to_immutable(self):
         """

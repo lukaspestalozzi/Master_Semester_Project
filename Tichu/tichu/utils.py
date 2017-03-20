@@ -39,6 +39,15 @@ def flatten(iterable):
         yield iterable
 
 
+def indent(n, s="-"):
+    """
+    :param n: number >= 0
+    :param s: string
+    :return: string containing a copy of n times the string s
+    """
+    return s.join("" for _ in range(n))
+
+
 def check_true(expr, ex=AssertionError, msg="expr was not True"):
     """
     Raises an Exception when expr evaluates to False.

@@ -8,6 +8,10 @@ from tichu.players.tichuplayers import TichuPlayer
 from tichu.utils import check_param, check_isinstance, check_all_isinstance, check_true
 
 
+def is_double_win(ranking):
+    return len(ranking) >= 2 and ranking[0] == (ranking[1] + 2) % 4
+
+
 class Team(namedtuple("T", ["player1", "player2"])):
 
     def __init__(self, player1, player2):
@@ -165,6 +169,7 @@ class HandCardSnapshot(namedtuple("HCS", ["handcards0", "handcards1", "handcards
                                                              self.handcards1.pretty_string(),
                                                              self.handcards2.pretty_string(),
                                                              self.handcards3.pretty_string())
+
 
 class TichuGameHistory(namedtuple("TGH", ["team1", "team2", "winner_team", "points", "target_points", "rounds"])):
 
@@ -429,7 +434,7 @@ class SaveTichuRoundHistory(namedtuple("STRH", ["points", "announced_grand_tichu
     def nice_string(self, indent=0):
         ind_str = "".join("\t" for _ in range(1))
         tricks_str = ("\n"+ind_str).join(t.pretty_string(indent=2) for t in self.tricks)
-        s = ("{ind_str}round result: {rh.points[0]}:{rh.points[1]}\n{ind_str}number of Tricks: {nbr_tricks}\n{ind_str}--- Tricks ---\n{ind_str}{ts}"
+        s = ("{ind_str}round result: {rh.points[0]}:{rh.points[1]}\n{ind_str}number of Tricks: {nbr_tricks}\n{ind_str}ranking: {rh.ranking}\n{ind_str}--- Tricks ---\n{ind_str}{ts}"
              .format(rh=self, nbr_tricks=len(self.tricks), ts=tricks_str, ind_str=ind_str))
         return s
 
@@ -478,8 +483,6 @@ class TichuRoundHistory(namedtuple("RoundHistory", ["initial_points", "final_poi
                 return hnds
         return None
 
-
-
     def is_double_win(self):
         return len(self.ranking) >= 2 and self.ranking[0] == (self.ranking[1] + 2) % 4
 
@@ -517,7 +520,7 @@ class TichuRoundHistory(namedtuple("RoundHistory", ["initial_points", "final_poi
     def pretty_string(self, indent=0):
         ind_str = "".join("\t" for _ in range(1))
         tricks_str = ("\n"+ind_str).join(t.pretty_string(indent=2) for t in self.tricks)
-        s = ("{ind_str}round result: {rh.points[0]}:{rh.points[1]}\n{ind_str}number of Tricks: {nbr_tricks}\n{ind_str}--- Tricks ---\n{ind_str}{ts}"
+        s = ("{ind_str}round result: {rh.points[0]}:{rh.points[1]}\n{ind_str}number of Tricks: {nbr_tricks}\n{ind_str}ranking: {rh.ranking}\n{ind_str}handcards:{rh.complete_hands}\n{ind_str}--- Tricks ---\n{ind_str}{ts}"
              .format(rh=self, nbr_tricks=len(self.tricks), ts=tricks_str, ind_str=ind_str))
         return s
 
