@@ -4,7 +4,6 @@ from collections import defaultdict
 from time import time
 
 from tichu.cards.deck import Deck
-from tichu.exceptions import LogicError
 from tichu.game.gameutils import *
 from tichu.utils import *
 
@@ -88,10 +87,11 @@ class TichuGame(object):
         leading_player = self._mahjong_player()
 
         # ##################### TEST TODO remove later
-        nbr_remove = 11
-        for pl in self._players:
-            pl._hand_cards.remove_all(pl.hand_cards.random_cards(nbr_remove))  # remove some random cards to make game shorter
-            assert len(pl.hand_cards) == 14-nbr_remove
+        nbr_remove = 0
+        if nbr_remove > 0:
+            for pl in self._players:
+                pl._hand_cards.remove_all(pl.hand_cards.random_cards(nbr_remove))  # remove some random cards to make game shorter
+                assert len(pl.hand_cards) == 14-nbr_remove
         # #################### END TEST
 
         roundstate.complete_hands = self.make_handcards_snapshot()

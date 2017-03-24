@@ -92,7 +92,6 @@ class CardSuit(ComparableEnum):
     SPECIAL = u'\u1f0cf'
 
     def __init__(self, unicode):
-        self._value_ = self._name_
         self._unicode = unicode
         self._shortname = self._name_[:2]
         self._repr = "Suit({})".format(self.name)

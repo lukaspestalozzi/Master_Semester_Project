@@ -3,7 +3,7 @@ import logging
 import uuid
 
 
-from tichu.agents.abstractagent import BaseAgent
+from tichu.agents.baseagent import BaseAgent
 from tichu.cards.card import CardValue
 from tichu.cards.cards import Cards, ImmutableCards, Single
 from tichu.exceptions import IllegalActionException

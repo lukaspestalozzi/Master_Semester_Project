@@ -6,10 +6,8 @@ from collections import defaultdict
 
 import itertools
 
-import logging
-
 from tichu.cards.card import Card, CardSuit, CardValue
-from tichu.utils import try_ignore, check_param, check_isinstance, check_all_isinstance, check_true
+from tichu.utils import check_param, check_isinstance, check_all_isinstance, check_true, ignored
 
 __author__ = 'Lukas Pestalozzi'
 
@@ -17,6 +15,7 @@ __author__ = 'Lukas Pestalozzi'
 class ImmutableCards(collectionsabc.Collection):
     # TODO change all "isinstance(x, ImmutableClass)" to "self.__class__ == x.__class__"
 
+    __slots__ = ("_cards", "_hash", "_repr", "_str")
     _card_val_to_sword_card = {
         2: Card.TWO_SWORD,
         3: Card.THREE_SWORD,
@@ -119,7 +118,7 @@ class ImmutableCards(collectionsabc.Collection):
         # store 'all single' partition
         final_partitions = set()
         open_partitions = set()
-        open_partitions.add(Partition([Combination([c]) for c in no_phoenix_cards]))
+        open_partitions.add(Partition([Single(c) for c in no_phoenix_cards]))
 
         done = {}
 
@@ -769,6 +768,8 @@ class Combination(metaclass=abc.ABCMeta):
 
 class Single(Combination):
 
+    __slots__ = ("_card", "_height")
+
     def __init__(self, card):
         super().__init__([card])
         self._card = card
@@ -821,6 +822,8 @@ class Single(Combination):
 
 class Pair(Combination):
 
+    __slots__ = ("_card_value", "_height")
+
     def __init__(self, card1, card2):
         check_param(card1 is not card2, param=(card1, card2))  # different cards
         super().__init__((card1, card2))
@@ -842,6 +845,8 @@ class Pair(Combination):
 
 class Trio(Combination):
 
+    __slots__ = ("_card_value", "_height")
+
     def __init__(self, card1, card2, card3):
         check_param(card1 is not card2 and card1 is not card3 and card2 is not card3, param=(card1, card2, card3))  # 3 different cards
         super().__init__((card1, card2, card3))
@@ -862,6 +867,8 @@ class Trio(Combination):
 
 
 class FullHouse(Combination):
+
+    __slots__ = ("_pair", "_trio", "_height")
 
     def __init__(self, pair, trio):
         check_isinstance(pair, Pair)
@@ -912,6 +919,8 @@ class FullHouse(Combination):
 
 
 class PairSteps(Combination):
+
+    __slots__ = ("_lowest_pair_height", "_height", "_pairs")
 
     def __init__(self, pairs):
         check_param(len(pairs) >= 2)
@@ -967,6 +976,8 @@ class PairSteps(Combination):
 
 class Straight(Combination):
 
+    __slots__ = ("_height", "_ph_as")
+
     def __init__(self, cards, phoenix_as=None):
         check_param(len(cards) >= 5)
         if Card.PHOENIX in cards:
@@ -1006,7 +1017,7 @@ class Straight(Combination):
 
     def __str__(self):
         if self.contains_phoenix():
-            return "{}({})-> {}".format(self.__class__.__name__.upper(), ",".join("PH:"+str(self.phoenix_as) if c is Card.PHOENIX else str(c) for c in sorted(self._cards)), len(self))
+            return "{}({})".format(self.__class__.__name__.upper(), ",".join("PH:"+str(self.phoenix_as) if c is Card.PHOENIX else str(c) for c in sorted(self._cards)))
         else:
             return super().__str__()
 
@@ -1025,11 +1036,13 @@ class Bomb(Combination):
 
 class SquareBomb(Bomb):
 
+    __slots__ = ("_height", )
+
     def __init__(self, card1, card2, card3, card4):
         super().__init__((card1, card2, card3, card4))
-        check_true(len(set(self.cards)) == 4)  # all cards are different
+        check_param(len(set(self.cards)) == 4)  # all cards are different
         # all cards have same card_value (takes also care of the phoenix)
-        check_true(len({c.card_value for c in self.cards}) == 1)
+        check_param(len({c.card_value for c in self.cards}) == 1)
         self._height = card1.card_height + 500  # 500 to make sure it is higher than any other non bomb combination
 
     @property
@@ -1048,6 +1061,8 @@ class SquareBomb(Bomb):
 
 
 class StraightBomb(Bomb):
+
+    __slots__ = ("_height", )
 
     def __init__(self, straight):
         check_isinstance(straight, Straight)

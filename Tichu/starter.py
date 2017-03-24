@@ -1,4 +1,5 @@
 import logging
+import datetime
 
 from tichu.agents.minimaxagent import MiniMaxPIAgent
 from tichu.agents.randomagent import RandomAgent
@@ -8,14 +9,24 @@ from tichu.players.tichuplayers import TichuPlayer
 from tichu import logginginit
 
 if __name__ == "__main__":
-    logginginit.initialize_logger("./logs", console_log_level=logging.INFO)
+    logginginit.initialize_logger("./logs", console_log_level=logging.INFO, all_log="all.log")
 
     players = [
         TichuPlayer(name="player0", agent=MiniMaxPIAgent(), perfect_information_mode=True),
+        TichuPlayer(name="player1", agent=MiniMaxPIAgent(), perfect_information_mode=True),
+        TichuPlayer(name="player2", agent=MiniMaxPIAgent(), perfect_information_mode=True),
+        TichuPlayer(name="player3", agent=MiniMaxPIAgent(), perfect_information_mode=True),
+    ]
+
+    random_players = [
+        TichuPlayer(name="player0", agent=RandomAgent()),
         TichuPlayer(name="player1", agent=RandomAgent()),
         TichuPlayer(name="player2", agent=RandomAgent()),
-        TichuPlayer(name="player3", agent=RandomAgent())
+        TichuPlayer(name="player3", agent=RandomAgent()),
     ]
+
+    # players = random_players
+
     team1 = Team(player1=players[0], player2=players[2])
     team2 = Team(player1=players[1], player2=players[3])
     GM = TichuGame(team1, team2, target_points=1)
@@ -26,5 +37,7 @@ if __name__ == "__main__":
 
     with open("./logs/game_res.log", "a") as f:
         f.write("\n\n################################## NEW GAME ##################################\n")
+        now = datetime.datetime.now()
+        f.write("time: {}\n".format(now.strftime("%Y-%m-%d %H:%M")))
         f.write(res_string)
 

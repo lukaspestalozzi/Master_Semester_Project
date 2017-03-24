@@ -5,7 +5,7 @@ import random
 import logging
 from collections import defaultdict
 
-from tichu.agents.abstractagent import BaseAgent
+from tichu.agents.baseagent import BaseAgent
 from tichu.cards.card import CardValue
 from tichu.game.gameutils import Card_To
 

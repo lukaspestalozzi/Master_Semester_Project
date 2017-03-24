@@ -1,3 +1,5 @@
+from decorator import contextmanager
+
 
 def raiser(ex):
     """
@@ -124,17 +126,14 @@ def check_param(expr, param="[No Parameter given]", msg=None):
         return True
 
 
-def try_ignore(fun_to_call, *args, **kwargs):
-    """
-    callf fun_to_call with the args and kwargs. If an exeption occures, then ignores it and returns None
-    :param fun_to_call: a function to be called
-    :return: the result of the function call or None if an exception was thrown
-    """
+# contextmanagers
+@contextmanager
+def ignored(*exceptions):
     try:
-        res = fun_to_call(*args, **kwargs)
-        return res
-    except Exception:
-        return None
+        yield
+    except exceptions:
+        pass
+
 
 class Final(type):
     """
