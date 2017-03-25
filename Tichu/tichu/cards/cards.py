@@ -577,7 +577,7 @@ class Cards(ImmutableCards):
     A mutable set of Cards with some helpful functions.
     """
 
-    def __init__(self, cards):
+    def __init__(self, cards=list()):
         super().__init__(cards)
         self._cards = set(self._cards)
         self.__hash__ = None  # diable hashing

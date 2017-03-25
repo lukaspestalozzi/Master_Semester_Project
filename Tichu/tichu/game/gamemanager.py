@@ -86,14 +86,6 @@ class TichuGame(object):
         # round-loop
         leading_player = self._mahjong_player()
 
-        # ##################### TEST TODO remove later
-        nbr_remove = 0
-        if nbr_remove > 0:
-            for pl in self._players:
-                pl._hand_cards.remove_all(pl.hand_cards.random_cards(nbr_remove))  # remove some random cards to make game shorter
-                assert len(pl.hand_cards) == 14-nbr_remove
-        # #################### END TEST
-
         roundstate.complete_hands = self.make_handcards_snapshot()
 
         wish = None

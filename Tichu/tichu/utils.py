@@ -126,7 +126,6 @@ def check_param(expr, param="[No Parameter given]", msg=None):
         return True
 
 
-# contextmanagers
 @contextmanager
 def ignored(*exceptions):
     try:
@@ -144,3 +143,15 @@ class Final(type):
             if isinstance(b, Final):
                 raise TypeError("type '{0}' is not an acceptable base type".format(b.__name__))
         return type.__new__(mcs, name, bases, dict(classdict))
+
+
+class Singleton(type):
+    """
+    Class that has only one instance
+    """
+    instance = None
+
+    def __call__(cls, *args, **kw):
+        if not cls.instance:
+            cls.instance = super(Singleton, cls).__call__(*args, **kw)
+        return cls.instance

@@ -158,11 +158,14 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         Called by the the tichu manager to ask for the 3 cards to be swapped
         :return a SwapCards instance.
         """
-        from tichu.game.gameutils import SwapCards
         swap_cards = self._agent.swap_cards(self.hand_cards)
-        sc = SwapCards(self, *swap_cards)
-        self._hand_cards.remove_all(sc.cards())
-        return sc
+        check_true(len(swap_cards) == 3
+                   and len({sw.player_pos for sw in swap_cards}) == 1
+                   and len({sw.to for sw in swap_cards}) == 3,
+                   ex=IllegalActionException, msg="swap cards were not correct")
+        for sw in swap_cards:
+            self._hand_cards.remove(sw.card)
+        return swap_cards
 
     def announce_grand_tichu_or_not(self, announced_grand_tichu):
         """

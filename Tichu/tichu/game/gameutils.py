@@ -1,3 +1,5 @@
+import abc
+
 from collections import namedtuple
 from enum import Enum
 
@@ -646,6 +648,7 @@ Card_To = namedtuple("Card_To", ["card", "to"])
 SwapCard = namedtuple("SwapCard", ["card", "from_", "to"])
 
 
+# ####################### old actions ##########################
 class PlayerActionType(Enum):
     PASS = 0
     COMBINATION = 1
