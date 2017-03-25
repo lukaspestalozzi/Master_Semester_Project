@@ -146,6 +146,20 @@ class HandCardSnapshot(namedtuple("HCS", ["handcards0", "handcards1", "handcards
         check_all_isinstance([handcards0, handcards1, handcards2, handcards3], ImmutableCards)
         super().__init__()
 
+    def remove_cards(self, from_pos, cards):
+        """
+
+        :param from_pos:
+        :param cards:
+        :return: a new HandCardSnapshot instance with the cards removed from the given position
+        """
+        cards_at_pos = Cards(self[from_pos])
+        cards_at_pos.remove_all(cards)
+        new_cards_at_pos = cards_at_pos.to_immutable()
+        new_l = list(self)
+        new_l[from_pos] = new_cards_at_pos
+        return HandCardSnapshot(*new_l)
+
     def copy(self, save=False):
         """
         Makes a copy of this instance
@@ -439,11 +453,7 @@ class SaveTichuRoundHistory(namedtuple("STRH", ["points", "announced_grand_tichu
         return s
 
 
-class TichuRoundHistory(namedtuple("RoundHistory", ["initial_points", "final_points", "points",
-                                                    "grand_tichu_hands", "before_swap_hands",
-                                                    "card_swaps", "complete_hands",
-                                                    "announced_grand_tichus", "announced_tichus",
-                                                    "tricks", "handcards", "ranking"])):
+class TichuRoundHistory(namedtuple("RoundHistory", ["initial_points", "final_points", "points", "grand_tichu_hands", "before_swap_hands", "card_swaps", "complete_hands", "announced_grand_tichus", "announced_tichus", "tricks", "handcards", "ranking"])):
 
     def __init__(self, initial_points, final_points, points, grand_tichu_hands, before_swap_hands,
                  card_swaps, complete_hands, announced_grand_tichus, announced_tichus, tricks, handcards, ranking):
@@ -527,6 +537,7 @@ class TichuRoundHistory(namedtuple("RoundHistory", ["initial_points", "final_poi
 
 class Trick(object):
     """ (Immutable) List of PlayerActions """
+    __slots__ = ("_actions",)
 
     def __init__(self, actions):
         check_all_isinstance(actions, PlayerAction)
@@ -585,6 +596,7 @@ class SaveTrick(Trick):
     """
     Immutable Trick containing only save PlayerActions (no information about the player except the name)
     """
+    __slots__ = ()
 
     def __init__(self, actions):
         save_actions = [SavePlayerAction.from_playeraction(a) for a in actions]
@@ -595,6 +607,7 @@ class UnfinishedTrick(Trick):
     """
     Mutable Trick instance
     """
+    __slots__ = ("_actions",)
 
     def __init__(self):
         super().__init__([])

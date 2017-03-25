@@ -1,8 +1,8 @@
+import random
 from collections import namedtuple
 from tichu.cards.card import Card
 from tichu.cards.cards import Combination, Cards
 from tichu.exceptions import IllegalActionException
-from tichu.game.gameutils import HandCardSnapshot
 
 from tichu.gametree import GameTree
 import numpy as np
@@ -85,17 +85,23 @@ class MonteCarloTreeSearch(object):
         return children_states[np.argmax(scores)]
 
 
-class MctsState(namedtuple("GameState", ["player_pos", "hand_cards", "tricks", "combination_on_table", "wish", "ranking", "nbr_passed"])):
+class MctsState(namedtuple("GameState", ["player_pos", "hand_cards", "tricks", "combination_on_table", "wish", "ranking", "nbr_passed", "announced_tichu", "announced_grand_tichu"])):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._visited_count = 0
         self._reward_count = 0
-        pcombs, play_wish = self._possible_combinations()
-        self._possible_actions = pcombs
-        self._expanded_actions = []
-        self._remaining_actions = list(self._possible_actions)
+
+        pcombs, play_wish = self._find_possible_combinations()
+        self._possible_combinations = pcombs
         self._can_pass = self.combination_on_table is not None and not play_wish
+        self._expanded_actions = set()
+        self._remaining_actions = list(self._possible_combinations)
+        self._action_state_transitions = dict()
+
+        if self._can_pass:
+            self._remaining_actions.append(None)
+
 
 
     @property
@@ -116,7 +122,7 @@ class MctsState(namedtuple("GameState", ["player_pos", "hand_cards", "tricks", "
     def increase_visited_count(self):
         self._visited_count += 1
 
-    def _possible_combinations(self):
+    def _find_possible_combinations(self):
         """
         :return: a tuple of the possible combinations and whether the combinations satisfy the wish
         """
@@ -129,55 +135,53 @@ class MctsState(namedtuple("GameState", ["player_pos", "hand_cards", "tricks", "
         return (possible_combs, False)
 
     def _state_for_comb(self, comb):
-        # TODO überprüfen
         new_comb_on_table = comb
-        # remove comb from handcards:
-        player_handcards = Cards(self.combination_on_table)
-        assert len(player_handcards) > 0
-        player_handcards.remove_all(comb)
-        assert len(player_handcards) < len(self.combination_on_table)
-        new_handcards_l = list(self.hand_cards)
-        new_handcards_l[self.player_pos] = player_handcards.to_immutable()
-        new_handcards = HandCardSnapshot(*new_handcards_l)
-        assert new_handcards[self.player_pos].issubset(player_handcards), "new:{}; phc:{}".format(new_handcards[self.player_pos], player_handcards)
-        assert len(player_handcards) == len(new_handcards[self.player_pos])
-        # ranking:
+        new_handcards = self.hand_cards.remove_cards(from_pos=self.player_pos, cards=comb.cards)
+        assert len(new_handcards[self.player_pos]) < len(self.hand_cards[self.player_pos])
+        assert new_handcards[self.player_pos].issubset(self.hand_cards[self.player_pos])
+
+        # test ranking:
         new_ranking = list(self.ranking)
-        if len(player_handcards) == 0:
+        if len(new_handcards[self.player_pos]) == 0:
             new_ranking.append(self.player_pos)
             assert len(set(new_ranking)) == len(new_ranking), "state:{}\ncomb:{}".format(self, comb)
 
         # handle dog
+        next_player = self.next_player_turn()
         if Card.DOG in comb:
-            next_player = next((ppos % 4 for ppos in range(self.player_pos+2, self.player_pos+3+2)
-                                              if len(self.hand_cards[ppos % 4]) > 0))
+            next_player = next((ppos % 4 for ppos in range(self.player_pos+2, self.player_pos+3+2) if len(self.hand_cards[ppos % 4]) > 0))
             assert next_player is not None
-            new_comb_on_table = None
+            assert self.nbr_passed == 0 # just to be sure
+            new_comb_on_table = None  # dog is removed instantly
 
         # create game-state
-        gs = MctsState(player_pos=self.next_player_turn(),
+        gs = MctsState(player_pos=next_player,
                        hand_cards=new_handcards,
                        tricks=self.tricks,
                        combination_on_table=new_comb_on_table,
                        wish=None if comb.fulfills_wish(self.wish) else self.wish,
                        ranking=new_ranking,
-                       nbr_passed=0)
+                       nbr_passed=0,
+                       announced_tichu=self.announced_tichu,
+                       announced_grand_tichu=self.announced_grand_tichu)
         return gs
 
     def _state_for_action(self, action):
         """
-
         :param action: Combination or None (pass).
         :return: The new game state the action leads to.
         """
-        if action is None:
-            return self._state_for_pass()
+        if action in self._action_state_transitions:
+            return self._action_state_transitions[action]
+        elif action is None:
+            new_state = self._state_for_pass()
         elif isinstance(action, Combination):
             assert action.can_be_played_on(self.combination_on_table)
-            return self._state_for_comb(action)
-
+            new_state = self._state_for_comb(action)
         else:
             raise ValueError("action must be None or a Combination")
+        self._action_state_transitions[action] = new_state
+        return new_state
 
     def _state_for_pass(self):
         if not self._can_pass:
@@ -185,9 +189,9 @@ class MctsState(namedtuple("GameState", ["player_pos", "hand_cards", "tricks", "
         else:
             # TODO überprüfen
             # give trick to player if this is 3rd passing
-            new_tricks = self.tricks
+            new_tricks = self.tricks  # tricks is a tuple (of len 4) containing list of cards  # TODO change to list of Tricks (and unfinished tricks)
             if self.nbr_passed == 2:
-                trick_winner_pos = (self.player_pos + 1) % 4
+                trick_winner_pos = (self.player_pos + 1) % 4  # 3 players passed, so it is the next player to this player
                 new_tricks = list(self.tricks)
                 new_tricks[trick_winner_pos] = Cards(self.tricks[trick_winner_pos]).add_all(self.combination_on_table).to_immutable()
                 new_tricks = tuple(new_tricks)
@@ -197,28 +201,106 @@ class MctsState(namedtuple("GameState", ["player_pos", "hand_cards", "tricks", "
                            combination_on_table=self.combination_on_table if self.nbr_passed < 2 else None,  # test if this pass action is the 3rd
                            wish=self.wish,
                            ranking=list(self.ranking),
-                           nbr_passed=self.nbr_passed+1 if self.nbr_passed < 2 else 0)
+                           nbr_passed=self.nbr_passed+1 if self.nbr_passed < 2 else 0,
+                           announced_tichu=self.announced_tichu,
+                           announced_grand_tichu=self.announced_grand_tichu)
             assert ((gs.combination_on_table is None and gs.nbr_passed == 0) or (gs.combination_on_table is not None and gs.nbr_passed > 0))
             return gs
 
     def next_player_turn(self):
-        # TODO überprüfen
         return next((ppos % 4 for ppos in range(self.player_pos+1, self.player_pos+4) if len(self.hand_cards[ppos % 4]) > 0))
 
-    def expand(self):
-        pass  # TODO return action, new_state of not yet visited action
+    def expand(self, strategy='RANDOM'):
+        """
+
+        :param strategy: ['RANDOM', 'NEXT', 'LOWEST', 'HIGHEST'] how the action to expand is chosen.
+            - RANDOM: a random action
+            - NEXT: the next action in the list
+            - LOWEST: the lowest combination (sorted by length and then height, None counting as the lowest of all possiblecombinations)
+            - HIGHEST: the highest combination
+        :return: tuple(action, new_state) of a not yet visited action
+        """
+        if strategy == 'RANDOM':
+            action = random.choice(self._remaining_actions)
+            self._remaining_actions.remove(action)
+        elif strategy == 'NEXT':
+            action = self._remaining_actions.pop()
+        elif strategy == 'LOWEST':
+            action = sorted(self._remaining_actions, key=lambda c: 0 if c is None else (len(c), c.height)).pop()
+        elif strategy == 'HIGHEST':
+            action = sorted(self._remaining_actions, reversed=True, key=lambda c: 0 if c is None else (len(c), c.height)).pop()
+        else:
+            raise ValueError("strategy must be one of ['RANDOM', 'NEXT', 'LOWEST', 'HIGHEST'], but was {}".format(strategy))
+
+        assert action not in self._expanded_actions
+        self._expanded_actions.add(action)
+        new_state = self._state_for_action(action)
+        return (action, new_state)
 
     def can_be_expanded(self):
-        pass  # TODO not all actions have been returned by 'expand'
-
-    def is_terminal(self):
-        pass  # TODO
+        return not self.is_terminal() and len(self._remaining_actions) > 0
 
     def random_action(self):
-        pass  # TODO return (action, new_state)
+        """
+        :return: tuple(action, new_state) of a random legal action in this state.
+        """
+        action = random.choice(self._possible_combinations)
+        try:
+            new_state = self._action_state_transitions[action]
+        except KeyError:
+            new_state = self._state_for_action(action)
+        return (action, new_state)
+
+    def is_double_win(self):
+        return len(self.ranking) >= 2 and self.ranking[0] == (self.ranking[1] + 2) % 4
+
+    def is_terminal(self):
+        return (len(self.ranking) >= 3
+                or sum([len(hc) > 0 for hc in self.hand_cards]) <= 1  # equivalent to previous one TODO remove?
+                or self.is_double_win())
 
     def evaluate(self):
-        pass  # TODO
+        """
+        :return: tuple of length 4 with the points of each player at the corresponding index.
+        """
+        def calc_tichu_points():
+            tichu_points = [0, 0, 0, 0]
+            for gt_pos in self.announced_grand_tichu:
+                tichu_points[gt_pos] += 200 if gt_pos == self.ranking[0] else -200
+            for t_pos in self.announced_tichu:
+                tichu_points[t_pos] += 100 if t_pos == self.ranking[0] else -100
+            return tichu_points
+
+        points = calc_tichu_points()
+        final_ranking = self.ranking + [ppos for ppos in range(4) if ppos not in self.ranking]
+        assert len(final_ranking) == 4, "{} -> {}".format(self.ranking, final_ranking)
+
+        if self.is_double_win():
+            # double win
+            points[final_ranking[0]] += 100
+            points[final_ranking[1]] += 100
+            points[final_ranking[2]] -= 100
+            points[final_ranking[3]] -= 100
+        else:
+            # not double win
+            for p in range(3):  # first 3 players get the points in their won tricks
+                points[final_ranking[p]] += sum(t.points for t in self.tricks[final_ranking[p]])
+
+            # first player gets the points of the last players tricks
+            winner = final_ranking[0]
+            looser = final_ranking[3]
+            points[winner] += sum(t.points for t in self.tricks[looser])
+
+            # the handcards of the last player go to the enemy team
+            points[(looser+1) % 4] += sum(t.points for t in self.hand_cards[looser])
+        # fi
+
+        # sum the points of each team
+        for pos in range(4):
+            points[pos] += points[(pos+2) % 4]
+
+        assert len(points) == 4
+        return tuple(points)
 
     def __hash__(self):
         return hash((self.player_pos, self.hand_cards, self.combination_on_table, self.wish, self.nbr_passed))

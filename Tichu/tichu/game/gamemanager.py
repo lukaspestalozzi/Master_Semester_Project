@@ -290,6 +290,7 @@ class TichuGame(object):
         """
         :return: dict{int: points}, a dict containing the points of each players gained (or lost) by succeeding or failing to fullfill a (grand)Tichu
         """
+        # TODO there is a nicer version in monecarlo state
         points_t, points_gt = defaultdict(lambda: 0), defaultdict(lambda: 0)
         points_gt.update({pid: -200 for pid in self._history.current_round.announced_grand_tichus})  # assuming all players failed
         points_t.update({pid: -100 for pid in self._history.current_round.announced_tichus})  # assuming all players failed
