@@ -44,6 +44,7 @@ class BaseAgent(metaclass=abc.ABCMeta):
 
         :param announced_tichu:
         :param announced_grand_tichu:
+        :param round_history:
         :return:
         """
         # TODO describe
@@ -61,6 +62,7 @@ class BaseAgent(metaclass=abc.ABCMeta):
         """
 
         :param round_history:
+        :param wish:
         :return:
         """
         # TODO describe
@@ -92,7 +94,7 @@ class BaseAgent(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def give_dragon_away(self, hand_cards, round_history):
+    def give_dragon_away(self, hand_cards, trick, round_history):
         """
 
         :param hand_cards:

@@ -1,9 +1,7 @@
 from collections import abc
 
 from tichu.cards.card import Card
-from tichu.cards.cards import Single, Trio, Pair, Straight, StraightBomb, PairSteps, ImmutableCards, SquareBomb, \
-    FullHouse
-from tichu.cards.cards import Combination
+from tichu.cards.cards import Single, Trio, Pair, Straight, StraightBomb, PairSteps, ImmutableCards, SquareBomb, FullHouse, Combination
 from tichu.utils import check_isinstance, ignored
 
 __author__ = 'Lukas Pestalozzi'

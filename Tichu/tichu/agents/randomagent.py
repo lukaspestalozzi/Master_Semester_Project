@@ -7,7 +7,7 @@ from collections import defaultdict
 
 from tichu.agents.baseagent import BaseAgent
 from tichu.cards.card import CardValue
-from tichu.game.gameutils import Card_To
+from tichu.game.gameutils import PassAction, CombinationAction, SwapCardAction
 
 
 class RandomAgent(BaseAgent):
@@ -15,7 +15,7 @@ class RandomAgent(BaseAgent):
     def __init__(self):
         super().__init__()
 
-    def give_dragon_away(self, hand_cards, round_history):
+    def give_dragon_away(self, hand_cards, trick, round_history):
         pl_pos = (self.position + 1) % 4
         return pl_pos
 
@@ -43,7 +43,7 @@ class RandomAgent(BaseAgent):
         logging.debug("Agent plays: "+str(comb))
 
         assert comb is None or len(possible_combs) > 0, "If there is a combination to play, don't pass"
-        return comb
+        return PassAction(self._position) if comb is None else CombinationAction(self._position, combination=comb)
 
     def play_bomb(self, hand_cards, round_history):
         possible_bombs = [b for b in hand_cards.all_bombs() if round_history.last_combination < b]
@@ -96,9 +96,9 @@ class RandomAgent(BaseAgent):
     def swap_cards(self, hand_cards):
         sc = hand_cards.random_cards(3)
         scards = [
-                   Card_To(sc[0], (self.position + 1) % 4),
-                   Card_To(sc[1], (self.position + 2) % 4),
-                   Card_To(sc[2], (self.position + 3) % 4)
+                    SwapCardAction(player_from=self._position, card=sc[0], player_to=(self.position + 1) % 4),
+                    SwapCardAction(player_from=self._position, card=sc[1], player_to=(self.position + 2) % 4),
+                    SwapCardAction(player_from=self._position, card=sc[2], player_to=(self.position + 3) % 4)
                 ]
         return scards
 

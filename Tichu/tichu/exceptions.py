@@ -1,6 +1,13 @@
 
 
-class LogicError(Exception):
+class TichuError(Exception):
+    """
+    Parent class for all Error of the Tichu Module
+    """
+    pass
+
+
+class LogicError(TichuError):
     """
     Exception raised for LogicErrors.
     Raise this instead of writing 'Should never happen'.
@@ -8,14 +15,14 @@ class LogicError(Exception):
     pass
 
 
-class IllegalActionException(Exception):
+class IllegalActionException(TichuError):
     """
     Exception raised when a Player makes an illegal Move
     """
     pass
 
 
-class PlayerException(Exception):
+class PlayerException(TichuError):
     """
     Exception raised by a Player.
     """

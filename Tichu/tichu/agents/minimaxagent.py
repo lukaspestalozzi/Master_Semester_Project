@@ -9,7 +9,7 @@ import time
 from tichu.agents.baseagent import BaseAgent
 from tichu.cards.card import CardValue, Card
 from tichu.cards.cards import Cards, ImmutableCards
-from tichu.game.gameutils import Card_To, HandCardSnapshot, is_double_win
+from tichu.game.gameutils import HandCardSnapshot
 from tichu.utils import indent, check_param
 
 

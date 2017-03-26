@@ -202,7 +202,7 @@ class TypedList(list):
 
     def append(self, elem):
         if not isinstance(elem, self._dtype):
-            raise TypeError("elem must be of type {}".format(self._dtype))
+            raise TypeError("elem must be of type {}, but was {}".format(self._dtype, elem.__class__))
         return super().append(elem)
 
     def __setitem__(self, key, value):

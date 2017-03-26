@@ -4,17 +4,16 @@ from collections import namedtuple
 
 import abc
 from tichu.cards.card import Card, CardValue
-from tichu.cards.cards import Combination, ImmutableCards, Cards
+from tichu.cards.cards import Combination, ImmutableCards, Cards, Bomb
 from tichu.cards.cards import Single
-from tichu.exceptions import IllegalActionException
-from tichu.players.tichuplayers import TichuPlayer
+from tichu.exceptions import IllegalActionException, LogicError
 from tichu.typedcollections import TypedList, TypedTuple
 
 # --------------- Trick ------------------------
-from tichu.utils import check_param, check_isinstance, check_all_isinstance
+from tichu.utils import check_param, check_isinstance, check_all_isinstance, check_true, indent
 
 
-class CombinationList(TypedList):
+class CombinationActionList(TypedList):
     """ List only accepting Combination instances
     >>> CombinationList([Single(Card.PHOENIX)])
     [SINGLE(PHOENIX)]
@@ -46,25 +45,25 @@ class CombinationList(TypedList):
     __slots__ = ()
 
     def __init__(self, iterable):
-        super().__init__(Combination, iterable)
+        super().__init__(CombinationAction, iterable)
 
 
-class CombinationTuple(TypedTuple):
+class CombinationActionTuple(TypedTuple):
     __slots__ = ()
 
     def __new__(cls, iterable):
-        return TypedTuple.__new__(cls, Combination, iterable)
+        return TypedTuple.__new__(cls, CombinationAction, iterable)
 
 
-class UnfinishedTrick(CombinationList):
+class UnfinishedTrick(CombinationActionList):
     """Mutable Trick (list of combinations) instance
     >>> UnfinishedTrick()
     []
     """
     __slots__ = ()
 
-    def __init__(self, combinations=list()):
-        super().__init__(combinations)
+    def __init__(self, comb_actions=list()):
+        super().__init__(comb_actions)
 
     @classmethod
     def from_trick(cls, trick):
@@ -72,6 +71,10 @@ class UnfinishedTrick(CombinationList):
 
     @property
     def last_combination(self):
+        return self[-1].combination if len(self) > 0 else None
+
+    @property
+    def last_combination_action(self):
         return self[-1] if len(self) > 0 else None
 
     def is_empty(self):
@@ -84,22 +87,26 @@ class UnfinishedTrick(CombinationList):
         """
         :return: An (immutable) Trick
         """
-        return Trick(combinations=list(self))
+        return Trick(list(self))
 
 
-class Trick(CombinationTuple):
+class Trick(CombinationActionTuple):
     """ (Immutable) List of Combinations """
     __slots__ = ()
 
-    def __init__(self, combinations):
+    def __init__(self, comb_actions):
         """
-        :param combinations: a sequence of combinations.
+        :param comb_actions: a sequence of combinations.
         """
-        super().__init__(combinations)
+        super().__init__()
 
     @property
     def combinations(self):
         return list(self)
+
+    @property
+    def last_combination_action(self):
+        return self[-1] if len(self) > 0 else None
 
     @property
     def points(self):
@@ -110,16 +117,16 @@ class Trick(CombinationTuple):
         """
         :return: The last combination of this trick
         """
-        return self[-1]
+        return self[-1].combination
 
     def is_dragon_trick(self):
-        return Card.DRAGON in self[-1]
+        return Card.DRAGON in self.last_combination
 
     def count_points(self):
-        return sum([comb.points for comb in self])
+        return sum([comb.combination.points for comb in self])
 
-    def pretty_string(self, indent=0):
-        ind_str = "".join("\t" for _ in range(1))
+    def pretty_string(self, indent_=0):
+        ind_str = indent(indent_, s=" ")
         return f"{ind_str}Trick[{self[-1].player_pos}]: {' -> '.join([comb.pretty_string() for comb in self])}"
 
     def __repr__(self):
@@ -127,9 +134,38 @@ class Trick(CombinationTuple):
 
 
 # -------------- Events and Actions -------------------
-
-
 class GameEvent(object, metaclass=abc.ABCMeta):
+
+    def pretty_string(self, indent_=0):
+        return f"{indent(indent_, s=' ')}{str(self)}"
+
+    def __str__(self):
+        return f"{self.__class__.__name__}"
+
+
+class RoundEndEvent(GameEvent):
+    """ The event of finishing a round """
+    __slots__ = ("_ranking", )
+
+    def __init__(self, ranking):
+        super().__init__()
+        self._ranking = tuple(ranking)
+
+    @property
+    def ranking(self):
+        return tuple(self._ranking)
+
+    def __str__(self):
+        return f"{self.__class__.__name__}(ranking:{self._ranking})"
+
+
+class RoundStartEvent(GameEvent):
+    """ The event of starting a round """
+    __slots__ = ()
+    # TODO store information here
+
+
+class PlayerGameEvent(GameEvent, metaclass=abc.ABCMeta):
     """ abstract parent class for all game events possible in the game """
 
     __slots__ = ("_player_pos",)
@@ -141,6 +177,9 @@ class GameEvent(object, metaclass=abc.ABCMeta):
     @property
     def player_pos(self):
         return self._player_pos
+
+    def pretty_string(self, indent_=0):
+        return f"{indent(indent_, s=' ')}"+self.__str__()
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self._player_pos})"
@@ -155,43 +194,93 @@ class GameEvent(object, metaclass=abc.ABCMeta):
         return hash(self.__class__) + self._player_pos
 
 
-class FinishEvent(GameEvent):
+class FinishEvent(PlayerGameEvent):
     """ A player finished action"""
     __slots__ = ()
 
-    def __str__(self):
-        return f"Finish({self._player_pos})"
 
-
-class WinTrickEvent(GameEvent):
+class WinTrickEvent(PlayerGameEvent):
     """ Win a trick """
 
-    __slots__ = ("_trick",)
+    __slots__ = ("_hand_cards")
 
-    def __init__(self, player_pos, trick):
+    def __init__(self, player_pos, trick, hand_cards):
+        """
+        :param player_pos:
+        :param hand_cards: The HandCardSnapshot of the players when the trick finished
+        """
+        check_isinstance(hand_cards, HandCardSnapshot)
         check_isinstance(trick, Trick)
         super().__init__(player_pos=player_pos)
+        self._hand_cards = hand_cards
         self._trick = trick
+
+    @property
+    def hand_cards(self):
+        return self._hand_cards
 
     @property
     def trick(self):
         return self._trick
 
+    def pretty_string(self, indent_=0):
+        return f"{indent(indent_, s=' ')}{self.__class__.__name__}(winner:{self._player_pos})"
+
     def __repr__(self):
-        return f"{self.__class__.__name__}({self._player_pos}, {str(self._trick)})"
+        return f"{self.__class__.__name__}({self._player_pos} handcards:{self._hand_cards}, trick:{self._trick})"
 
     def __eq__(self, other):
-        return super().__eq__(other) and self.trick == other.trick
+        return super().__eq__(other) and self.hand_cards == self.hand_cards and self.trick == other.trick
 
     def __hash__(self):
-        return hash((self._player_pos, self._trick))
+        return hash((self._player_pos, self.hand_cards, self._trick))
 
 
-class PlayerAction(GameEvent, metaclass=abc.ABCMeta):
+class PlayerAction(PlayerGameEvent, metaclass=abc.ABCMeta):
     """
     An action instigated by a player
     """
-    pass
+    __slots__ = ()
+
+    def check(self, played_on=False, has_cards=None, is_combination=False, not_pass=False, is_bomb=False):
+        """
+        Checks the following properties when the argument is not False:
+        :param played_on: Combination, whether the action can be played on the combination
+        :param has_cards: Player, whether the player has the cards to play this action
+        :param not_pass: bool, whether the action can be pass or not. (not_pass = True, -> action must not be pass action)
+        :param is_bomb: bool, whether the action must be a bomb or not.
+        :return: True if all checks succeed, False otherwise
+        """
+
+        if isinstance(played_on, Combination):
+            check_true(self.can_be_played_on_combination(played_on), ex=IllegalActionException,
+                       msg=f"{self} can't be played on {played_on}")
+
+        from tichu.players.tichuplayers import TichuPlayer  # TODO import on top?
+        if isinstance(has_cards, TichuPlayer):
+            check_true(self.does_player_have_cards(has_cards), ex=IllegalActionException,
+                       msg=f"{has_cards} does not have the cards for {self}")
+
+        if not_pass:
+            check_true(not isinstance(self, PassAction), ex=IllegalActionException,
+                       msg=f"Action must not be Pass, but was {self}")
+
+        if is_combination:
+            check_true(isinstance(self, CombinationAction), ex=IllegalActionException,
+                       msg=f"Action must be a CombinationAction, but was {self}")
+
+        if is_bomb:
+            check_true(self.is_bomb(), ex=IllegalActionException, msg=f"Action must not be Bomb, but was {self}")
+        return True
+
+    def can_be_played_on_combination(self, comb):
+        return True
+
+    def does_player_have_cards(self, player):
+        return player is not None
+
+    def is_bomb(self):
+        return False
 
 
 class PassAction(PlayerAction):
@@ -199,24 +288,22 @@ class PassAction(PlayerAction):
 
     __slots__ = ()
 
+    def can_be_played_on_combination(self, comb):
+        return comb is not None
+
     def __str__(self):
         return f"Pass({self._player_pos})"
 
 
 class TichuAction(PlayerAction):
     """ Announce a tichu action """
-    __slots__ = ()
 
-    def __str__(self):
-        return f"Tichu({self._player_pos})"
+    __slots__ = ()
 
 
 class GrandTichuAction(PlayerAction):
     """ Announce a grand tichu action """
     __slots__ = ()
-
-    def __str__(self):
-        return f"GrandTichu({self._player_pos})"
 
 
 class GiveDragonAwayAction(PlayerAction):
@@ -225,7 +312,7 @@ class GiveDragonAwayAction(PlayerAction):
     __slots__ = ("_trick", "_to")
 
     def __init__(self, player_from, player_to, trick):
-        check_param(player_to in range(4) and abs(player_from - player_to) == 1)
+        check_param(player_to in range(4) and ((player_from+1)% 4 == player_to or (player_from-1)% 4 == player_to), param=(player_from, player_to))
         check_isinstance(trick, Trick)
         check_param(Card.DRAGON is trick.last_combination.card)
         super().__init__(player_pos=player_from)
@@ -240,13 +327,16 @@ class GiveDragonAwayAction(PlayerAction):
     def to(self):
         return self._to
 
+    def can_be_played_on_combination(self, comb):
+        return Card.DRAGON is comb.card
+
     def __eq__(self, other):
         return super().__eq__(other) and self.trick == other.trick and self.to == other.to
 
     def __hash__(self):
         return hash((self._player_pos, self._trick, self._to))
 
-    def __repr__(self):
+    def __str__(self):
         return f"{self.__class__.__name__}({self._player_pos} -> {self._to}: {str(self._trick)})"
 
 
@@ -270,13 +360,16 @@ class SwapCardAction(PlayerAction):
     def to(self):
         return self._to
 
+    def does_player_have_cards(self, player):
+        return self._card in player.hand_cards
+
     def __eq__(self, other):
         return super().__eq__(other) and self.card == other.card and self.to == other.to
 
     def __hash__(self):
         return hash((self._player_pos, self._card, self._to))
 
-    def __repr__(self):
+    def __str__(self):
         return f"{self.__class__.__name__}({self._player_pos} -> {self._to}: {str(self._card)})"
 
 
@@ -286,7 +379,9 @@ class WishAction(PlayerAction):
     __slots__ = ("_cardval",)
 
     def __init__(self, player_from, cardvalue):
-        check_isinstance(cardvalue, CardValue)
+        if cardvalue is not None:
+            check_isinstance(cardvalue, CardValue)
+            check_param(cardvalue not in {CardValue.PHOENIX, CardValue.DRAGON, CardValue.DOG, CardValue.MAHJONG}, msg="Wish can't be a special card.")
         super().__init__(player_pos=player_from)
         self._cardval = cardvalue
 
@@ -294,13 +389,16 @@ class WishAction(PlayerAction):
     def card_value(self):
         return self._cardval
 
+    def can_be_played_on_combination(self, comb):
+        return Card.MAHJONG in comb
+
     def __eq__(self, other):
         return super().__eq__(other) and self.card_value == other.card_value
 
     def __hash__(self):
         return hash((self._player_pos, self._cardval))
 
-    def __repr__(self):
+    def __str__(self):
         return f"Wish({self._player_pos}:{str(self._cardval)})"
 
 
@@ -318,8 +416,20 @@ class CombinationAction(PlayerAction):
     def combination(self):
         return self._comb
 
+    def does_player_have_cards(self, player):
+        return player.has_cards(self._comb)
+
+    def can_be_played_on_combination(self, comb):
+        return comb is None or comb < self._comb
+
+    def is_bomb(self):
+        return isinstance(self._comb, Bomb)
+
     def __repr__(self):
         return f"{self.__class__.__name__}({self._player_pos}, {str(self._comb)})"
+
+    def __str__(self):
+        return f"({self.player_pos}:{self.combination})"
 
     def __eq__(self, other):
         return super().__eq__(other) and self.combination == other.combination
@@ -327,6 +437,17 @@ class CombinationAction(PlayerAction):
     def __hash__(self):
         return hash((self._player_pos, self._comb))
 
+    def __contains__(self, item):
+        return self._comb.__contains__(item)
+
+    def __iter__(self):
+        return self._comb.__iter__()
+
+
+class CombinationTichuAction(CombinationAction, TichuAction):
+    """ Action to say Tichu while playing a combination """
+    def __str__(self):
+        return f"{self.__class__.__name__}({self.player_pos}:{self.combination})"
 
 # ----------------- Immutable Game State and History -----------------
 
@@ -442,13 +563,26 @@ class GameHistory(namedtuple("GH", ["team1", "team2", "winner_team", "points", "
     def points_team2(self):
         return self.points[1]
 
-    def pretty_string(self, indent=0):
+    def pretty_string_old(self, indent=0):
         # TODO use pformat
         ind_str = "".join(" " for _ in range(indent))
         rounds_str = ("\n" + ind_str).join(r.pretty_string(indent=1) for r in self.rounds)
         s = (
         "{ind_str}game result: {gh.points[0]}:{gh.points[1]}\n{ind_str}number of rounds: {nbr_rounds}\n{ind_str}----------- Rounds  -----------------\n{ind_str}{rrs}"
         .format(gh=self, nbr_rounds=len(self.rounds), rrs=rounds_str, ind_str=ind_str))
+        return s
+
+    def pretty_string(self, indent_=0):
+        ind = indent(indent_, s=" ")
+        s =  f"{ind}Game Result: {self.points}\n"
+        s += f"{ind}Number of Rounds: {len(self.rounds)}\n"
+        s += "----------- Rounds -----------------\n"
+        rind = indent_+4
+        rind_str = indent(rind, s=" ")
+        for k, round_ in enumerate(self.rounds):
+            s += f"{rind_str}----------- Round {k} -----------------\n"
+            s += round_.pretty_string(rind)
+            s += "\n"
         return s
 
 
@@ -463,11 +597,12 @@ class RoundHistory(namedtuple("RH", ["initial_points", "final_points", "points",
 
         check_all_isinstance([grand_tichu_hands, before_swap_hands, complete_hands], HandCardSnapshot)
 
-        check_isinstance(card_swaps, frozenset)
-        check_all_isinstance(card_swaps, SwapCardAction)
-        check_param(len(card_swaps) == 12)
-        check_param(len({sca.player_pos for sca in card_swaps}) == 4)
-        check_param(len({sca.player_to for sca in card_swaps}) == 4)
+        if card_swaps != frozenset():
+            check_isinstance(card_swaps, frozenset)
+            check_all_isinstance(card_swaps, SwapCardAction)
+            check_param(len(card_swaps) == 12, param=card_swaps)
+            check_param(len({sca.player_pos for sca in card_swaps}) == 4)
+            check_param(len({sca.to for sca in card_swaps}) == 4)
 
         check_isinstance(announced_grand_tichus, frozenset)
         check_isinstance(announced_tichus, frozenset)
@@ -502,7 +637,7 @@ class RoundHistory(namedtuple("RH", ["initial_points", "final_points", "points",
                 return hnds
         return None
 
-    def pretty_string(self, indent=0):
+    def pretty_string_old(self, indent=0):
         # TODO use pformat
         ind_str = "".join("\t" for _ in range(1))
         tricks_str = ("\n" + ind_str).join(t.pretty_string(indent=2) for t in self.tricks)
@@ -511,6 +646,22 @@ class RoundHistory(namedtuple("RH", ["initial_points", "final_points", "points",
         .format(rh=self, nbr_tricks=len(self.tricks), ts=tricks_str, ind_str=ind_str))
         return s
 
+    def pretty_string(self, indent_=0):
+        ind = indent(indent_, s=" ")
+        s =  f"{ind}Round Result: {self.points}\n"
+        s += f"{ind}Game Points after Round: {self.final_points}\n"
+        s += f"{ind}Number of Tricks: {len(self.tricks)}\n"
+        tind = indent_ + 4
+        s += f"{indent(tind, s=' ')}---------- Tricks ----------\n"
+        for k, trick in enumerate(self.tricks):
+            s += trick.pretty_string(tind)
+            s += "\n"
+        s += f"{indent(tind, s=' ')}---------- Events ----------\n"
+        s += ind
+        for event in self.events:
+            s += event.pretty_string()
+            s += "\n" if isinstance(event, RoundEndEvent) else " ---> "
+        return s
 
 # ----------------- Mutable Game State and History -----------------
 
@@ -546,7 +697,8 @@ class RoundStateBuilder(object):
             self._announced_tichu = set(roundstate.announced_tichu)
             self._announced_grand_tichu = set(roundstate.announced_grand_tichu)
 
-    def build(self):
+    def build(self, save=False):
+        assert save is False, "save=True is not implemented"
         return RoundState(current_pos=self._current_pos,
                           hand_cards=HandCardSnapshot(*[ImmutableCards(cards) for cards in self._hand_cards]),
                           won_tricks=tuple([tuple(tks) for tks in self._won_tricks]),
@@ -658,6 +810,7 @@ class GameHistoryBuilder(object):
         self._winner_team = winner_team
         self._points = points
         self.target_points = target_points
+        self._current_round = None
         self._rounds = list(rounds)
 
     @classmethod
@@ -708,9 +861,30 @@ class GameHistoryBuilder(object):
         check_param(len(points) == 2)
         self._points = points
 
-    def add_round(self, round_history):
+    @property
+    def current_round(self):
+        return self._current_round
+
+    def _append_round(self, round_history):
         check_isinstance(round_history, RoundHistory)
         self._rounds.append(round_history)
+
+    def finish_round(self):
+        if self._current_round:
+            # if there is a current round
+            self._current_round.append_event(RoundEndEvent(self._current_round.ranking))
+            self.points = self._current_round.final_points
+            self._append_round(self._current_round.build())
+        self._current_round = None
+
+    def start_new_round(self):
+        assert self._current_round is None
+        self._current_round = RoundHistoryBuilder(initial_points=self.points)
+        self._current_round.append_event(RoundStartEvent())
+        return self._current_round
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}\n\tpoints:{self._points}\n\tteam1:{self._team1}\n\tteam2:{self._team2}\n\tcurrent_round:{self._current_round}"
 
 
 class RoundHistoryBuilder(object):
@@ -733,6 +907,9 @@ class RoundHistoryBuilder(object):
         self._handcards = list()
         self._ranking = list()
         self._events = list()
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}\n\tcurr trick:{self._current_trick}\n\tranking:{self._ranking}\n\ttricks:{self._tricks}\n\tevents:{self._events}"
 
     @property
     def initial_points(self):
@@ -789,6 +966,10 @@ class RoundHistoryBuilder(object):
         return set(self._announced_grand_tichus)
 
     @property
+    def ranking(self):
+        return tuple(self._ranking)
+
+    @property
     def tricks(self):
         return tuple(self._tricks)
 
@@ -800,50 +981,125 @@ class RoundHistoryBuilder(object):
             return self._current_trick.last_combination
 
     @property
-    def last_finished_trick(self):
-        return self._tricks[-1] if len(self._tricks) > 0 else None
+    def current_handcards(self):
+        if len(self._current_trick) > 0:
+            last_hc = self._handcards[-1] if len(self._handcards) > 0 else self._complete_hands
+            last_checkpoint = tuple([Cards(hc) for hc in last_hc])
+            for comb_action in self._current_trick:
+                last_checkpoint[comb_action.player_pos].remove_all(comb_action.combination)
+            return HandCardSnapshot(*[ImmutableCards(hc) for hc in last_checkpoint])
+
+        if len(self._handcards) > 0:
+            return self._handcards[-1]
+        if self._complete_hands:
+            return self.complete_hands
+        if self._before_swap_hands:
+            return self.before_swap_hands
+        else:
+            return self.grand_tichu_hands
 
     @property
     def last_finished_trick(self):
         return self._tricks[-1] if len(self._tricks) > 0 else None
 
-    # ########## Card Swap ############
+    @property
+    def curr_trick_finished(self):
+        """
+        :return: Immutable Trick instance of the current trick
+        """
+        return self._current_trick.finish()
 
-    def add_cardswap(self, swap_card_action):
-        check_isinstance(swap_card_action, SwapCardAction)
-        self._swap_actions.add(swap_card_action)
-        assert len({(sw.player_pos, sw.player_to) for sw in self._swap_actions}) == len(self._swap_actions)
+    # ---------- Swap Cards ---------- #
 
-    # ###### Tichus #######
+    def _add_swap_actions(self, event):
+        self._swap_actions.add(event)
+        check_true(len({(sw.player_pos, sw.to) for sw in self._swap_actions}) == len(self._swap_actions))
 
-    def announce_grand_tichu(self, player_id):
-        self._announced_grand_tichus.add(player_id)
+    # ---------- Tichus ---------- #
 
-    def announce_tichu(self, player_id):
-        if player_id in self._announced_grand_tichus:
-            raise IllegalActionException( "Player({}) can't announce normal Tichu when already announced grand Tichu.".format(player_id))
-        self._announced_tichus.add(player_id)
+    def _announce_grand_tichu(self, player_pos):
+        self._announced_grand_tichus.add(player_pos)
 
-    # ###### Trick #######
+    def _announce_tichu(self, player_pos):
+        check_true(player_pos not in self._announced_grand_tichus, ex=IllegalActionException,
+                   msg=f"Player({player_pos}) can't announce normal Tichu when already announced grand Tichu.")
+        self._announced_tichus.add(player_pos)
 
-    def finish_trick(self, handcards):
-        check_isinstance(handcards, HandCardSnapshot)
-        self._tricks.append(self._current_trick.finish())
-        self._handcards.append(handcards)
+    # ---------- Trick ---------- #
+    def current_trick_is_empty(self):
+        return self._current_trick.is_empty()
+
+    def current_trick_is_dragon_trick(self):
+        return Card.DRAGON in self._current_trick.last_combination if self._current_trick.last_combination is not None else False
+
+    def _finish_trick(self, event):
+        assert self._current_trick.finish() == event.trick, f"There might be a LogicProblem, {self._current_trick.finish()} must be equals {event.trick}, but was not!"
+        self._tricks.append(event.trick)
+        self._handcards.append(event.hand_cards)
         self._current_trick = UnfinishedTrick()
 
-    # ###### Ranking ######
+    # ---------- Ranking ---------- #
 
-    def ranking_append_player(self, player_pos):
+    def _ranking_append_player(self, player_pos):
         check_param(player_pos in range(4) and player_pos not in self._ranking)
         self._ranking.append(player_pos)
 
-    def rank_of(self, player_pos):
-        return self._ranking.index(player_pos) + 1 if player_pos in self._ranking else None
+    def is_double_win(self):
+        return len(self.ranking) >= 2 and self.ranking[0] == (self.ranking[1] + 2) % 4
 
-        # ###### Build #######
+    def round_ended(self):
+        return len(self._ranking) >= 3 or self.is_double_win()
 
-    def build(self):
+    # ---------- Events ------------- #
+    def append_all_events(self, events):
+        for event in events:
+            self.append_event(event)
+
+    def append_event(self, event):
+        check_isinstance(event, GameEvent)
+        self._handle_event(event)
+        self._events.append(event)
+
+    def _handle_event(self, event):
+        if isinstance(event, FinishEvent):
+            self._ranking_append_player(event.player_pos)
+
+        if isinstance(event, WinTrickEvent):
+            self._finish_trick(event)
+
+        if isinstance(event, PassAction):
+            pass
+
+        if isinstance(event, TichuAction):
+            self._announce_tichu(event.player_pos)
+
+        if isinstance(event, GrandTichuAction):
+            self._announce_grand_tichu(event.player_pos)
+
+        if isinstance(event, GiveDragonAwayAction):
+            pass
+
+        if isinstance(event, SwapCardAction):
+            self._add_swap_actions(event)
+
+        if isinstance(event, WishAction):
+            pass
+
+        if isinstance(event, CombinationAction):
+            self._current_trick.append(event)
+
+    def build(self, save=False):
+        assert save is False, "save=True is not implemented"
+        tks = list(self._tricks)
+        additional_hcrds = []
+        # print("tks before", tks, "current trick", self._current_trick)
+        # print("additional_hcrds before", additional_hcrds)
+        if len(self._current_trick) > 0:
+            tks += [self._current_trick.finish()]
+            # calculate updated handards
+            additional_hcrds = [self.current_handcards]
+        # print("tks", tks)
+        # print("additional_hcrds", additional_hcrds)
         return RoundHistory(
                 initial_points=self._initial_points,
                 final_points=self.final_points,
@@ -854,8 +1110,8 @@ class RoundHistoryBuilder(object):
                 complete_hands=self.complete_hands,
                 announced_grand_tichus=frozenset(self.announced_grand_tichus),
                 announced_tichus=frozenset(self.announced_tichus),
-                tricks=tuple(self._tricks),
-                handcards=tuple(self._handcards),
+                tricks=tuple(tks),
+                handcards=tuple(self._handcards + additional_hcrds),
                 ranking=tuple(self._ranking),
                 events=tuple(self._events),
         )
@@ -866,6 +1122,7 @@ class RoundHistoryBuilder(object):
 
 class Team(namedtuple("T", ["player1", "player2"])):
     def __init__(self, player1, player2):
+        from tichu.players.tichuplayers import TichuPlayer  # TODO import on top?
         check_isinstance(player1, TichuPlayer)
         check_isinstance(player2, TichuPlayer)
         super(Team, self).__init__()

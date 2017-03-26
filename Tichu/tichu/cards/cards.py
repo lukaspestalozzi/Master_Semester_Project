@@ -7,7 +7,7 @@ from collections import defaultdict
 import itertools
 
 from tichu.cards.card import Card, CardSuit, CardValue
-from tichu.utils import check_param, check_isinstance, check_all_isinstance, check_true, ignored
+from tichu.utils import check_param, check_isinstance, check_all_isinstance, check_true
 
 __author__ = 'Lukas Pestalozzi'
 
@@ -577,7 +577,7 @@ class Cards(ImmutableCards):
     A mutable set of Cards with some helpful functions.
     """
 
-    def __init__(self, cards=list()):
+    def __init__(self, cards=set()):
         super().__init__(cards)
         self._cards = set(self._cards)
         self.__hash__ = None  # diable hashing
@@ -794,8 +794,8 @@ class Single(Combination):
         check_param(newheight == Card.PHOENIX.card_height or 2 <= newheight < 15, param=newheight)  # newheight must be between 2 and 14 (TWO and As)
         if self._card is Card.PHOENIX:
             self._height = newheight
-        else:
-            warnings.warn("Tried to set the height of a non-phoenix single. The height was not set.")
+        # else:
+        #    warnings.warn("Tried to set the height of a non-phoenix single. The height was not set.")
         return self.height
 
     def is_phoenix(self):
