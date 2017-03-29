@@ -724,8 +724,8 @@ class Combination(metaclass=abc.ABCMeta):
 
     def can_be_played_on(self, other_comb):
         try:
-            return other_comb < self
-        except Exception:
+            return other_comb is None or other_comb < self
+        except TypeError:
             return False
 
     def __iter__(self):

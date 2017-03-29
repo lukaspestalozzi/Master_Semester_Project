@@ -1,3 +1,5 @@
+import logging
+
 import warnings
 from pprint import pformat
 from collections import namedtuple
@@ -5,42 +7,16 @@ from collections import namedtuple
 import abc
 from tichu.cards.card import Card, CardValue
 from tichu.cards.cards import Combination, ImmutableCards, Cards, Bomb
-from tichu.cards.cards import Single
-from tichu.exceptions import IllegalActionException, LogicError
+from tichu.cards.cards import Pair
+from tichu.exceptions import IllegalActionException
 from tichu.typedcollections import TypedList, TypedTuple
+from tichu.utils import check_param, check_isinstance, check_all_isinstance, check_true, indent
 
 # --------------- Trick ------------------------
-from tichu.utils import check_param, check_isinstance, check_all_isinstance, check_true, indent
 
 
 class CombinationActionList(TypedList):
     """ List only accepting Combination instances
-    >>> CombinationList([Single(Card.PHOENIX)])
-    [SINGLE(PHOENIX)]
-    >>> CombinationList((1, 3, 4))
-    Traceback (most recent call last):
-    ...
-    TypeError: All elements must be instance of <class 'tichu.cards.cards.Combination'>
-    >>> cl = CombinationList([Single(Card.PHOENIX)])
-    >>> cl.append(Single(Card.DRAGON))
-    >>> cl
-    [SINGLE(PHOENIX), SINGLE(DRAGON)]
-    >>> CombinationList([Single(Card.PHOENIX), Single(Card.DRAGON)]).append('a')
-    Traceback (most recent call last):
-    ...
-    TypeError: elem must be of type <class 'tichu.cards.cards.Combination'>
-
-    >>> CombinationList([Single(Card.PHOENIX), Single(Card.DRAGON)])[0]
-    SINGLE(PHOENIX)
-    >>> cl = CombinationList([Single(Card.PHOENIX), Single(Card.DRAGON)])
-    >>> cl[0] = Single(Card.DOG)
-    >>> cl[0].card == Card.DOG
-    True
-    >>> cl = CombinationList([Single(Card.PHOENIX), Single(Card.DRAGON)])
-    >>> cl[0] = 'a'
-    Traceback (most recent call last):
-    ...
-    TypeError: value must be of type <class 'tichu.cards.cards.Combination'>
     """
     __slots__ = ()
 
@@ -55,19 +31,7 @@ class CombinationActionTuple(TypedTuple):
         return TypedTuple.__new__(cls, CombinationAction, iterable)
 
 
-class UnfinishedTrick(CombinationActionList):
-    """Mutable Trick (list of combinations) instance
-    >>> UnfinishedTrick()
-    []
-    """
-    __slots__ = ()
-
-    def __init__(self, comb_actions=list()):
-        super().__init__(comb_actions)
-
-    @classmethod
-    def from_trick(cls, trick):
-        return cls(list(trick))
+class BaseTrick(metaclass=abc.ABCMeta):
 
     @property
     def last_combination(self):
@@ -77,8 +41,48 @@ class UnfinishedTrick(CombinationActionList):
     def last_combination_action(self):
         return self[-1] if len(self) > 0 else None
 
+    @property
+    def points(self):
+        return self.count_points()
+
+    def count_points(self):
+        return sum([comb.combination.points for comb in self])
+
     def is_empty(self):
         return len(self) == 0
+
+    def pretty_string(self, indent_=0):
+        ind_str = indent(indent_, s=" ")
+        if self.is_empty():
+            return f"{self.__class__.__name__}(empty)"
+        else:
+            return f"{ind_str}{self.__class__.__name__}[{self[-1].player_pos}]: {' -> '.join([comb.pretty_string() for comb in self])}"
+
+    def __str__(self):
+        return self.pretty_string()
+
+
+class UnfinishedTrick(CombinationActionList, BaseTrick):
+    """Mutable Trick (list of combinations) instance
+    >>> UnfinishedTrick()
+    []
+    >>> UnfinishedTrick().is_empty()
+    True
+    >>> UnfinishedTrick().count_points()
+    0
+    >>> UnfinishedTrick().last_combination_action
+
+    >>> UnfinishedTrick().last_combination
+
+    """
+    __slots__ = ()
+
+    def __init__(self, comb_actions=list()):
+        super().__init__(comb_actions)
+
+    @classmethod
+    def from_trick(cls, trick):
+        return cls(list(trick))
 
     def copy(self):
         return UnfinishedTrick(list(self))
@@ -90,8 +94,29 @@ class UnfinishedTrick(CombinationActionList):
         return Trick(list(self))
 
 
-class Trick(CombinationActionTuple):
-    """ (Immutable) List of Combinations """
+class Trick(CombinationActionTuple, BaseTrick):
+    """ (Immutable) List of Combinations
+    >>> Trick([])
+    Trick()
+    >>> Trick([]).is_empty()
+    True
+    >>> Trick([]).count_points()
+    0
+    >>> Trick([]).last_combination_action
+
+    >>> Trick([]).last_combination
+
+    >>> Trick([CombinationAction(1, Pair(Card.A_HOUSE, Card.A_JADE))])
+    Trick(CombinationAction(1, PAIR(A♣,A♦)))
+    >>> Trick([CombinationAction(1, Pair(Card.A_HOUSE, Card.A_JADE))]).is_empty()
+    False
+    >>> Trick([CombinationAction(1, Pair(Card.K_HOUSE, Card.K_JADE))]).count_points()
+    20
+    >>> Trick([CombinationAction(1, Pair(Card.A_HOUSE, Card.A_JADE))]).last_combination_action
+    CombinationAction(1, PAIR(A♣,A♦))
+    >>> Trick([CombinationAction(1, Pair(Card.A_HOUSE, Card.A_JADE))]).last_combination
+    PAIR(A♣,A♦)
+    """
     __slots__ = ()
 
     def __init__(self, comb_actions):
@@ -108,26 +133,13 @@ class Trick(CombinationActionTuple):
     def last_combination_action(self):
         return self[-1] if len(self) > 0 else None
 
-    @property
-    def points(self):
-        return self.count_points()
-
-    @property
-    def last_combination(self):
-        """
-        :return: The last combination of this trick
-        """
-        return self[-1].combination
+    def add_combination_action(self, combination_action):
+        ut = UnfinishedTrick.from_trick(self)
+        ut.append(combination_action)
+        return ut.finish()
 
     def is_dragon_trick(self):
         return Card.DRAGON in self.last_combination
-
-    def count_points(self):
-        return sum([comb.combination.points for comb in self])
-
-    def pretty_string(self, indent_=0):
-        ind_str = indent(indent_, s=" ")
-        return f"{ind_str}Trick[{self[-1].player_pos}]: {' -> '.join([comb.pretty_string() for comb in self])}"
 
     def __repr__(self):
         return "{}({})".format(self.__class__.__name__, ' -> '.join([repr(com) for com in self]))
@@ -460,10 +472,10 @@ class RoundState(namedtuple("RS", ["current_pos", "hand_cards", "won_tricks", "t
                                    "nbr_passed", "announced_tichu", "announced_grand_tichu"])):
     def __init__(self, current_pos, hand_cards, won_tricks, trick_on_table, wish, ranking, nbr_passed,
                  announced_tichu, announced_grand_tichu):
+        super().__init__()
         # some paranoid checks
         assert current_pos in range(4)
-        assert isinstance(hand_cards, tuple)
-        assert all(isinstance(hc, HandCardSnapshot) for hc in hand_cards)
+        assert isinstance(hand_cards, HandCardSnapshot)
 
         assert isinstance(won_tricks, tuple)
         assert all(isinstance(tricks, tuple) for tricks in won_tricks)
@@ -474,17 +486,23 @@ class RoundState(namedtuple("RS", ["current_pos", "hand_cards", "won_tricks", "t
         assert isinstance(ranking, tuple)
         assert all(r in range(4) for r in ranking)
 
-        assert nbr_passed in range(3)  # must not be 3
+        assert nbr_passed in range(4-len(ranking)), f"nbr pass: {nbr_passed}, ranking: {self.ranking}, possible: {[range(4-len(self.ranking)-1)]}"  # the players not in ranking can pass, not more
 
         assert isinstance(announced_tichu, frozenset)
         assert isinstance(announced_grand_tichu, frozenset)
         assert all(r in range(4) for r in announced_tichu)
         assert all(r in range(4) for r in announced_grand_tichu)
-        super().__init__()
+
+        self._action_state_transitions = dict()
+        self._possible_actions = None
+        self._possible_combs = None
+        self._satisfy_wish = None
+        self._can_pass = None
+
+        # end __init__
 
     def next_player_turn(self):
-        return next((ppos % 4 for ppos in range(self.current_pos + 1, self.current_pos + 4) if
-                     len(self.hand_cards[ppos % 4]) > 0))
+        return next((ppos % 4 for ppos in range(self.current_pos + 1, self.current_pos + 4) if len(self.hand_cards[ppos % 4]) > 0))
 
     def is_double_win(self):
         return len(self.ranking) >= 2 and self.ranking[0] == (self.ranking[1] + 2) % 4
@@ -499,7 +517,7 @@ class RoundState(namedtuple("RS", ["current_pos", "hand_cards", "won_tricks", "t
         Only correct if the state is terminal
         :return: tuple of length 4 with the points of each player at the corresponding index.
         """
-
+        # TODO Test
         def calc_tichu_points():
             tichu_points = [0, 0, 0, 0]
             for gt_pos in self.announced_grand_tichu:
@@ -512,7 +530,7 @@ class RoundState(namedtuple("RS", ["current_pos", "hand_cards", "won_tricks", "t
             warnings.warn("Calculating points of a NON terminal state! Result may be incorrect.")
 
         points = calc_tichu_points()
-        final_ranking = self.ranking + [ppos for ppos in range(4) if ppos not in self.ranking]
+        final_ranking = list(self.ranking) + [ppos for ppos in range(4) if ppos not in self.ranking]
         assert len(final_ranking) == 4, "{} -> {}".format(self.ranking, final_ranking)
 
         if self.is_double_win():
@@ -541,6 +559,147 @@ class RoundState(namedtuple("RS", ["current_pos", "hand_cards", "won_tricks", "t
 
         assert len(points) == 4
         return tuple(points)
+
+    def possible_actions(self):
+        """
+        :return: frozenset of all possible actions in this state
+        """
+        if self._possible_actions is not None:
+            return frozenset(self._possible_actions)
+        poss_combs, _ = self._possible_combinations()
+        poss_acs = {CombinationAction(player_pos=self.current_pos, combination=comb) for comb in poss_combs}
+        if self._can_pass:
+            poss_acs.add(PassAction(self.current_pos))
+        assert self._possible_actions is None  # sanity check
+        self._possible_actions = frozenset(poss_acs)
+        return frozenset(poss_acs)
+
+    def state_for_action(self, action):
+        """
+        :param action: CombinationAction or PassAction.
+        :return: The new game state the action leads to.
+        """
+        if not action.player_pos == self.current_pos:
+            raise IllegalActionException(f"Only player:{self.current_pos} can play in this case, but action was: {action}")
+        if action in self._action_state_transitions:
+            return self._action_state_transitions[action]
+
+        elif isinstance(action, PassAction):
+            new_state = self._state_for_pass()
+
+        elif isinstance(action, CombinationAction):
+            assert action.combination.can_be_played_on(self.trick_on_table.last_combination)
+            new_state = self._state_for_combination_action(action)
+
+        else:
+            raise ValueError("action must be PassActon or a CombinationAction")
+        self._action_state_transitions[action] = new_state
+        return new_state
+
+    def _possible_combinations(self):
+        """
+        :return: a tuple of the possible combinations and whether the combinations satisfy the wish
+        """
+        if self._possible_combs is not None:
+            # return already calculated combinations
+            return (frozenset(self._possible_combs), self._satisfy_wish)
+        comb_on_table = self.trick_on_table.last_combination
+        possible_combs = set(self.hand_cards[self.current_pos].all_combinations(played_on=comb_on_table))
+        # verify wish
+        self._satisfy_wish = False
+        if self.wish and self.wish in (c.card_value for c in self.hand_cards[self.current_pos]):
+            pcombs = {comb for comb in possible_combs if comb.contains_cardval(self.wish)}
+            if len(pcombs):
+                self._satisfy_wish = True
+                possible_combs = pcombs
+        self._possible_combs = frozenset(possible_combs)
+        self._can_pass = self.trick_on_table.last_combination is not None and not self._satisfy_wish
+        return (frozenset(possible_combs), self._satisfy_wish)
+
+    def _state_for_combination_action(self, combination_action):
+        comb = combination_action.combination
+        new_trick_on_table = self.trick_on_table.add_combination_action(combination_action)
+        new_handcards = self.hand_cards.remove_cards(from_pos=self.current_pos, cards=comb.cards)
+        assert len(new_handcards[self.current_pos]) < len(self.hand_cards[self.current_pos])
+        assert new_handcards[self.current_pos].issubset(self.hand_cards[self.current_pos])
+
+        # test ranking:
+        new_ranking = list(self.ranking)
+        if len(new_handcards[self.current_pos]) == 0:
+            new_ranking.append(self.current_pos)
+            assert len(set(new_ranking)) == len(new_ranking), "state:{}\ncomb:{}".format(self, comb)
+
+        # handle dog
+        next_player = self.next_player_turn()
+        if Card.DOG in comb:
+            next_player = next((ppos % 4 for ppos in range(self.current_pos+2, self.current_pos+3+2) if len(self.hand_cards[ppos % 4]) > 0))
+            assert next_player is not None
+            assert self.nbr_passed == 0  # just to be sure
+            assert self.trick_on_table.is_empty()
+            new_trick_on_table = Trick([])  # dog is removed instantly
+
+        # create game-state
+        gs = RoundState(current_pos=next_player,
+                        hand_cards=new_handcards,
+                        won_tricks=self.won_tricks,
+                        trick_on_table=new_trick_on_table,
+                        wish=None if comb.fulfills_wish(self.wish) else self.wish,
+                        ranking=tuple(new_ranking),
+                        nbr_passed=0,
+                        announced_tichu=self.announced_tichu,
+                        announced_grand_tichu=self.announced_grand_tichu)
+        return gs
+
+    def _state_for_pass(self):
+        new_won_tricks = self.won_tricks  # tricks is a tuple (of len 4) containing tuple of tricks
+        new_trick_on_table = self.trick_on_table
+        new_passed_nr = self.nbr_passed + 1
+
+        next_player_pos = self.next_player_turn()
+        leading_player = self.trick_on_table.last_combination_action.player_pos
+
+        if (leading_player == next_player_pos
+                or self.current_pos < leading_player < next_player_pos
+                or next_player_pos < self.current_pos < leading_player
+                or leading_player < next_player_pos < self.current_pos):
+            # trick ends with leading as winner
+            trick_winner_pos = leading_player
+            # TODO handle Dragon, who give to? return 2 states?
+            # give the trick to the trick_winner_pos TODO create TrickSnapshots
+            winner_tricks = list(self.won_tricks[trick_winner_pos])
+            winner_tricks.append(self.trick_on_table)
+            new_won_tricks = list(self.won_tricks)
+            new_won_tricks[trick_winner_pos] = tuple(winner_tricks)
+            new_won_tricks = tuple(new_won_tricks)
+            new_trick_on_table = Trick([])  # There is a new trick on the table
+            new_passed_nr = 0
+
+        gs = RoundState(current_pos=next_player_pos,
+                        hand_cards=self.hand_cards,
+                        won_tricks=new_won_tricks,
+                        trick_on_table=new_trick_on_table,
+                        wish=self.wish,
+                        ranking=tuple(self.ranking),
+                        nbr_passed=new_passed_nr,
+                        announced_tichu=self.announced_tichu,
+                        announced_grand_tichu=self.announced_grand_tichu)
+
+        assert 0 <= gs.nbr_passed < 3
+        assert ((gs.trick_on_table.is_empty() and gs.nbr_passed == 0) or ((not gs.trick_on_table.is_empty()) and gs.nbr_passed > 0))
+        return gs
+
+    def __hash__(self):
+        # return hash((self.__class__, self.current_pos, self.hand_cards, self.trick_on_table, self.wish, self.nbr_passed))
+        return super().__hash__()
+
+    def __eq__(self, other):
+        """return (self.__class__ == other.__class__
+                and self.current_pos == other.current_pos
+                and self.hand_cards == other.hand_cards
+                and self.trick_on_table == other.trick_on_table
+                and self.wish == other.wish
+                and self.nbr_passed == other.nbr_passed)"""
+        return super().__eq__(other)
 
 
 class GameHistory(namedtuple("GH", ["team1", "team2", "winner_team", "points", "target_points", "rounds"])):
@@ -637,30 +796,34 @@ class RoundHistory(namedtuple("RH", ["initial_points", "final_points", "points",
                 return hnds
         return None
 
-    def pretty_string_old(self, indent=0):
-        # TODO use pformat
-        ind_str = "".join("\t" for _ in range(1))
-        tricks_str = ("\n" + ind_str).join(t.pretty_string(indent=2) for t in self.tricks)
-        s = (
-        "{ind_str}round result: {rh.points[0]}:{rh.points[1]}\n{ind_str}number of Tricks: {nbr_tricks}\n{ind_str}ranking: {rh.ranking}\n{ind_str}handcards:{rh.complete_hands}\n{ind_str}--- Tricks ---\n{ind_str}{ts}"
-        .format(rh=self, nbr_tricks=len(self.tricks), ts=tricks_str, ind_str=ind_str))
-        return s
+    def nbr_passed(self):
+        if len(self.tricks) == 0 or self.tricks[-1].is_empty():
+            return 0
+        else:
+            nbr_passed = 0
+            k = -1
+            last_event = self.events[k]
+            while not isinstance(last_event, (CombinationAction, WinTrickEvent)):
+                if isinstance(last_event, PassAction):
+                    nbr_passed += 1
+                k -= 1
+                last_event = self.events[k]
+            return nbr_passed
 
     def pretty_string(self, indent_=0):
         ind = indent(indent_, s=" ")
         s =  f"{ind}Round Result: {self.points}\n"
         s += f"{ind}Game Points after Round: {self.final_points}\n"
+        s += f"{ind}ranking: {self.ranking}\n"
         s += f"{ind}Number of Tricks: {len(self.tricks)}\n"
-        tind = indent_ + 4
-        s += f"{indent(tind, s=' ')}---------- Tricks ----------\n"
+        ind4 = indent(indent_+4, s=' ')
+        s += f"{ind4}---------- Tricks ----------\n"
         for k, trick in enumerate(self.tricks):
-            s += trick.pretty_string(tind)
+            s += trick.pretty_string(indent_+4)
             s += "\n"
-        s += f"{indent(tind, s=' ')}---------- Events ----------\n"
-        s += ind
-        for event in self.events:
-            s += event.pretty_string()
-            s += "\n" if isinstance(event, RoundEndEvent) else " ---> "
+        s += f"{ind4}---------- Events ----------\n"
+        s += ind4
+        s += ("\n"+ind4).join(ev.pretty_string() for ev in self.events)
         return s
 
 # ----------------- Mutable Game State and History -----------------
@@ -981,6 +1144,13 @@ class RoundHistoryBuilder(object):
             return self._current_trick.last_combination
 
     @property
+    def last_combination_action(self):
+        if len(self._current_trick) == 0:
+            return self._tricks[-1].last_combination_action if len(self._tricks) > 0 else None
+        else:
+            return self._current_trick.last_combination_action
+
+    @property
     def current_handcards(self):
         if len(self._current_trick) > 0:
             last_hc = self._handcards[-1] if len(self._handcards) > 0 else self._complete_hands
@@ -1184,7 +1354,7 @@ class HandCardSnapshot(namedtuple("HCS", ["handcards0", "handcards1", "handcards
             raise ValueError("save must be one of [False, 0, 1, 2, 3] but was: " + str(save))
 
     def __str__(self):
-        return "HCS:\n\t0:{}\n\t1:{}\n\t2:{}\n\t3:{}".format(self.handcards0.pretty_string(),
-                                                             self.handcards1.pretty_string(),
-                                                             self.handcards2.pretty_string(),
-                                                             self.handcards3.pretty_string())
+        return "HandCardSnapshot:\n\t0:{}\n\t1:{}\n\t2:{}\n\t3:{}".format(self.handcards0.pretty_string(),
+                                                                          self.handcards1.pretty_string(),
+                                                                          self.handcards2.pretty_string(),
+                                                                          self.handcards3.pretty_string())

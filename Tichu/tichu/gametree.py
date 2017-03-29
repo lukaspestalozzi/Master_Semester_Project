@@ -1,96 +1,146 @@
+import logging
+
+from pprint import pformat
+from tichu.utils import check_isinstance
+
+
+u2514 = u'\u2514'  # 'L'
+u251C = u'\u251C'  # '|-'
+u2500 = u'\u2500'  # '-'
+u2502 = u'\u2502'  # '|'
 
 
 class GameTree(object):
 
     def __init__(self, root=None):
-        self._nodes = {}  # state -> node
+        self._nodes = dict()  # state -> node
         self._root_node = None
         if root is not None:
             self.add_root(root)
 
-    def children(self, state):
-        return self._nodes[state].children
+    @property
+    def root(self):
+        return self._root_node.data if self._root_node is not None else None
 
-    def parent(self, state):
-        return self._nodes[state].parent
+    def children_of(self, state):
+        return {cn.data for cn in self._node(state).children_nodes}
 
-    def add_child(self, parent, action, child):
+    def parent_of(self, state):
+        try:
+            parent_node = self._node(state).parent_node
+        except KeyError as ke:
+            raise NotInTreeError from ke
+        else:
+            return parent_node.data if parent_node is not None else None
+
+    def add_child(self, parent, child):
         """
         :Adds the given child to the given parent.
         :If parent is not in the Tree, tries to add the parent as root.
 
         :param parent:
-        :param action:
         :param child:
-        :return:
+        :return: self
         :raises NoParentError: if the parent is None.
         :raises MultipleRootsError: if there is already a root in the tree, but the parent is not in the tree
+        :raises MultipleNodesError: if the child already is in the tree
         """
         if parent is None:
             raise NoParentError("Parent can't be None")
+        if child in self._nodes:
+            if child in self.children_of(parent):
+                logging.debug("[add_child] tried to add a child already in the tree, but parent matched -> kept already existing child node")
+                return self  # the child is already there -> keep existing node
+            else:
+                logging.error(f"MultipleNodesError: Can't add already existing child: \n\tparent: {parent}\n\tchild: {child}, \n\t\n\texisting parent of child: {self.parent_of(child)}\n\texisting child: {self._nodes[child].data}")
+                raise MultipleNodesError("Can't add already existing node to different parent")
+
         try:
-            parent_node = self._nodes[parent]
-        except KeyError:
+            parent_node = self._node(parent)
+        except NotInTreeError:
             # parent is not in the tree, try to make it root.
             parent_node = self.add_root(parent)  # raises MultipleRootsError if there is already a root
 
         # add the child
-        self._nodes[child] = parent_node._add_child(action=action, data=child)
+        child_node = self._create_node(parent=parent_node, data=child)
+        parent_node.add_child_node(child_node)
+        self._nodes[child] = child_node
+        return self
 
     def add_root(self, root):
         """
         Adds a root Node with root as data
         :param root:
-        :return:
+        :return: self
         :raises MultipleRootsError: If there is already a root in the Tree.
         """
         if self._root_node is not None:
             raise MultipleRootsError("This Tree already has a Root")
         assert root not in self._nodes  # sanity check
-        self._root_node = Node(parent=None, action=None, data=root)
+        self._root_node = self._create_node(parent=None, data=root)
         self._nodes[root] = self._root_node
+        return self
+
+    def is_leaf(self, state):
+        return self._node(state).is_leaf()
+
+    def pretty_string(self):
+        if self._root_node is None:
+            return "Tree is empty (Root is None)"
+        else:
+            return pformat(self._nodes)
+
+    def print_hierarchy(self):
+        return self._root_node.print_hierarchy(indent='', last=True)
+
+    def _node(self, state):
+        try:
+            return self._nodes[state]
+        except KeyError as ke:
+            raise NotInTreeError() from ke
+
+    def _create_node(self, parent, data):
+        """
+        Creates a node, subclasses can overwrite this method to inject custom Nodes into the tree
+        :param parent:
+        :param data:
+        :return:
+        """
+        return GameTreeNode(parent=parent, data=data)
+
+    def __contains__(self, state):
+        return state in self._nodes
+
+    def __str__(self):
+        if self._root_node is None:
+            return "Tree is empty (Root is None)"
+        else:
+            return pformat(self._nodes)
 
 
-class Node(object):
+class GameTreeNode(object):
 
-    def __init__(self, parent, action, data=None):
+    def __init__(self, parent, data=None):
+        # assert action is None or isinstance(action, PlayerAction), f"action: {action}"
+        parent is None or check_isinstance(parent, GameTreeNode)
         self._parent = parent  # the parent node (None for root)
-        self._action = action  # the action lead here
         self._data = data  # any object
-        self._children = []  # list of nodes
-        self._actions = {}  # action -> child_node
+        self._children = set()
 
     @property
-    def parent(self):
-        return self._parent.data
-
-    @property
-    def action(self):
-        return self._action
+    def parent_node(self):
+        return self._parent
 
     @property
     def data(self):
         return self._data
 
     @property
-    def children(self):
-        return [c.data for c in self._children]
+    def children_nodes(self):
+        return frozenset(self._children)
 
-    def child_for_action(self, action):
-        return self._actions[action].data
-
-    def _add_child(self, action, data):
-        """
-        :param action:
-        :param data:
-        :return: the newly created child node
-        """
-        # TODO allow duplicated actions/children
-        assert action not in self._actions
-        child_node = Node(parent=self, action=action, data=data)
-        self._children.append(child_node)
-        self._actions[action] = child_node
-        return child_node
+    def add_child_node(self, node):
+        self._children.add(node)
 
     def is_root(self):
         return self._parent is None
@@ -98,20 +148,39 @@ class Node(object):
     def is_leaf(self):
         return len(self._children) == 0
 
-    def __getattr__(self, i):
-        return self._children[i].data
+    def _short_label(self):
+        if self.is_root():
+            return 'Root'
+        else:
+            return str(hash(self.data))
 
+    def print_hierarchy(self, indent, last):
+        string = ''
+        next_indent = indent
+        node_label = self._short_label()
+        if self.is_root():
+            string += node_label + '\n'
+        else:
+            string += f"{indent}{(u2514 if last else u251C)}{u2500}{u2500}{node_label}\n"
+            if last and len(self._children) == 0:
+                string += indent + '\n'
+            next_indent = f'{indent}{" " if last else u2502}  '
+        for k, childnode in enumerate(self._children):
+            string += childnode.print_hierarchy(next_indent, last=k == len(self._children)-1)
+        return string
 # --------- Tree Exceptions --------------------
 
 
-class TreeError(Exception):
-    pass
+class TreeError(Exception): pass
 
 
-class MultipleRootsError(TreeError, ValueError):
-    pass
+class MultipleRootsError(TreeError, ValueError): pass
 
 
-class NoParentError(TreeError, ValueError):
-    pass
+class NoParentError(TreeError, ValueError): pass
 
+
+class NotInTreeError(TreeError, ValueError): pass
+
+
+class MultipleNodesError(TreeError, ValueError): pass

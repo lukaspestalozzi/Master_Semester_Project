@@ -75,7 +75,7 @@ class RandomAgent(BaseAgent):
         logging.debug("Agent plays first: " + str(comb))
 
         assert comb is not None
-        return comb
+        return CombinationAction(self._position, combination=comb)
 
     def _play_wish(self, hand_cards, possible_combs, wish):
         """

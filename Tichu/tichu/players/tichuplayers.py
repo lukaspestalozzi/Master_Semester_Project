@@ -205,15 +205,13 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :return: the combination the players wants to play as a CombinationAction.
         """
         assert len(self._hand_cards) > 0
-        comb = self._agent.play_first(hand_cards=self.hand_cards,
-                                      round_history=game_history.current_round.build(save=self._copy_savely),
-                                      wish=wish)
+        action = self._agent.play_first(hand_cards=self.hand_cards,
+                                        round_history=game_history.current_round.build(save=self._copy_savely),
+                                        wish=wish)
 
-        action = CombinationAction(player_pos=self.position, combination=comb)
         action.check(has_cards=self, is_combination=True, not_pass=True)
         TichuPlayer._check_wish(game_history.current_round.last_combination, action, self.hand_cards, wish)
         self._hand_cards.remove_all(action.combination.cards)
-        self._log_remaining_handcards()
         return action
 
     def play_combination(self, game_history, wish):
@@ -237,7 +235,6 @@ class TichuPlayer(metaclass=abc.ABCMeta):
 
         if isinstance(action, CombinationAction):
             self._hand_cards.remove_all(action.combination.cards)
-            self._log_remaining_handcards()
 
         return action
 
@@ -274,7 +271,6 @@ class TichuPlayer(metaclass=abc.ABCMeta):
             bomb_action = CombinationAction(player_pos=self.position, combination=bomb_comb)
             bomb_action.check(played_on=game_history.current_round.last_combination, has_cards=self, is_bomb=True)
             self._hand_cards.remove_all(bomb_action.combination)
-            self._log_remaining_handcards()
         return bomb_action
 
     def give_dragon_away(self, game_history, trick):
@@ -299,9 +295,6 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         w = self._agent.wish(self.hand_cards, game_history.current_round.build(save=self._copy_savely))
         wish_action = WishAction(player_from=self._position, cardvalue=w)
         return wish_action
-
-    def _log_remaining_handcards(self):
-        logging.debug("remaining Handcards {}: {}".format(self.name, ", ".join([str(c) for c in sorted(self._hand_cards)])))
 
     def __hash__(self):
         return self._hash

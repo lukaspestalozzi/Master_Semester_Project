@@ -1,6 +1,11 @@
 from decorator import contextmanager
 
 
+# unicode characters:
+
+
+# functions
+
 def raiser(ex):
     """
     :param ex: the exception to be raised
@@ -105,7 +110,7 @@ def check_isinstance(item, clazzes, msg=None):
     :raises: TypeError when isinstance(item, clazzes) is False
     """
     if not isinstance(item, clazzes):
-        message = msg if msg is not None else "item must be instance of at least one of: [{}], but was {}".format(clazzes, item)
+        message = msg if msg is not None else "item must be instance of at least one of: [{}], but was {}".format(clazzes, item.__class__)
         raise TypeError(message)
     else:
         return True
@@ -124,6 +129,47 @@ def check_param(expr, param="[No Parameter given]", msg=None):
         raise ValueError(message)
     else:
         return True
+
+
+def crange(start, stop, modulo):
+    """
+    Circular range generator.
+    :param start: int, start integer (included)
+    :param stop: stop integer (excluded), If start == stop, then a whole circle is returned. ie. crange(0, 0, 4) -> [0, 1, 2, 3]
+    :param modulo: the modulo of the range
+    >>> list(crange(0, 5, 10))
+    [0, 1, 2, 3, 4]
+    >>> list(crange(7, 3, 10))
+    [7, 8, 9, 0, 1, 2]
+    >>> list(crange(0, 10, 4))
+    [0, 1]
+    >>> list(crange(13, 10, 4))
+    [1]
+    >>> list(crange(0, 0, 4))
+    [0, 1, 2, 3]
+    >>> list(crange(6, 6, 4))
+    [2, 3, 0, 1]
+    >>> list(crange(1, 2, 4))
+    [1]
+    >>> list(crange(1, 4, 4))
+    [1, 2, 3]
+    >>> list(crange(3, 2, 4))
+    [3, 0, 1]
+    >>> list(crange(3, 0, 4))
+    [3]
+    >>> list(crange(2, 3, 4))
+    [2]
+    >>> list(crange(2, 1, 4))
+    [2, 3, 0]
+    """
+    startmod = start % modulo
+    stopmod = stop % modulo
+    yield startmod
+    k = (startmod + 1) % modulo
+    while k != stopmod:
+        yield k
+        k = (k + 1) % modulo
+
 
 
 @contextmanager

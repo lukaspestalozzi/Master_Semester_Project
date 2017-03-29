@@ -14,11 +14,6 @@ class BaseAgent(metaclass=abc.ABCMeta):
     def position(self, pos):
         self._position = pos
 
-    def to_json(self):
-        return {
-            "agent_type": self.__class__.__name__,
-        }
-
     @abc.abstractmethod
     def announce_grand_tichu(self, announced_grand_tichu):
         """

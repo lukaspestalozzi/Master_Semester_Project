@@ -93,6 +93,7 @@ class TichuGame(object):
         roundhistory_builder.complete_hands = self.make_handcards_snapshot()
 
         wish = None
+        logging.info("handcards after cardswap: " + str(roundhistory_builder.complete_hands))
         # trick's loop
         while not roundhistory_builder.round_ended():
             leading_player, wish = self._run_trick(leading_player=leading_player, wish=wish)
@@ -128,8 +129,8 @@ class TichuGame(object):
         nbr_pass = 0
         while not trick_ended:
             assert not next_to_play.has_finished
-            logging.debug(f"Current Round: {rhb}")
-            logging.info("Next to play -> {}.".format(next_to_play.name))
+
+            logging.debug(f"Next to play -> {next_to_play.name}, (combination on table: {rhb._current_trick.last_combination}, wish:{wish})")
             played_action = None
             if rhb.current_trick_is_empty():  # first play of the trick
                 played_action = next_to_play.play_first(game_history=self._history, wish=wish)
@@ -138,10 +139,10 @@ class TichuGame(object):
 
             rhb.append_event(played_action)  # handles Tichu and update the trick on the table
             if isinstance(played_action, PassAction):
-                logging.info("[PASS] {}.".format(next_to_play.name))
+                logging.info(f"[PASS] {next_to_play.name}. ".ljust(35)+f"(handcards: {next_to_play.hand_cards.pretty_string()})")
                 nbr_pass += 1
             else:  # if trick
-                logging.info("[PLAY] {}: {}.".format(next_to_play.name, played_action.combination))
+                logging.info(f"[PLAY] {next_to_play.name}: {played_action.combination}. ".ljust(35)+f"(handcards: {next_to_play.hand_cards.pretty_string()})")
 
                 # update the leading_player
                 leading_player = next_to_play
@@ -167,12 +168,14 @@ class TichuGame(object):
 
                     # test doppelsieg
                     if rhb.is_double_win():
+                        logging.debug("Trick ends. Double win")
                         trick_ended = True
 
                     # test whether 3rd players to win and thus ends the trick.
                     # (3rd to win automatically gets the last trick)
                     if len(rhb.ranking) == 3:
                         rhb.append_event(FinishEvent(player_pos=self._next_to_play(next_to_play.position).position))  # add last players
+                        logging.debug("Trick ends. Dog trick.")
                         trick_ended = True
 
                     logging.debug("Ranking: {}".format(rhb.ranking))
@@ -199,10 +202,16 @@ class TichuGame(object):
                     bomb_action = self._ask_for_bomb(next_to_play.position)
 
             # determine the next player to play
+            just_played = next_to_play
             next_to_play = self._next_to_play(next_to_play.position)
 
-            # test the pass count
-            if nbr_pass >= 3:
+            # test if leading player wins the trick (ie, if the next player is the leading player or the leading player was jumped over)
+            if not trick_ended and (leading_player.position == next_to_play.position
+                                    or just_played.position < leading_player.position < next_to_play.position
+                                    or next_to_play.position < just_played.position < leading_player.position
+                                    or leading_player.position < next_to_play.position < just_played.position):
+
+                logging.debug("Trick ends. it's the leading_players turn again.")
                 trick_ended = True
 
             # end-while

@@ -64,10 +64,20 @@ class CardValue(ComparableEnum):
             self._points = -25
         else:
             self._points = 0
-
+        u"\U0001F426"
         self._repr = "CardValue({} {})".format(self.name, self.value)
-        self._str = (self.name if self.value > 10 or self.value in {15, 1.5, 1, 0}
-                     else str(self.value))
+        if self.value == 15:  # DRAGON
+            self._str = "DRAGON"  # u"\U0001F409"  # dragon
+        elif self.value == 1.5:  # PHOENIX
+            self._str = u"\U0001F010"  # 'MAHJONG TILE ONE OF BAMBOOS' (U+1F010)
+        elif self.value == 1:  # MAHJONG
+            self._str = u"\U0001F004"  # mahjong
+        elif self.value == 0:  # DOG
+            self._str = "DOG"  # u"\U0001F436"  # dog
+        elif self.value > 10:  # J - A
+            self._str = str(self.name)
+        else:  # 2 - 10
+            self._str = str(self.value)
 
     @property
     def height(self):
@@ -85,10 +95,10 @@ class CardValue(ComparableEnum):
 
 
 class CardSuit(ComparableEnum):
-    SWORD = u'\u2660'
+    SWORD = u"\u2694"  # 'CROSSED SWORDS' (U+2694)
     JADE = u'\u2663'
     PAGODA = u'\u2665'
-    HOUSE = u'\u2666'
+    HOUSE = u"\u2605"  # 'BLACK STAR' (U+2605)
     SPECIAL = u'\u1f0cf'
 
     def __init__(self, unicode):
@@ -183,10 +193,12 @@ class Card(ComparableEnum):
         self._suit = cardsuit
         self._cardvalue = cardvalue
 
-        # precompute strings and hashe
+        # precompute strings and hash
         self._hash = hash((cardvalue, cardsuit))
-        self._str = ("{}{}".format(str(self._cardvalue), self._suit.pretty_string()) if self._suit is not CardSuit.SPECIAL
-                     else "{}".format(str(self._cardvalue)))
+
+
+        self._str = (f"{str(self._cardvalue)}{self._suit.pretty_string()}" if self._suit is not CardSuit.SPECIAL
+                     else f"{str(self._cardvalue)}")
         self._repr = "Card({}, {})".format(repr(self._cardvalue), repr(self._suit))
 
     @property

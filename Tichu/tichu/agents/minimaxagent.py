@@ -9,7 +9,7 @@ import time
 from tichu.agents.baseagent import BaseAgent
 from tichu.cards.card import CardValue, Card
 from tichu.cards.cards import Cards, ImmutableCards
-from tichu.game.gameutils import HandCardSnapshot
+from tichu.game.gameutils import HandCardSnapshot, PassAction, CombinationAction, SwapCardAction
 from tichu.utils import indent, check_param
 
 
@@ -34,10 +34,9 @@ class MiniMaxPIAgent(BaseAgent):  # MiniMaxPerfectInformationAgent
 
     def __init__(self):
         super().__init__()
-        self._minimax = MiniMaxSearch(max_depth=5)
-        self._montecarlo = MonteCarloSearch(nbr_simualtions=10)
+        self._minimax = MiniMaxSearch(max_depth=2)
 
-    def give_dragon_away(self, hand_cards, round_history):
+    def give_dragon_away(self, hand_cards, trick, round_history):
         pl_pos = (self.position + 1) % 4
         return pl_pos
 
@@ -47,14 +46,14 @@ class MiniMaxPIAgent(BaseAgent):  # MiniMaxPerfectInformationAgent
                               and cv is not CardValue.DRAGON
                               and cv is not CardValue.MAHJONG
                               and cv is not CardValue.PHOENIX])
-        return None  # TODO for now make no wish!!
+        return wish
 
     def play_combination(self, wish, hand_cards, round_history):
         nbr_passed = round_history.nbr_passed()
         assert nbr_passed in range(0, 4)
         comb = self._start_montecarlo_search(self._create_start_state(hand_cards=hand_cards, round_history=round_history, wish=wish,
-                                          combination_on_table=round_history.combination_on_table, nbr_passed=nbr_passed))
-        return comb
+                                             combination_on_table=round_history.combination_on_table, nbr_passed=nbr_passed))
+        return PassAction(self._position) if comb is None else CombinationAction(self._position, combination=comb)
 
     def play_bomb(self, hand_cards, round_history):
         return None  # TODO, for now only play bomb when it's your turn -> bomb will never be beaten by another bomb!!
@@ -102,7 +101,7 @@ class MiniMaxPIAgent(BaseAgent):  # MiniMaxPerfectInformationAgent
         logging.info("player #{} started montecarlo".format(self.position))
         start_t = time.time()
 
-        action = self._montecarlo.search(start_state=start_state, playerpos=self.position)
+        action = self._minimax.search(start_state=start_state, playerpos=self.position)
 
         logging.info("player #{} ended montecarlo (time: {})".format(self.position, time.time()-start_t))
         return action
@@ -110,10 +109,10 @@ class MiniMaxPIAgent(BaseAgent):  # MiniMaxPerfectInformationAgent
     def swap_cards(self, hand_cards):
         sc = hand_cards.random_cards(3)
         scards = [
-                   Card_To(sc[0], (self.position + 1) % 4),
-                   Card_To(sc[1], (self.position + 2) % 4),
-                   Card_To(sc[2], (self.position + 3) % 4)
-                ]
+            SwapCardAction(player_from=self._position, card=sc[0], player_to=(self.position + 1) % 4),
+            SwapCardAction(player_from=self._position, card=sc[1], player_to=(self.position + 2) % 4),
+            SwapCardAction(player_from=self._position, card=sc[2], player_to=(self.position + 3) % 4)
+        ]
         return scards
 
     def notify_about_announced_tichus(self, tichu, grand_tichu):
