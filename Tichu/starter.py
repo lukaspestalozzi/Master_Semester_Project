@@ -13,9 +13,9 @@ if __name__ == "__main__":
 
     players = [
         TichuPlayer(name="player0", agent=MonteCarloPerfectInformationAgent(), perfect_information_mode=True),
-        TichuPlayer(name="player1", agent=RandomAgent(), perfect_information_mode=True),
+        TichuPlayer(name="player1", agent=MonteCarloPerfectInformationAgent(), perfect_information_mode=True),
         TichuPlayer(name="player2", agent=MonteCarloPerfectInformationAgent(), perfect_information_mode=True),
-        TichuPlayer(name="player3", agent=RandomAgent(), perfect_information_mode=True),
+        TichuPlayer(name="player3", agent=MonteCarloPerfectInformationAgent(), perfect_information_mode=True),
     ]
     """
     players = [

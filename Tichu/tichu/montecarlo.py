@@ -158,6 +158,10 @@ class MonteCarloTree(GameTree):
         return MonteCarloTreeNode(parent, data)
 
     def is_fully_expanded(self, state):
+        """
+        :param state: the game-state
+        :return: True if all possible actions in this state are already present as children in this tree.
+        """
         return self._node(state).is_fully_expanded()
 
     def expand(self, state, strategy='RANDOM'):
@@ -276,7 +280,8 @@ class MonteCarloTreeNode(GameTreeNode):
         return best_child, action
 
     def _short_label(self):
+        s = ''
         if self.is_root():
-            return 'Root'
-        else:
-            return f'{self.data.action_leading_here} ratio:{self.reward_ratio:.2f} (visited:{self._visited_count}, reward:{self.reward_count})'
+            s += 'Root'
+        s += f'{hash(self.data)} {self.data.action_leading_here} ratio:{self.reward_ratio:.2f} (visited:{self._visited_count}, reward:{self.reward_count})'
+        return s

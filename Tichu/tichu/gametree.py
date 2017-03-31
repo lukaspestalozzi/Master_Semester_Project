@@ -11,6 +11,15 @@ u2502 = u'\u2502'  # '|'
 
 
 class GameTree(object):
+    """
+    A n-ary Tree
+
+    - Each node has an associated game state (may be None)
+    - Each node has exactly one parent pointer (None only for the Root)
+    - The edges between a parent and a child should represent actions in the Game that change the game state.
+    - Each node has a set of children. Note that not all children of a node P must have P as parent-pointer.
+      This allows different action paths to lead to the same game state.
+    """
 
     def __init__(self, root=None):
         self._nodes = dict()  # state -> node
@@ -35,42 +44,47 @@ class GameTree(object):
 
     def add_child(self, parent, child):
         """
-        :Adds the given child to the given parent.
-        :If parent is not in the Tree, tries to add the parent as root.
+        Adds the given child to the given parent.
 
-        :param parent:
-        :param child:
+        If parent is not in the Tree, tries to add the parent as root.
+
+        If the child is already in the Tree under a different Parent, then adds the existing child-node to the given parent.
+        The child-node still has the old parent but is now present in both parent-nodes child set.
+
+        :param parent: parent game state
+        :param child: child game state
         :return: self
         :raises NoParentError: if the parent is None.
         :raises MultipleRootsError: if there is already a root in the tree, but the parent is not in the tree
-        :raises MultipleNodesError: if the child already is in the tree
         """
         if parent is None:
-            raise NoParentError("Parent can't be None")
-        if child in self._nodes:
+            raise NoParentError("Parent can't be None, use 'tree.add_root(child)' instead.")
+        elif child in self._nodes:
             if child in self.children_of(parent):
                 logging.debug("[add_child] tried to add a child already in the tree, but parent matched -> kept already existing child node")
                 return self  # the child is already there -> keep existing node
             else:
-                logging.error(f"MultipleNodesError: Can't add already existing child: \n\tparent: {parent}\n\tchild: {child}, \n\t\n\texisting parent of child: {self.parent_of(child)}\n\texisting child: {self._nodes[child].data}")
-                raise MultipleNodesError("Can't add already existing node to different parent")
+                logging.debug("[add_child] tried to add a child already in the tree, under another parent -> kept already existing child node and added it to the parents children")
+                self._node(parent).add_child_node(self._node(child))  # the child already exists -> keep existing child and add it to the parent's children
+                return self
+        else:
+            try:
+                parent_node = self._node(parent)
+            except NotInTreeError:
+                # parent is not in the tree, try to make it root.
+                parent_node = self.add_root(parent)  # raises MultipleRootsError if there is already a root
 
-        try:
-            parent_node = self._node(parent)
-        except NotInTreeError:
-            # parent is not in the tree, try to make it root.
-            parent_node = self.add_root(parent)  # raises MultipleRootsError if there is already a root
-
-        # add the child
-        child_node = self._create_node(parent=parent_node, data=child)
-        parent_node.add_child_node(child_node)
-        self._nodes[child] = child_node
+            # add the child
+            child_node = self._create_node(parent=parent_node, data=child)
+            parent_node.add_child_node(child_node)
+            self._nodes[child] = child_node
         return self
 
     def add_root(self, root):
         """
-        Adds a root Node with root as data
-        :param root:
+        Adds a root Node with root as game state
+
+        :param root: the state
         :return: self
         :raises MultipleRootsError: If there is already a root in the Tree.
         """

@@ -87,6 +87,14 @@ class CardValue(ComparableEnum):
     def points(self):
         return self._points
 
+    @staticmethod
+    def from_name(name):
+        names = {cv: cv.name for cv in CardValue}
+        try:
+            return names[name]
+        except KeyError:
+            raise ValueError(f"There is no CardValue with name '{name}'")
+
     def __repr__(self):
         return self._str
 
