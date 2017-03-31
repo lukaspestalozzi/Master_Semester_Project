@@ -45,6 +45,10 @@ class BaseTrick(metaclass=abc.ABCMeta):
     def points(self):
         return self.count_points()
 
+    @property
+    def winner(self):
+        return self.last_combination_action.player_pos
+
     def count_points(self):
         return sum([comb.combination.points for comb in self])
 
@@ -796,6 +800,13 @@ class RoundHistory(namedtuple("RH", ["initial_points", "final_points", "points",
                 return hnds
         return None
 
+    @property
+    def won_tricks(self):
+        wt = ([], [], [], [])
+        for t in self.tricks:
+            wt[t.winner].append(t)
+        return tuple((tuple(ts) for ts in wt))
+
     def nbr_passed(self):
         if len(self.tricks) == 0 or self.tricks[-1].is_empty():
             return 0
@@ -816,6 +827,8 @@ class RoundHistory(namedtuple("RH", ["initial_points", "final_points", "points",
         s += f"{ind}Game Points after Round: {self.final_points}\n"
         s += f"{ind}ranking: {self.ranking}\n"
         s += f"{ind}Number of Tricks: {len(self.tricks)}\n"
+        s += f"{ind}Handcards: \n"
+        s += self.complete_hands.pretty_string(indent_=indent_+4) + "\n"
         ind4 = indent(indent_+4, s=' ')
         s += f"{ind4}---------- Tricks ----------\n"
         for k, trick in enumerate(self.tricks):
@@ -1353,8 +1366,10 @@ class HandCardSnapshot(namedtuple("HCS", ["handcards0", "handcards1", "handcards
         else:
             raise ValueError("save must be one of [False, 0, 1, 2, 3] but was: " + str(save))
 
+    def pretty_string(self, indent_=0):
+        ind = indent(indent_, s=" ")
+        s = f"{ind}0:{self.handcards0.pretty_string()}\n{ind}1:{self.handcards1.pretty_string()}\n{ind}2:{self.handcards2.pretty_string()}\n{ind}3:{self.handcards3.pretty_string()}"
+        return s
+
     def __str__(self):
-        return "HandCardSnapshot:\n\t0:{}\n\t1:{}\n\t2:{}\n\t3:{}".format(self.handcards0.pretty_string(),
-                                                                          self.handcards1.pretty_string(),
-                                                                          self.handcards2.pretty_string(),
-                                                                          self.handcards3.pretty_string())
+        return self.pretty_string()

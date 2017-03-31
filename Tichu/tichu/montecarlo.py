@@ -42,7 +42,7 @@ class MonteCarloTreeSearch(object):
         """
         :return: :boolean whether the search should be ended
         """
-        return iteration > 50
+        return iteration > 100
 
     def tree_policy(self, state):
         """
@@ -127,7 +127,11 @@ class MctsState(RoundState):
         return (action, new_state)
 
     def evaluate(self):
-        return self.calculate_points()
+        # return self.calculate_points()
+        res = [0, 0, 0, 0]
+        for rank, pos in enumerate(self.ranking):
+            res[pos] = (4-rank)**2
+        return tuple(res)
 
     # TODO hash & equals??
 
@@ -228,8 +232,8 @@ class MonteCarloTreeNode(GameTreeNode):
         :return: True
         """
         self.increase_visited_count()
-        self.update_reward_count(rollout_result[self.data.current_pos])
         if self.parent_node is not None:
+            self.update_reward_count(rollout_result[self.parent_node.data.current_pos])
             return self.parent_node.backup(rollout_result)
         else:
             return True

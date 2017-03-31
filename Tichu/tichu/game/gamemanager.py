@@ -93,7 +93,7 @@ class TichuGame(object):
         roundhistory_builder.complete_hands = self.make_handcards_snapshot()
 
         wish = None
-        logging.info("handcards after cardswap: " + str(roundhistory_builder.complete_hands))
+        logging.info("handcards after cardswap:\n" + roundhistory_builder.complete_hands.pretty_string(indent_=4))
         # trick's loop
         while not roundhistory_builder.round_ended():
             leading_player, wish = self._run_trick(leading_player=leading_player, wish=wish)

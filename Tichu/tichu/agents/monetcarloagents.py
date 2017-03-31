@@ -31,8 +31,7 @@ class MonteCarloPerfectInformationAgent(BaseAgent):
     def play_combination(self, wish, hand_cards, round_history):
         nbr_passed = round_history.nbr_passed()
         assert nbr_passed in range(0, 4)
-        action = self._start_montecarlo_search(self._create_mcts_state(hand_cards=hand_cards,
-                                                                       round_history=round_history,
+        action = self._start_montecarlo_search(self._create_mcts_state(round_history=round_history,
                                                                        wish=wish,
                                                                        trick_on_table=round_history.tricks[-1],
                                                                        nbr_passed=nbr_passed))
@@ -44,33 +43,30 @@ class MonteCarloPerfectInformationAgent(BaseAgent):
     def play_first(self, hand_cards, round_history, wish):
         nbr_passed = round_history.nbr_passed()
         assert nbr_passed == 0
-        action = self._start_montecarlo_search(self._create_mcts_state(hand_cards=hand_cards,
-                                                                       round_history=round_history,
+        action = self._start_montecarlo_search(self._create_mcts_state(round_history=round_history,
                                                                        wish=wish,
                                                                        trick_on_table=Trick([]),
                                                                        nbr_passed=nbr_passed))
         return action
 
-    def _create_mcts_state(self, hand_cards, round_history, wish, trick_on_table, nbr_passed):
+    def _create_mcts_state(self, round_history, wish, trick_on_table, nbr_passed):
         """
-        :param hand_cards:
         :param round_history:
         :param wish:
         :param trick_on_table:
         :param nbr_passed:
         :return:
         """
-        # TODO FIX won_tricks is not empty !!!!!
         return MctsState(current_pos=self.position,
                          hand_cards=round_history.last_handcards,
-                         won_tricks=(tuple(Trick([])), tuple(Trick([])), tuple(Trick([])), tuple(Trick([]))),
+                         won_tricks=round_history.won_tricks,
                          trick_on_table=trick_on_table,
                          wish=wish,
-                         ranking=round_history.ranking,
+                         ranking=tuple(round_history.ranking),
                          nbr_passed=nbr_passed,
-                         announced_tichu=round_history.announced_tichus,
-                         announced_grand_tichu=round_history.announced_grand_tichus,
-                         action_leading_here=None)
+                         announced_tichu=frozenset(round_history.announced_tichus),
+                         announced_grand_tichu=frozenset(round_history.announced_grand_tichus),
+                         action_leading_here=round_history.events[-1])
 
     def _start_montecarlo_search(self, start_state):
         start_t = time.time()

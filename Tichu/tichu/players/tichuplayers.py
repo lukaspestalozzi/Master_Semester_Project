@@ -110,7 +110,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :return: The number of points the players gained with his tricks
         """
         pts = sum([t.points for t in self._tricks])
-        logging.debug(f"counting points of tricks, player:{self.position}, tricks:{self._tricks} -> pts")
+        logging.debug(f"counting points of tricks, player:{self.position}, tricks:{self._tricks} -> {pts}")
         return pts
 
     def new_game(self, new_position, teammate):
