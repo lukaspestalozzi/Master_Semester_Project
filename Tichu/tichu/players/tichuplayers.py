@@ -120,6 +120,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         self.remove_tricks()
         self.remove_hand_cards()
         self._agent.position = new_position
+        self._agent.start_game()
 
     def new_round(self):
         self.remove_tricks()

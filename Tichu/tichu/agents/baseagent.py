@@ -15,6 +15,13 @@ class BaseAgent(metaclass=abc.ABCMeta):
         self._position = pos
 
     @abc.abstractmethod
+    def start_game(self):
+        """
+        Should be called before a game starts and after the position of the agent is set
+        :return:
+        """
+
+    @abc.abstractmethod
     def announce_grand_tichu(self, announced_grand_tichu):
         """
 

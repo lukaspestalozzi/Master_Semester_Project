@@ -36,6 +36,9 @@ class MiniMaxPIAgent(BaseAgent):  # MiniMaxPerfectInformationAgent
         super().__init__()
         self._minimax = MiniMaxSearch(max_depth=2)
 
+    def start_game(self):
+        pass
+
     def give_dragon_away(self, hand_cards, trick, round_history):
         pl_pos = (self.position + 1) % 4
         return pl_pos

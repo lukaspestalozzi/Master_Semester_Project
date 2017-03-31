@@ -2,16 +2,18 @@ import random
 
 import logging
 
-from tichu.agents.abstractagent import BaseAgent
+from tichu.agents.baseagent import BaseAgent
 from tichu.cards.card import CardValue
 from tichu.cards.cards import Single
-from tichu.game.gameutils import Card_To
 
 
 class PassingAgent(BaseAgent):
 
     def __init__(self):
         super().__init__()
+
+    def start_game(self):
+        pass
 
     def give_dragon_away(self, hand_cards, round_history):
         pl_pos = (self.position + 1) % 4

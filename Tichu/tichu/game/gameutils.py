@@ -472,8 +472,7 @@ class GameState(namedtuple("GS", [])):
     pass  # TODO
 
 
-class RoundState(namedtuple("RS", ["current_pos", "hand_cards", "won_tricks", "trick_on_table", "wish", "ranking",
-                                   "nbr_passed", "announced_tichu", "announced_grand_tichu"])):
+class RoundState(namedtuple("RS", ["current_pos", "hand_cards", "won_tricks", "trick_on_table", "wish", "ranking", "nbr_passed", "announced_tichu", "announced_grand_tichu"])):
     def __init__(self, current_pos, hand_cards, won_tricks, trick_on_table, wish, ranking, nbr_passed,
                  announced_tichu, announced_grand_tichu):
         super().__init__()

@@ -16,6 +16,9 @@ class MonteCarloPerfectInformationAgent(BaseAgent):
         super().__init__()
         self._mcts = MonteCarloTreeSearch()
 
+    def start_game(self):
+        pass
+
     def give_dragon_away(self, hand_cards, trick, round_history):
         pl_pos = (self.position + 1) % 4
         return pl_pos

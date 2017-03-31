@@ -1,5 +1,6 @@
 import logging
 import datetime
+from tichu.agents.human_agent import HumanInputAgent
 
 from tichu.agents.monetcarloagents import MonteCarloPerfectInformationAgent
 from tichu.agents.randomagent import RandomAgent
@@ -12,10 +13,10 @@ if __name__ == "__main__":
     logginginit.initialize_logger("./logs", console_log_level=logging.INFO, all_log="all.log")
 
     players = [
-        TichuPlayer(name="player0", agent=MonteCarloPerfectInformationAgent(), perfect_information_mode=True),
-        TichuPlayer(name="player1", agent=MonteCarloPerfectInformationAgent(), perfect_information_mode=True),
-        TichuPlayer(name="player2", agent=MonteCarloPerfectInformationAgent(), perfect_information_mode=True),
-        TichuPlayer(name="player3", agent=MonteCarloPerfectInformationAgent(), perfect_information_mode=True),
+        TichuPlayer(name="player0", agent=HumanInputAgent(), perfect_information_mode=True),
+        TichuPlayer(name="player1", agent=RandomAgent(), perfect_information_mode=True),
+        TichuPlayer(name="player2", agent=RandomAgent(), perfect_information_mode=True),
+        TichuPlayer(name="player3", agent=RandomAgent(), perfect_information_mode=True),
     ]
     """
     players = [
@@ -27,7 +28,7 @@ if __name__ == "__main__":
 
     team1 = Team(player1=players[0], player2=players[2])
     team2 = Team(player1=players[1], player2=players[3])
-    GM = TichuGame(team1, team2, target_points=1000)
+    GM = TichuGame(team1, team2, target_points=1)
     res = GM.start_game()
 
     res_string = res.pretty_string()
