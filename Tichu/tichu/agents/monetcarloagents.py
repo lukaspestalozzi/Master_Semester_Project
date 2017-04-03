@@ -4,14 +4,14 @@ import time
 
 from tichu.agents.partialagents import *
 from tichu.game.gameutils import Trick
-from tichu.montecarlo import MctsState, MonteCarloTreeSearch
+from tichu.montecarlo import MctsState, DefaultMonteCarloTreeSearch
 
 
 class SimpleMonteCarloPerfectInformationAgent(SimplePartialAgent):
 
     def __init__(self):
         super().__init__()
-        self._mcts = MonteCarloTreeSearch()
+        self._mcts = DefaultMonteCarloTreeSearch(search_iterations=50, nbr_rollouts=5)
 
     def play_combination(self, wish, round_history):
         nbr_passed = round_history.nbr_passed()

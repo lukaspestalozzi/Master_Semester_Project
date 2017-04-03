@@ -114,11 +114,23 @@ class GameTree(object):
     def print_hierarchy(self):
         return self._root_node.print_hierarchy(indent='', last=True)
 
+    def clear(self):
+        """
+        Remove all Nodes from the Tree
+        :return: tuple(nodes dict, rootdata)
+        """
+        logging.debug("Clearing The Tree.")
+        nds = self._nodes
+        self._nodes = dict()
+        r = self.root
+        self._root_node = None
+        return (nds, r)
+
     def _node(self, state):
         try:
             return self._nodes[state]
         except KeyError as ke:
-            raise NotInTreeError() from ke
+            raise NotInTreeError(f"'{state}' is not in the Tree.") from ke
 
     def _create_node(self, parent, data):
         """
