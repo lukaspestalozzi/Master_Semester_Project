@@ -136,6 +136,7 @@ class AllCombinationsTest(unittest.TestCase):
                     self.assertTrue(bomb in expected_bombs, "bomb: {} in bombs: {}".format(bomb, expected_bombs))
 
     def test_single_no_args(self):
+        # TODO Fails because singles now does not return 2 cards with the same cardvalues
         singles_ctc = [
             CombTestCase(othercards={},
                          combinations={Single(c) for c in {c for c in C}}),  # test all cards

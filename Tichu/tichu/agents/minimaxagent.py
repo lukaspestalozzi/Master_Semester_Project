@@ -6,7 +6,7 @@ from multiprocessing.pool import ThreadPool, Pool
 
 import time
 
-from tichu.agents.baseagent import BaseAgent
+from tichu.agents.baseagent import DefaultAgent
 from tichu.cards.card import CardValue, Card
 from tichu.cards.cards import Cards, ImmutableCards
 from tichu.game.gameutils import HandCardSnapshot, PassAction, CombinationAction, SwapCardAction
@@ -30,59 +30,41 @@ class GameState(namedtuple("GameState", ["player_pos", "hand_cards", "tricks", "
                 and self.nbr_passed == other.nbr_passed)
 
 
-class MiniMaxPIAgent(BaseAgent):  # MiniMaxPerfectInformationAgent
+class MiniMaxPIAgent(DefaultAgent):  # MiniMaxPerfectInformationAgent
 
     def __init__(self):
         super().__init__()
         self._minimax = MiniMaxSearch(max_depth=2)
 
-    def start_game(self):
-        pass
-
-    def give_dragon_away(self, hand_cards, trick, round_history):
-        pl_pos = (self.position + 1) % 4
-        return pl_pos
-
-    def wish(self, hand_cards, round_history):
-        wish = random.choice([cv for cv in CardValue
-                              if cv is not CardValue.DOG
-                              and cv is not CardValue.DRAGON
-                              and cv is not CardValue.MAHJONG
-                              and cv is not CardValue.PHOENIX])
-        return wish
-
-    def play_combination(self, wish, hand_cards, round_history):
+    def play_combination(self, wish, round_history):
         nbr_passed = round_history.nbr_passed()
         assert nbr_passed in range(0, 4)
-        comb = self._start_montecarlo_search(self._create_start_state(hand_cards=hand_cards, round_history=round_history, wish=wish,
+        comb = self._start_montecarlo_search(self._create_start_state(hand_cards=self.hand_cards, round_history=round_history, wish=wish,
                                              combination_on_table=round_history.combination_on_table, nbr_passed=nbr_passed))
         return PassAction(self._position) if comb is None else CombinationAction(self._position, combination=comb)
 
-    def play_bomb(self, hand_cards, round_history):
-        return None  # TODO, for now only play bomb when it's your turn -> bomb will never be beaten by another bomb!!
-
-    def play_first(self, hand_cards, round_history, wish):
+    def play_first(self, round_history, wish):
         nbr_passed = round_history.nbr_passed()
         assert nbr_passed == 0
-        comb = self._start_montecarlo_search(self._create_start_state(hand_cards=hand_cards, round_history=round_history, wish=wish, combination_on_table=None, nbr_passed=nbr_passed))
+        comb = self._start_montecarlo_search(self._create_start_state(hand_cards=self.hand_cards, round_history=round_history, wish=wish, combination_on_table=None, nbr_passed=nbr_passed))
 
         return comb
 
-    def _possible_combinations(self, hand_cards, played_on, wish):
+    def _possible_combinations(self, played_on, wish):
         """
         :param hand_cards:
         :param wish:
         :return: A combination fulfilling the wish if possible, None if not possible
         """
-        possible_combs = list(hand_cards.all_combinations(played_on=played_on))
+        possible_combs = list(self.hand_cards.all_combinations(played_on=played_on))
         # verify wish
-        if wish and wish in (c.card_value for c in hand_cards):
+        if wish and wish in (c.card_value for c in self.hand_cards):
             pcombs = [comb for comb in possible_combs if comb.contains_cardval(wish)]
             if len(pcombs):
                 return pcombs
         return possible_combs
 
-    def _create_start_state(self, hand_cards, round_history, wish, combination_on_table, nbr_passed):
+    def _create_start_state(self, round_history, wish, combination_on_table, nbr_passed):
         return GameState(player_pos=self.position,
                          hand_cards=round_history.last_handcards,
                          tricks=(ImmutableCards([]), ImmutableCards([]), ImmutableCards([]), ImmutableCards([])),
@@ -108,24 +90,6 @@ class MiniMaxPIAgent(BaseAgent):  # MiniMaxPerfectInformationAgent
 
         logging.info("player #{} ended montecarlo (time: {})".format(self.position, time.time()-start_t))
         return action
-
-    def swap_cards(self, hand_cards):
-        sc = hand_cards.random_cards(3)
-        scards = [
-            SwapCardAction(player_from=self._position, card=sc[0], player_to=(self.position + 1) % 4),
-            SwapCardAction(player_from=self._position, card=sc[1], player_to=(self.position + 2) % 4),
-            SwapCardAction(player_from=self._position, card=sc[2], player_to=(self.position + 3) % 4)
-        ]
-        return scards
-
-    def notify_about_announced_tichus(self, tichu, grand_tichu):
-        pass
-
-    def announce_tichu(self, announced_tichu, announced_grand_tichu, round_history):
-        return False
-
-    def announce_grand_tichu(self, announced_grand_tichu):
-        return False
 
     # Minimax Search
     @staticmethod
@@ -430,7 +394,10 @@ class MiniMaxSearch(object):
             return -res - 0.1  # shorter is better & - 0.1 to mark it as 'heuristic value'
 
 
-class MonteCarloSearch(MiniMaxSearch):
+class SimpleMonteCarloSearch(MiniMaxSearch):
+    """
+    Simulates a number of rollouts from the current state and averages the results to decide the best move
+    """
 
     def __init__(self, nbr_simualtions):
         check_param(nbr_simualtions > 0)

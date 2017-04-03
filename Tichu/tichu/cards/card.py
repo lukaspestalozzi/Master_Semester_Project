@@ -89,11 +89,54 @@ class CardValue(ComparableEnum):
 
     @staticmethod
     def from_name(name):
-        names = {cv: cv.name for cv in CardValue}
+        """
+        >>> CardValue.from_name('TWO').name
+        'TWO'
+        >>> CardValue.from_name('THREE').name
+        'THREE'
+        >>> CardValue.from_name('FOUR').name
+        'FOUR'
+        >>> CardValue.from_name('FIVE').name
+        'FIVE'
+        >>> CardValue.from_name('SIX').name
+        'SIX'
+        >>> CardValue.from_name('SEVEN').name
+        'SEVEN'
+        >>> CardValue.from_name('EIGHT').name
+        'EIGHT'
+        >>> CardValue.from_name('NINE').name
+        'NINE'
+        >>> CardValue.from_name('TEN').name
+        'TEN'
+        >>> CardValue.from_name('J').name
+        'J'
+        >>> CardValue.from_name('Q').name
+        'Q'
+        >>> CardValue.from_name('K').name
+        'K'
+        >>> CardValue.from_name('A').name
+        'A'
+        >>> CardValue.from_name('DOG').name
+        'DOG'
+        >>> CardValue.from_name('PHOENIX').name
+        'PHOENIX'
+        >>> CardValue.from_name('DRAGON').name
+        'DRAGON'
+        >>> CardValue.from_name('MAHJONG').name
+        'MAHJONG'
+        >>> CardValue.from_name('Not existant')
+        Traceback (most recent call last):
+        ...
+        ValueError: There is no CardValue with name 'Not existant'. possible names: ['A', 'DOG', 'DRAGON', 'EIGHT', 'FIVE', 'FOUR', 'J', 'K', 'MAHJONG', 'NINE', 'PHOENIX', 'Q', 'SEVEN', 'SIX', 'TEN', 'THREE', 'TWO']
+
+        :param name:
+        :return:
+        """
+        names = {cv.name: cv for cv in CardValue}
         try:
             return names[name]
         except KeyError:
-            raise ValueError(f"There is no CardValue with name '{name}'")
+            raise ValueError(f"There is no CardValue with name '{name}'. possible names: {sorted(names.keys())}")
 
     def __repr__(self):
         return self._str

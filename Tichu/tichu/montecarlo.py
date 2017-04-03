@@ -1,3 +1,5 @@
+import abc
+
 import logging
 
 import random
@@ -10,22 +12,21 @@ from tichu.utils import check_isinstance, check_all_isinstance
 
 
 class MonteCarloTreeSearch(object):
+    """
+    Implements the standard MonteCarloTreeSearch algorithm.
+    """
 
     def __init__(self):
-        self._tree = MonteCarloTree()
-        self._const = 1.0 / np.sqrt(2)  # value may be improved. 1 / sqrt(2) proposed on p.9 in "A Survey of Monte Carlo Tree Search Methods"
-        self._player_pos = None
+        self.tree = MonteCarloTree()
+        # self._const = 1.0 / np.sqrt(2)  # value may be improved. 1 / sqrt(2) proposed on p.9 in "A Survey of Monte Carlo Tree Search Methods"
 
     def search(self, start_state):
         check_isinstance(start_state, MctsState)
-        logging.debug(f"Player {start_state.current_pos} started montecarlo search.")
-
-        self._player_pos = start_state.current_pos
-        if start_state not in self._tree:
+        if start_state not in self.tree:
             try:
-                self._tree.add_root(start_state)
+                self.tree.add_root(start_state)
             except MultipleRootsError:
-                self._tree = MonteCarloTree(root=start_state)
+                self.tree = MonteCarloTree(root=start_state)
                 logging.debug("[search] replaced the MonteCarloTree")
 
         iteration = 0
@@ -35,24 +36,26 @@ class MonteCarloTreeSearch(object):
             rollout_result = self.default_policy(leaf_state)
             self.backup(leaf_state, rollout_result)
         child, action = self.best_child(start_state)
-        logging.debug(f'tree after search: \n{self._tree.print_hierarchy()}')
+        # logging.debug(f'tree after search: \n{self._tree.print_hierarchy()}')
         return action
 
     def is_end_search(self, iteration):
         """
         :return: :boolean whether the search should be ended
         """
-        return iteration > 100
+        return iteration > 200
 
     def tree_policy(self, state):
         """
+        Traverses the Tree and selects a leaf-node to be expanded.
+
         :param state: The starting state of the search
         :return: state: The state of the selected leaf node.
         """
         curr_state = state
         while not curr_state.is_terminal():
-            if not self._tree.is_fully_expanded(curr_state):
-                action, child_state = self._tree.expand(curr_state, strategy="RANDOM")
+            if not self.tree.is_fully_expanded(curr_state):
+                action, child_state = self.tree.expand(curr_state)
                 return child_state
             else:
                 curr_state, _ = self.best_child(curr_state)
@@ -75,8 +78,7 @@ class MonteCarloTreeSearch(object):
         :param rollout_result:
         :return: None
         """
-        # TODO may be adapded for multiple players (negmax)
-        self._tree.backup(leaf_state, rollout_result)
+        self.tree.backup(leaf_state, rollout_result)
         return None
 
     def best_child(self, state):
@@ -84,7 +86,7 @@ class MonteCarloTreeSearch(object):
         :param state:
         :return: The best child of the given state
         """
-        return self._tree.best_child_of(state)
+        return self.tree.best_child_of(state)
 
 
 class MctsState(RoundState):
@@ -152,7 +154,7 @@ class MctsState(RoundState):
         return s
 
 
-class MonteCarloTree(GameTree):
+class MonteCarloTree(GameTree, metaclass=abc.ABCMeta):
 
     def _create_node(self, parent, data):
         return MonteCarloTreeNode(parent, data)
@@ -164,19 +166,14 @@ class MonteCarloTree(GameTree):
         """
         return self._node(state).is_fully_expanded()
 
-    def expand(self, state, strategy='RANDOM'):
+    def expand(self, state):
         """
         Chooses an action from the given state, with the given strategy and adds a new child node corresponding to the new state
         :param state: the state to expand
-        :param strategy: ['RANDOM', 'NEXT', 'LOWEST', 'HIGHEST'] how the action to expand is chosen.
-            - RANDOM: a random action
-            - NEXT: the next action in the list
-            - LOWEST: the lowest combination (sorted by length and then height, None counting as the lowest of all possiblecombinations)
-            - HIGHEST: the highest combination
         :return: tuple(action, new_state) of a not yet visited action
         """
         expanding_node = self._node(state)
-        action, new_state = expanding_node.expand_node(strategy=strategy)
+        action, new_state = expanding_node.expand_node()
         self.add_child(parent=state, child=new_state)
         return (action, new_state)
 
@@ -185,8 +182,27 @@ class MonteCarloTree(GameTree):
         node.backup(rollout_result=rollout_result)
 
     def best_child_of(self, state):
-        bc_node, action = self._node(state).best_child()
+        bc_node, action = self._node(state).best_child_node()
         return (bc_node.data, action)
+
+    def main_line(self, hand_cards=False):
+        """
+        Traverses the Tree from the root, always taking the 'best child' from each node.
+        :param hand_cards: If True, returns tripple (game_state, action, handcards)
+        :return: The best Path from the root. Path is a sequence of tuples (game_state, action) with the root at position 0.
+        """
+        if hand_cards:
+            path = [(self._root_node.data, None, self._root_node.data.hand_cards)]
+        else:
+            path = [(self._root_node.data, None)]
+        curr_node = self._root_node
+        while not curr_node.is_leaf():
+            curr_node, action = curr_node.best_child_node()
+            if hand_cards:
+                path.append((curr_node.data, action, curr_node.data.hand_cards))
+            else:
+                path.append((curr_node.data, action))
+        return path
 
 
 class MonteCarloTreeNode(GameTreeNode):
@@ -218,8 +234,6 @@ class MonteCarloTreeNode(GameTreeNode):
 
     def update_reward_count(self, amount):
         self._reward_count += amount
-
-    def increase_visited_count(self):
         self._visited_count += 1
 
     def is_fully_expanded(self):
@@ -235,7 +249,6 @@ class MonteCarloTreeNode(GameTreeNode):
         :param rollout_result:
         :return: True
         """
-        self.increase_visited_count()
         if self.parent_node is not None:
             self.update_reward_count(rollout_result[self.parent_node.data.current_pos])
             return self.parent_node.backup(rollout_result)
@@ -265,16 +278,14 @@ class MonteCarloTreeNode(GameTreeNode):
 
         return action, new_state
 
-    def best_child(self):
+    def best_child_node(self):
         """
-        :param ret_action: If True, returns a tuple (child node, action to child)
-        :return: The best child node of this node
+        :return: Tuple (The best child node of this node, the action leading to that node)
         """
         assert len(self._children) > 0
         C = 0.707106781186  # 1.0 / np.sqrt(2)  # value may be improved, proposed on p.9 in "A Survey of Monte Carlo Tree Search Methods"
 
-        scores = [(c, c.reward_ratio + C*np.sqrt((2 * np.log(self._visited_count) / max(c.visited_count, 1e-6))))
-                  for c in self._children]
+        scores = [(c, c.reward_ratio + C*np.sqrt((2 * np.log(self._visited_count) / max(c.visited_count, 1e-6)))) for c in self._children]
         best_child, score = max(scores, key=lambda t: t[1])
         action = best_child.data.action_leading_here
         return best_child, action
@@ -285,3 +296,14 @@ class MonteCarloTreeNode(GameTreeNode):
             s += 'Root'
         s += f'{hash(self.data)} {self.data.action_leading_here} ratio:{self.reward_ratio:.2f} (visited:{self._visited_count}, reward:{self.reward_count})'
         return s
+
+
+class MonteCarloSearchTree(MonteCarloTree):
+    """
+    Implements the standard MonteCarloTreeSearch algorithm.
+    Following Methods can and should be overwritten to customize the search.
+    """
+
+    def __init__(self):
+        super().__init__()
+

@@ -31,6 +31,13 @@ class GameTree(object):
     def root(self):
         return self._root_node.data if self._root_node is not None else None
 
+    @property
+    def size(self):
+        """
+        :return: The number of Nodes in the Tree
+        """
+        return len(self._nodes)
+
     def children_of(self, state):
         return {cn.data for cn in self._node(state).children_nodes}
 
@@ -182,6 +189,8 @@ class GameTreeNode(object):
         for k, childnode in enumerate(self._children):
             string += childnode.print_hierarchy(next_indent, last=k == len(self._children)-1)
         return string
+
+
 # --------- Tree Exceptions --------------------
 
 

@@ -172,7 +172,8 @@ class ImmutableCards(collectionsabc.Collection):
                 yield from (StraightBomb(st) for st in ImmutableCards(cards).straights(contains_value=contains_value))
 
     def singles(self, contains_value=None):
-        sgls = (Single(c) for c in self._cards)
+        unique_cardvals = [crds[0] for cv, crds in self.value_dict().items()]
+        sgls = (Single(c) for c in unique_cardvals)
         if isinstance(contains_value, CardValue):
             return (s for s in sgls if s.contains_cardval(contains_value))
         else:
@@ -1017,7 +1018,7 @@ class Straight(Combination):
 
     def __str__(self):
         if self.contains_phoenix():
-            return "{}({})".format(self.__class__.__name__.upper(), ",".join("PH:"+str(self.phoenix_as) if c is Card.PHOENIX else str(c) for c in sorted(self._cards)))
+            return "{}({})".format(self.__class__.__name__.upper(), ",".join(str(c)+":"+str(self.phoenix_as) if c is Card.PHOENIX else str(c) for c in sorted(self._cards)))
         else:
             return super().__str__()
 

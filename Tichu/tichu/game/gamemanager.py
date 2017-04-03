@@ -8,7 +8,7 @@ from tichu.cards.cards import ImmutableCards
 from tichu.cards.deck import Deck
 from tichu.exceptions import IllegalActionException, LogicError
 from tichu.game.gameutils import Team, GameHistoryBuilder, HandCardSnapshot, SwapCardAction, PassAction, TichuAction, \
-    FinishEvent, WinTrickEvent, RoundEndEvent, RoundStartEvent
+    FinishEvent, WinTrickEvent, RoundEndEvent, RoundStartEvent, GrandTichuAction
 from tichu.utils import *
 
 
@@ -125,29 +125,34 @@ class TichuGame(object):
         logging.info("start trick...")
 
         trick_ended = False
-        next_to_play = leading_player
+        current_player = leading_player
         nbr_pass = 0
         while not trick_ended:
-            assert not next_to_play.has_finished
+            assert not current_player.has_finished
 
-            logging.debug(f"Next to play -> {next_to_play.name}, (combination on table: {rhb._current_trick.last_combination}, wish:{wish})")
+            logging.debug(f"Next to play -> {current_player.position}, (combination on table: {rhb._current_trick.last_combination}, wish:{wish})")
             played_action = None
             if rhb.current_trick_is_empty():  # first play of the trick
-                played_action = next_to_play.play_first(game_history=self._history, wish=wish)
+                played_action = current_player.play_first(game_history=self._history, wish=wish)
             else:
-                played_action = next_to_play.play_combination(game_history=self._history, wish=wish)
+                played_action = current_player.play_combination(game_history=self._history, wish=wish)
 
             rhb.append_event(played_action)  # handles Tichu and update the trick on the table
             if isinstance(played_action, PassAction):
-                logging.info(f"[PASS] {next_to_play.name}. ".ljust(35)+f"(handcards: {next_to_play.hand_cards.pretty_string()})")
+                logging.info(f"[PASS] {current_player.position}. ".ljust(35)+f"(handcards: {current_player.hand_cards.pretty_string()})")
                 nbr_pass += 1
             else:  # if trick
-                logging.info(f"[PLAY] {next_to_play.name}: {played_action.combination}. ".ljust(35)+f"(handcards: {next_to_play.hand_cards.pretty_string()})")
+                logging.info(f"[PLAY] {current_player.position}: {played_action.combination}. ".ljust(35)+f"(handcards: {current_player.hand_cards.pretty_string()})")
 
                 # update the leading_player
-                leading_player = next_to_play
+                leading_player = current_player
                 # update the nbr pass actions
                 nbr_pass = 0
+
+                # if the player announced tichu with the move, announce it to the players
+                if isinstance(played_action, TichuAction) and current_player.position in rhb.announced_tichus:
+                    logging.info(f"[TICHU] announced by: {current_player.position}. ".ljust(35)+f"(handcards: {current_player.hand_cards.pretty_string()})")
+                    self._notify_all_players_about_tichus()
 
                 # verify wish
                 if wish is not None and played_action.combination.fulfills_wish(wish):
@@ -156,15 +161,15 @@ class TichuGame(object):
 
                 # handle Mahjong (ask for wish)
                 if Card.MAHJONG in played_action.combination:
-                    wish_action = next_to_play.wish(game_history=self._history)
+                    wish_action = current_player.wish(game_history=self._history)
                     wish = wish_action.card_value
                     rhb.append_event(wish_action)
-                    logging.info("[WISH] {}: {}".format(next_to_play.name, wish))
+                    logging.info(f"[WISH] {current_player.position}: {wish}")
 
                 # if the players finished with this move
-                if next_to_play.has_finished:
-                    rhb.append_event(FinishEvent(player_pos=next_to_play.position))
-                    logging.info("[FINISH] {}.".format(next_to_play.name))
+                if current_player.has_finished:
+                    rhb.append_event(FinishEvent(player_pos=current_player.position))
+                    logging.info(f"[FINISH] {current_player.position} (on rank {len(rhb.ranking)}).")
 
                     # test doppelsieg
                     if rhb.is_double_win():
@@ -174,45 +179,46 @@ class TichuGame(object):
                     # test whether 3rd players to win and thus ends the trick.
                     # (3rd to win automatically gets the last trick)
                     if len(rhb.ranking) == 3:
-                        rhb.append_event(FinishEvent(player_pos=self._next_to_play(next_to_play.position).position))  # add last players
+                        rhb.append_event(FinishEvent(player_pos=self._next_to_play(current_player.position).position))  # add last players
                         logging.debug("Trick ends. Dog trick.")
                         trick_ended = True
 
-                    logging.debug("Ranking: {}".format(rhb.ranking))
+                    logging.debug(f"Ranking: {rhb.ranking}")
 
                 # handle dog
                 if Card.DOG in played_action.combination:
                     assert len(played_action.combination) == 1  # just to be sure
-                    leading_player = self._players[next_to_play.team_mate]  # give lead to teammate
+                    leading_player = self._players[current_player.team_mate]  # give lead to teammate
+                    assert current_player.team_mate == (current_player.position + 2) % 4
                     trick_ended = True  # no one can play on the DOG
             # fi is trick
 
             if not trick_ended:
                 # ask all players whether they want to play a bomb
-                bomb_action = self._ask_for_bomb(next_to_play.position)
+                bomb_action = self._ask_for_bomb(current_player.position)
                 while bomb_action is not None:
                     bomb_player = self._players[bomb_action.player_pos]
-                    logging.info("[BOMB] {}: {}.".format(bomb_player.name, bomb_action.combination))
+                    logging.info(f"[BOMB] {bomb_player.position}: {bomb_action.combination}.")
                     rhb.append_event(bomb_action)
                     leading_player = bomb_player  # update the leading players
-                    next_to_play = self._next_to_play(bomb_player.position)
+                    current_player = self._next_to_play(bomb_player.position)
                     nbr_pass = 0
                     trick_ended = True  # can only play bombs on a bomb
                     # ask again for bomb
-                    bomb_action = self._ask_for_bomb(next_to_play.position)
+                    bomb_action = self._ask_for_bomb(current_player.position)
 
             # determine the next player to play
-            just_played = next_to_play
-            next_to_play = self._next_to_play(next_to_play.position)
+            if not trick_ended:
+                just_played = current_player
+                current_player = self._next_to_play(current_player.position)
 
-            # test if leading player wins the trick (ie, if the next player is the leading player or the leading player was jumped over)
-            if not trick_ended and (leading_player.position == next_to_play.position
-                                    or just_played.position < leading_player.position < next_to_play.position
-                                    or next_to_play.position < just_played.position < leading_player.position
-                                    or leading_player.position < next_to_play.position < just_played.position):
-
-                logging.debug("Trick ends. it's the leading_players turn again.")
-                trick_ended = True
+                # test if leading player wins the trick (ie, if the next player is the leading player or the leading player was jumped over)
+                if (leading_player.position == current_player.position
+                        or just_played.position < leading_player.position < current_player.position
+                        or current_player.position < just_played.position < leading_player.position
+                        or leading_player.position < current_player.position < just_played.position):
+                    logging.debug("Trick ends. it's the leading_players turn again.")
+                    trick_ended = True
 
             # end-while
 
@@ -224,13 +230,13 @@ class TichuGame(object):
             rhb.append_event(dragon_away_action)
             receiving_player = self._players[dragon_away_action.to]
             assert receiving_player.position != leading_player.position and receiving_player.position != (leading_player.position+2) % 4
-            logging.info("[GIVE DRAGON TRICK] {} -> {}".format(next_to_play.position, receiving_player.position))
+            logging.info(f"[GIVE DRAGON TRICK] {leading_player.position} -> {receiving_player.position}")
 
         # give trick to the receiving player
         rhb.append_event(WinTrickEvent(player_pos=receiving_player.position, trick=thetrick, hand_cards=self.make_handcards_snapshot()))
         receiving_player.add_trick(thetrick)
 
-        logging.info("[WIN TRICK] {}: ({})".format(next_to_play.name, thetrick))
+        logging.info(f"[WIN TRICK] {receiving_player.position}: ({thetrick})")
 
         # return the leading player and the wish
         return leading_player, wish
@@ -349,9 +355,10 @@ class TichuGame(object):
                                                                             announced_grand_tichu=list(announced_gt),
                                                                             game_history=self._history):
                 self._history.current_round.append_event(TichuAction(player_pos=pl.position))
+                logging.info(f"[TICHU] announced by: {pl.position}. ".ljust(35)+f"(handcards: {pl.hand_cards.pretty_string()})")
                 did_announce = True
-
-        self._notify_all_players_about_tichus()
+        if did_announce:
+            self._notify_all_players_about_tichus()
 
         return did_announce
 
@@ -413,8 +420,9 @@ class TichuGame(object):
 
             player.receive_first_8_cards(first_8)
 
-            if player.announce_grand_tichu_or_not(self._history.current_round.announced_grand_tichus):
-                self._history.current_round.announce_grand_tichu(k)
+            if player.announce_grand_tichu_or_not(announced_grand_tichu=self._history.current_round.announced_grand_tichus):
+                self._history.current_round.append_event(GrandTichuAction(k))
+                logging.info(f"[GRAND TICHU] announced by: {player.position}. ".ljust(35)+f"(handcards: {player.hand_cards.pretty_string()})")
 
             player.receive_last_6_cards(last_6)
 

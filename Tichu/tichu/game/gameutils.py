@@ -1,7 +1,6 @@
 import logging
 
 import warnings
-from pprint import pformat
 from collections import namedtuple
 
 import abc
@@ -27,7 +26,7 @@ class CombinationActionList(TypedList):
 class CombinationActionTuple(TypedTuple):
     __slots__ = ()
 
-    def __new__(cls, iterable):
+    def __new__(cls, iterable=list()):
         return TypedTuple.__new__(cls, CombinationAction, iterable)
 
 
@@ -123,7 +122,7 @@ class Trick(CombinationActionTuple, BaseTrick):
     """
     __slots__ = ()
 
-    def __init__(self, comb_actions):
+    def __init__(self, comb_actions=list()):
         """
         :param comb_actions: a sequence of combinations.
         """
@@ -286,7 +285,7 @@ class PlayerAction(PlayerGameEvent, metaclass=abc.ABCMeta):
                        msg=f"Action must be a CombinationAction, but was {self}")
 
         if is_bomb:
-            check_true(self.is_bomb(), ex=IllegalActionException, msg=f"Action must not be Bomb, but was {self}")
+            check_true(self.is_bomb(), ex=IllegalActionException, msg=f"Action must be Bomb, but was {self}")
         return True
 
     def can_be_played_on_combination(self, comb):
@@ -375,6 +374,10 @@ class SwapCardAction(PlayerAction):
     @property
     def to(self):
         return self._to
+
+    @property
+    def from_(self):
+        return self.player_pos
 
     def does_player_have_cards(self, player):
         return self._card in player.hand_cards
@@ -820,11 +823,16 @@ class RoundHistory(namedtuple("RH", ["initial_points", "final_points", "points",
                 last_event = self.events[k]
             return nbr_passed
 
+    def nbr_handcards(self, player_pos):
+        return len(self.last_handcards[player_pos])
+
     def pretty_string(self, indent_=0):
         ind = indent(indent_, s=" ")
         s =  f"{ind}Round Result: {self.points}\n"
         s += f"{ind}Game Points after Round: {self.final_points}\n"
         s += f"{ind}ranking: {self.ranking}\n"
+        s += f"{ind}grand tichus: {list(self.announced_grand_tichus)}\n"
+        s += f"{ind}tichus: {list(self.announced_tichus)}\n"
         s += f"{ind}Number of Tricks: {len(self.tricks)}\n"
         s += f"{ind}Handcards: \n"
         s += self.complete_hands.pretty_string(indent_=indent_+4) + "\n"
@@ -1333,6 +1341,10 @@ class HandCardSnapshot(namedtuple("HCS", ["handcards0", "handcards1", "handcards
         check_all_isinstance([handcards0, handcards1, handcards2, handcards3], ImmutableCards)
         super().__init__()
 
+    @classmethod
+    def from_cards_lists(cls, cards0, cards1, cards2, cards3):
+        return cls(ImmutableCards(cards0), ImmutableCards(cards1), ImmutableCards(cards2), ImmutableCards(cards3))
+
     def remove_cards(self, from_pos, cards):
         """
 
@@ -1365,7 +1377,7 @@ class HandCardSnapshot(namedtuple("HCS", ["handcards0", "handcards1", "handcards
         else:
             raise ValueError("save must be one of [False, 0, 1, 2, 3] but was: " + str(save))
 
-    def pretty_string(self, indent_=0):
+    def pretty_string(self, indent_: int = 0) -> str:
         ind = indent(indent_, s=" ")
         s = f"{ind}0:{self.handcards0.pretty_string()}\n{ind}1:{self.handcards1.pretty_string()}\n{ind}2:{self.handcards2.pretty_string()}\n{ind}3:{self.handcards3.pretty_string()}"
         return s

@@ -83,6 +83,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         """
         hcards = self._hand_cards
         self._hand_cards = Cards(cards=list())
+        self._update_agent_handcards()
         return hcards
 
     def can_announce_tichu(self):
@@ -135,6 +136,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         assert len(self._hand_cards) == 0
         self._hand_cards.add_all(cards)
         assert len(self._hand_cards) == 8
+        self._update_agent_handcards()
 
     def receive_last_6_cards(self, cards):
         """
@@ -144,6 +146,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         assert len(cards) == 6
         self._hand_cards.add_all(cards)
         assert len(self._hand_cards) == 14
+        self._update_agent_handcards()
 
     # ### Agent Methods ###
 
@@ -154,14 +157,17 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         """
         assert len(swapped_cards_actions) == 3
         assert all([isinstance(sc, SwapCardAction) for sc in swapped_cards_actions])
-        self._hand_cards.add_all([c.card for c in swapped_cards_actions])  # TODO agent, store info about swapped card
+        self._hand_cards.add_all([c.card for c in swapped_cards_actions])
+        self._update_agent_handcards()
+        self._agent.swap_cards_received(swapped_cards_actions=swapped_cards_actions)
 
     def swap_cards(self):
         """
         Called by the the tichu manager to ask for the 3 cards to be swapped
         :return a set (of length 3) of SwapCardAction instance.
         """
-        swap_cards = self._agent.swap_cards(self.hand_cards)
+        self._update_agent_handcards()
+        swap_cards = self._agent.swap_cards()
         check_true(len(swap_cards) == 3
                    and len({sw.player_pos for sw in swap_cards}) == 1
                    and next(iter(swap_cards)).player_pos == self._position
@@ -169,6 +175,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
                    ex=IllegalActionException, msg="swap card actions were not correct")
         for sw in swap_cards:
             self._hand_cards.remove(sw.card)
+        self._update_agent_handcards()
         return swap_cards
 
     def announce_grand_tichu_or_not(self, announced_grand_tichu):
@@ -186,8 +193,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param announced_grand_tichu: a collection of integers (in range(0, 4)), denoting playerIDs that already have announced a grand Tichu.
         :return True if this player announces a normal Tichu, False otherwise.
         """
-        nt = self._agent.announce_tichu(announced_tichu=tuple(announced_tichu), announced_grand_tichu=tuple(announced_grand_tichu),
-                                        round_history=game_history.current_round.build(save=self._copy_savely))
+        nt = self._agent.announce_tichu(announced_tichu=tuple(announced_tichu), announced_grand_tichu=tuple(announced_grand_tichu))
         return bool(nt)
 
     def players_announced_tichus(self, tichu=tuple(), grand_tichu=tuple()):
@@ -206,13 +212,13 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :return: the combination the players wants to play as a CombinationAction.
         """
         assert len(self._hand_cards) > 0
-        action = self._agent.play_first(hand_cards=self.hand_cards,
-                                        round_history=game_history.current_round.build(save=self._copy_savely),
+        action = self._agent.play_first(round_history=game_history.current_round.build(save=self._copy_savely),
                                         wish=wish)
 
         action.check(has_cards=self, is_combination=True, not_pass=True)
         TichuPlayer._check_wish(game_history.current_round.last_combination, action, self.hand_cards, wish)
         self._hand_cards.remove_all(action.combination.cards)
+        self._update_agent_handcards()
         return action
 
     def play_combination(self, game_history, wish):
@@ -223,12 +229,11 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :return: pass, or the combination the players wants to play as CombinationAction or PassAction.
         """
         assert len(self._hand_cards) > 0
-        action = self._agent.play_combination(wish=wish, hand_cards=self.hand_cards,
-                                              round_history=game_history.current_round.build(save=self._copy_savely))
+        action = self._agent.play_combination(wish=wish, round_history=game_history.current_round.build(save=self._copy_savely))
 
         check_isinstance(action, (CombinationAction, PassAction))
         check_true(action.player_pos == self._position)
-        with ignored(AttributeError, ValueError):  # TODO set correct exception
+        with ignored(AttributeError, ValueError):
             action.combination.set_phoenix_height(game_history.current_round.last_combination.height + 0.5)
 
         action.check(played_on=game_history.current_round.last_combination, has_cards=self)
@@ -236,7 +241,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
 
         if isinstance(action, CombinationAction):
             self._hand_cards.remove_all(action.combination.cards)
-
+        self._update_agent_handcards()
         return action
 
     @staticmethod
@@ -266,12 +271,13 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param game_history:The history of the tichu game so far.
         :return: the bomb (as CombinationAction) if the players wants to play a bomb. False or None otherwise
         """
-        bomb_comb = self._agent.play_bomb(hand_cards=self.hand_cards, round_history=game_history.current_round.build(save=self._copy_savely))
+        bomb_comb = self._agent.play_bomb(round_history=game_history.current_round.build(save=self._copy_savely))
         bomb_action = False
         if bomb_comb:
             bomb_action = CombinationAction(player_pos=self.position, combination=bomb_comb)
             bomb_action.check(played_on=game_history.current_round.last_combination, has_cards=self, is_bomb=True)
             self._hand_cards.remove_all(bomb_action.combination)
+        self._update_agent_handcards()
         return bomb_action
 
     def give_dragon_away(self, game_history, trick):
@@ -280,8 +286,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param trick: The dragon Trick
         :return: id of the players to give the trick to.
         """
-        pos = self._agent.give_dragon_away(hand_cards=self.hand_cards, trick=trick,
-                                           round_history=game_history.current_round.build(save=self._copy_savely))
+        pos = self._agent.give_dragon_away(trick=trick, round_history=game_history.current_round.build(save=self._copy_savely))
         try:
             dragon_action = GiveDragonAwayAction(player_from=self._position, player_to=pos, trick=trick)
             return dragon_action
@@ -293,9 +298,15 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param game_history: The history of the tichu game so far.
         :return: The WishAction to be wished
         """
-        w = self._agent.wish(self.hand_cards, game_history.current_round.build(save=self._copy_savely))
+        w = self._agent.wish(game_history.current_round.build(save=self._copy_savely))
         wish_action = WishAction(player_from=self._position, cardvalue=w)
         return wish_action
+
+    def _update_agent_handcards(self):
+        """
+        Updates the agents handcards with this players handcards
+        """
+        self._agent.hand_cards = self.hand_cards
 
     def __hash__(self):
         return self._hash
