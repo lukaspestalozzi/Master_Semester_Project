@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from csv import DictReader
 
+
 def load_card_dict(filename):
     """
     Create a dictionary mapping css card names to a more readable format.
@@ -17,6 +18,7 @@ def load_card_dict(filename):
         for row in reader:
             card_dict[row['html']] = row['card']
     return card_dict
+
 
 def get_ranks_only(hand):
     """
@@ -34,6 +36,7 @@ def get_ranks_only(hand):
         else:
             ranks.append(card[0])
     return ranks
+
 
 def vectorize_single_hand(hand, feature_list, boolean=False):
     """
@@ -53,6 +56,7 @@ def vectorize_single_hand(hand, feature_list, boolean=False):
         else:
             vec[i] = hand.count(feature)
     return vec
+
 
 def vectorize_hands(df, function, feature_list, hand_type, boolean=False):
     """
@@ -74,6 +78,7 @@ def vectorize_hands(df, function, feature_list, hand_type, boolean=False):
     vec_matrix = [x for x in df[hand_type].apply(vectorize).values]
     new_df = pd.DataFrame(vec_matrix, columns=feature_list)
     return new_df
+
 
 def load_clean_vectorize(data_filename, card_dict_filename, feature_set, hand_type):
     """

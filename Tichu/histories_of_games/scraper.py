@@ -7,6 +7,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 import warnings
 
+
 def run_scraper(n_games, filename):
     """
     Scrape information on Tichu hands from the n_games most recent played games
@@ -65,6 +66,7 @@ def get_game_urls(url, n):
     # print(game_urls)
     return game_urls[:n]
 
+
 def scrape_game(game_url):
     """
     Given a tichu page url, scrape relevant information from each tichu round.
@@ -90,6 +92,7 @@ def scrape_game(game_url):
 
     return game
 
+
 def find_rounds(game_url):
     """
     Given a tichu url, return a BeautifulSoup object containing the tichu rounds.
@@ -104,6 +107,7 @@ def find_rounds(game_url):
     rounds = soup.findAll('div', {'class': 'round'})
 
     return rounds
+
 
 def get_player_elos(game_url):
     """
@@ -134,6 +138,7 @@ def get_player_elos(game_url):
 
     return dict(zip(player_names, player_elos))
 
+
 def find_round_results(single_round):
     """
     Given a BeautifulSoup object containing a single tichu round, find for
@@ -161,6 +166,7 @@ def find_round_results(single_round):
     # [print(t) for t in res]
     return res
 
+
 def get_player_names(single_round):
     """
     Find names of players in a single tichu round.
@@ -175,6 +181,7 @@ def get_player_names(single_round):
         for line in elem.findAll('div', {'class': 'line'}):
             names.append(line.find('span', {'class': 'tip'})['data-players'])
     return names
+
 
 def get_gt_cards(single_round):
     """
@@ -195,6 +202,7 @@ def get_gt_cards(single_round):
 
     return gt_cards
 
+
 def get_gt_calls(single_round):
     """
     Find grand tichu calls of players in a single tichu round.
@@ -213,6 +221,7 @@ def get_gt_calls(single_round):
                 gt_calls.append(0)
     return gt_calls
 
+
 def get_final_cards(single_round):
     """
     Find grand tichu cards of players in a single tichu round.
@@ -226,10 +235,12 @@ def get_final_cards(single_round):
     for elem in single_round.findAll('div', {'class': 'completeHands'}):
         for line in elem.findAll('div', {'class': 'line big'}):
             for card_list in line.findAll('div', {'class': 'cards'}):
-                to_append = [' '.join(card['class']) for card in card_list.findAll('span') if 'tradeIcon' not in card['class']]
+                to_append = [' '.join(card['class']) for card in card_list.findAll('span') if
+                             'tradeIcon' not in card['class']]
                 final_cards.append(to_append)
 
     return final_cards
+
 
 def get_tichu_calls(single_round, player_names):
     """
@@ -251,6 +262,7 @@ def get_tichu_calls(single_round, player_names):
 
     return [int(name in tichu_calls) for name in player_names]
 
+
 def get_out_first(single_round, player_names):
     """
     Find if players went out first in a single tichu round.
@@ -262,11 +274,13 @@ def get_out_first(single_round, player_names):
     """
 
     for elem in single_round.findAll('div', {'class': 'gameMove'}):
-        if (elem.findAll('div', {'class': 'trading'}) != [] and len(elem.findAll('div', {'class': 'trading'})) == len([line.findAll('span') for line in elem.find('div', {'class': 'cards'})])):
-                first_out = elem.find('span', {'class': 'tip'})['data-players']
-                break
+        if (elem.findAll('div', {'class': 'trading'}) != [] and len(elem.findAll('div', {'class': 'trading'})) == len(
+                [line.findAll('span') for line in elem.find('div', {'class': 'cards'})])):
+            first_out = elem.find('span', {'class': 'tip'})['data-players']
+            break
 
     return [int(name == first_out) for name in player_names]
+
 
 if __name__ == '__main__':
     n_games, output_file = int(sys.argv[1]), sys.argv[2]
