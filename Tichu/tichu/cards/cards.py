@@ -7,7 +7,7 @@ from collections import defaultdict
 import itertools
 
 from tichu.cards.card import Card, CardSuit, CardValue
-from tichu.utils import check_param, check_isinstance, check_all_isinstance, check_true
+from tichu.utils import check_param, check_isinstance, check_all_isinstance, check_true, ignored
 
 __author__ = 'Lukas Pestalozzi'
 
@@ -663,13 +663,15 @@ class Combination(metaclass=abc.ABCMeta):
     @property
     def points(self):
         return sum(c.points for c in self._cards)
-    """
+
     @staticmethod
     def make(cards):
+        """
         makes a combiantion out of the given cards
         :param cards: the cards
         :return: the Combination
         :raise ValueError: if cards don't make a valid combination
+        """
         nbr_cards = len(cards)
         err = None
         try:
@@ -683,22 +685,24 @@ class Combination(metaclass=abc.ABCMeta):
             if nbr_cards == 3:
                 return Trio(*cards)
 
+            if nbr_cards % 2 == 0:
+                with ignored(Exception):
+                    ps = PairSteps.from_cards(cards)
+                    return ps
+
             if nbr_cards == 4:
                 return SquareBomb(*cards)
 
-            if nbr_cards % 2 == 0:
-                ps = try_ignore(lambda: PairSteps.from_cards(cards))
-                if ps:
-                    return ps
-
             if nbr_cards == 5:
-                fh = try_ignore(lambda: FullHouse.from_cards(cards))
-                if fh:
+                with ignored(Exception):
+                    fh = FullHouse.from_cards(cards)
                     return fh
 
             if nbr_cards >= 5:
-                st = try_ignore(lambda: Straight(cards))
-                sb = try_ignore(lambda: StraightBomb(st))
+                st, sb = None, None
+                with ignored(Exception):
+                    st = Straight(cards)
+                    sb = StraightBomb(st)
                 if sb:
                     return sb
                 if st:
@@ -707,7 +711,7 @@ class Combination(metaclass=abc.ABCMeta):
         except Exception as e:
             err = e
         raise ValueError("Is no combination: {}\ncards: {}".format(err, str(cards)))
-    """  # make
+
     def contains_phoenix(self):
         return Card.PHOENIX in self._cards
 

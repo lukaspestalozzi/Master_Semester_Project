@@ -478,6 +478,9 @@ class GameState(namedtuple("GS", [])):
 class RoundState(namedtuple("RS", ["current_pos", "hand_cards", "won_tricks", "trick_on_table", "wish", "ranking", "nbr_passed", "announced_tichu", "announced_grand_tichu"])):
     def __init__(self, current_pos, hand_cards, won_tricks, trick_on_table, wish, ranking, nbr_passed,
                  announced_tichu, announced_grand_tichu):
+
+        __slots__ = ('_action_state_transitions', '_possible_actions', '_possible_combs', '_satisfy_wish', '_can_pass')
+
         super().__init__()
         # some paranoid checks
         assert current_pos in range(4)
