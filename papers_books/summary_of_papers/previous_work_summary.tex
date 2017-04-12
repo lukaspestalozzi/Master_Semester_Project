@@ -1,0 +1,115 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+
+\title{Summary of previous work}
+\author{Lukas Pestalozzi}
+\date{February 2017}
+
+\begin{document}
+
+\maketitle
+
+\section{Tichu the game}
+
+\subsection{Tichu and AI}
+\begin{itemize}
+    \item game of not complete information
+    \item 4 players game (2 against 2 ,there is a partner and 2 enemies)
+    \item Following situations demand different decisions to be taken:
+    \begin{description}
+        \item[Standard situation:] play or pass on a already played trick.
+        \item[First play:] play on an empty table (first trick of a round)
+        \item[Card swap:] At the beginning of each game, decide which card to give to each player.
+        \item[Tichu announcement:] Before playing the first time in a game, decide wheter to announce a Tichu.
+        \item[Grand Tichu announcement:] Before receiving the 8th card, decide wheter to announce a grand tichu.
+        \item[Whishing a card:] After playing the Mah Jong, the player may wish a card to be played.
+        \item[Dragon trick:] When taking a trick with the dragon, decide whom (of the enemy players) to give that trick.
+    \end{description}
+\end{itemize}
+
+
+
+
+\section{Papers concerning Tichu or similar games}
+
+\subsection{Eine künstliche Intelligenz für das Kartenspiel Tichu (2013)}
+This is a thesis from the University of Stuttgard (2013) by David Pfander.
+David created an AI that is able to play and compete with human players.
+His approach is to hand-craft a $GetUtility$ function that gives a value to a partition of a set of cards. The higher the value, the better the partition of cards. This $GetUtility$ function is rather involved and relies on several hand-tuned threshholds and parameters.
+
+\subsubsection*{Description}
+Due to the partial unobservability of the game (and the large number of possible card distributions of the other players), David decides to use a minimax-search of depth 1. Ie, taking the action directly maximising the $GetUtility$ function without calculating possible moves for the other players.
+
+An action is defined in terms of $partitions$. A partition follow the standard mathematical definition of a partition (partitioning a set S in disjoint sub-sets (may include the empty-set) of S, such that the union of all elements in the partition forms S again).\\
+
+\textbf{Def1 (valid partition):} A partition of tichu-cards is valid iff all elements of the partition form a valid combination of cards according to the tichu rules.\\
+
+\textbf{Def2 (valid action):} An $action$ is the tuple $(p, c)$ where $p$ denotes a valid partition of tichu cards, and $c \in p$ such that $c$ is playable in the current game state according to the tichu rules. Note that $c = \emptyset$ denotes the $pass$ action.\\
+
+$GetUtility: (p, c) \rightarrow R$ is the function giving each action a numeric value depending on the current game state.
+
+With this function, the different decisions can be taken as follows:
+\begin{description}
+    \item[Standard situation:] Find the tuple $(p, c)$ of the players hand-cards that maximises $GetUtility$.
+    \item[First play:]Find the tuple $(p, c)$ of the players hand-cards that maximises $GetUtility$ ($c \not = \emptyset$)
+    \item[Card swap:] For all possible 3-tuples of the players hand-cards, find the maximum $GetUtility$ for the remaining 11 cards. Then decide which of the 3 cards to give to which player. This also includes some heuristics to help the teammate and sabotage the enemy.
+    \item[Tichu announcement:] Find a partition with $GetUtility$ higher than some predefined threshhold. Also don't say tichu when teammate already announced one, and only seldom if an enemy announced one.
+    \item[Grand Tichu announcement:] Same as simple Tichu, but with another threshhold taking into account that not all hand-cards are known yet.
+    \item[Whishing a card:] Many different strategies possible. All with the goal to disrupt the enemies chances of having a bomb.
+    \item[Dragon trick:]  Many different possible strategies possible. David decided to give the dragon trick to the enemy player with more hand-cards, with the idea that the more cards one has, the longer it takes to finish.
+
+\end{description}
+
+The $GetUtility$ function is rather sofisticated and relies on many hand-defined parameters/threshholds. I won't describe it here. David describes the algorithms he used quite well, maybe I can rebuild (or ask him for the code) to have an agent to compare.
+
+
+\subsubsection*{Results}
+12 Persons played with and against the AI and answered some questions afterwards:
+\begin{description}
+    \item[AI strengt:] 8/12 rated the AI strengts as $strong$ or $very strong$. Hinting that it can compete with human players.
+    \item[Comparison to other human players:] 8 deemed the AI as $similar$ or $stronger$. Only 3 answered with $weaker$.
+    \item[how oftendid the AI play nonsensical moves:] Only 2 answered $often$. The others said $never$ or $almost never$.
+\end{description}
+
+\subsubsection*{Conclusion}
+David creates the AI with a fine tuned $GetUtility$ function and acheives a playstrengh similar to human players.
+He does a quite complete analysis of all different decisions that have to be taken during the game and incorporates the results in the $GetUtility$ function.
+
+For me, this work is very useful to understand the different nuances of the game and may yield valuable insights during the development of my AI.
+
+
+\subsection{Fight the Landlord (Dou Di Zhu)}
+This is a report by 4 (students?) about creating an AI for the game Fight the Landlord (Dou Di Zhu).
+There are some crucial differences to Tichu, but the overall game is the same. The most important differences are:
+\begin{itemize}
+    \item Tichu is played 2 vs 2 while Dou Di Zhu is 2 vs 1.
+    \item In Dou Di Zhu there is a bidding phase at the beginning to determine who is the Landlord (the 1 player playing alone).
+    \item In Tichu at the beginning each player has to give one card to each other player.
+    \item In Dou Di Zhu there are more possible card combinations that can be played (Tichu can play a subset of them).
+    \item Tichu has 56 cards (52 normal + 4 special) while Dou Di Zhu has 52 normal + 2 jokers.
+    \item In Tichu you can announce a Tichu.
+\end{itemize}
+
+All in all, Tichu has a smaller fanout (less possible moves) and there are more players, which means less cards per player.
+But the 4 special cards, the card swaping and the 'Tichu' announcement increases the tactical possibilities.
+
+\subsubsection*{Description}
+Similarly to David, they split the cards into valid partitions. They define the $optimal$ $partition$ as the partition with lowest number of elements.
+They created 4 different Agents:
+\begin{description}
+    \item[Random Agent:] Plays random, valid moves.
+    \item[Simple Agent:] Plans for the future, plays the low-ranking valid card(s) first if possible.
+    \item[Advanced Agent:] Analyzes different contexts, and plays accordingly. Makes use of a decision tree and probabilities.
+    \item[Predictive Agent:] Remembers played cards and predicts the remaining cards of the other players. Plays cards as optimal as possible.
+\end{description}
+
+\subsubsection{Results}
+Their two predictive agents managed to beat a human landlord 54\% of all games (the advanced agents managed to win 52\% of the games).
+
+\subsubsection{Conclusion}
+They also used smart "hand crafted" rules (a decision tree) and some probability to create their agents.
+
+Their description of the implementation is rather shallow so it is not as useful as Davids report, but it shows again that it is possible to create an Agent capable of competing with humans.
+
+
+\end{document}
