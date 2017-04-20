@@ -1,14 +1,13 @@
 import abc
 
 import logging
-
-import random
-from tichu.game.gameutils import RoundState, PlayerAction
-
-from tichu.gametree import GameTree, GameTreeNode
 import numpy as np
 
-from tichu.utils import check_isinstance, check_all_isinstance
+import random
+
+from game.tichu.tichu_actions import PlayerAction
+from .states import RoundState
+from ..utils import GameTree, GameTreeNode, check_isinstance, check_all_isinstance
 
 
 class MctsState(RoundState):

@@ -1,8 +1,10 @@
 import logging
 
 import abc
-from tichu.cards.cards import Single
-from tichu.game.gameutils import SwapCardAction
+
+
+from ..cards import Single
+# from game.tichu.tichu_actions import SwapCardAction  INFO: Imported later
 
 
 class BaseAgent(metaclass=abc.ABCMeta):
@@ -150,7 +152,7 @@ class DefaultAgent(BaseAgent):
     def start_game(self):
         pass
 
-    def give_dragon_away(self, hand_cards, round_history):
+    def give_dragon_away(self, trick, round_history):
         pl_pos = (self.position + 1) % 4
         return pl_pos
 
@@ -181,6 +183,7 @@ class DefaultAgent(BaseAgent):
         return comb
 
     def swap_cards(self):
+        from game.tichu.tichu_actions import SwapCardAction
         sc = self.hand_cards.random_cards(3)
         scards = [
             SwapCardAction(player_from=self._position, card=sc[0], player_to=(self.position + 1) % 4),

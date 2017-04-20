@@ -33,7 +33,7 @@ class ComparableEnum(Enum):
             return self.value < other.value
         self._raise_cant_compare(other)
 
-
+# TODO change to 'CardRank'
 class CardValue(ComparableEnum):
     TWO = 2
     THREE = 3
@@ -66,17 +66,23 @@ class CardValue(ComparableEnum):
             self._points = 0
         u"\U0001F426"
         self._repr = "CardValue({} {})".format(self.name, self.value)
-        if self.value == 15:  # DRAGON
+        # DRAGON
+        if self.value == 15:
             self._str = "DRAGON"  # u"\U0001F409"  # dragon
-        elif self.value == 1.5:  # PHOENIX
-            self._str = u"\U0001F010"  # 'MAHJONG TILE ONE OF BAMBOOS' (U+1F010)
-        elif self.value == 1:  # MAHJONG
-            self._str = u"\U0001F004"  # mahjong
-        elif self.value == 0:  # DOG
+        # PHOENIX
+        elif self.value == 1.5:
+            self._str = "PH"  # u"\U0001F010"  # (U+1F010)
+        # MAHJONG
+        elif self.value == 1:
+            self._str = "1"  # u"\U0001F004"  # 'MAHJONG TILE ONE OF BAMBOOS'
+        # DOG
+        elif self.value == 0:
             self._str = "DOG"  # u"\U0001F436"  # dog
-        elif self.value > 10:  # J - A
+        # J - A
+        elif self.value > 10:
             self._str = str(self.name)
-        else:  # 2 - 10
+        # 2 - 10
+        else:
             self._str = str(self.value)
 
     @property
@@ -246,7 +252,6 @@ class Card(ComparableEnum):
 
         # precompute strings and hash
         self._hash = hash((cardvalue, cardsuit))
-
 
         self._str = (f"{str(self._cardvalue)}{self._suit.pretty_string()}" if self._suit is not CardSuit.SPECIAL
                      else f"{str(self._cardvalue)}")

@@ -171,33 +171,9 @@ def crange(start, stop, modulo):
         k = (k + 1) % modulo
 
 
-
 @contextmanager
 def ignored(*exceptions):
     try:
         yield
     except exceptions:
         pass
-
-
-class Final(type):
-    """
-    Class that can not be subclassed.
-    """
-    def __new__(mcs, name, bases, classdict):
-        for b in bases:
-            if isinstance(b, Final):
-                raise TypeError("type '{0}' is not an acceptable base type".format(b.__name__))
-        return type.__new__(mcs, name, bases, dict(classdict))
-
-
-class Singleton(type):
-    """
-    Class that has only one instance
-    """
-    instance = None
-
-    def __call__(cls, *args, **kw):
-        if not cls.instance:
-            cls.instance = super(Singleton, cls).__call__(*args, **kw)
-        return cls.instance

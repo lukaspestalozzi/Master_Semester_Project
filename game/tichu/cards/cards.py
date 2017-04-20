@@ -1,16 +1,14 @@
 import random
-import warnings
 from collections import abc as collectionsabc
 import abc
 from collections import defaultdict
 
 import itertools
 
-from tichu.cards.card import Card, CardSuit, CardValue
-from tichu.utils import check_param, check_isinstance, check_all_isinstance, check_true, ignored
+from .card import Card, CardSuit, CardValue
+from game.utils import check_param, check_isinstance, check_all_isinstance, check_true, ignored
 
 __author__ = 'Lukas Pestalozzi'
-
 
 class ImmutableCards(collectionsabc.Collection):
     # TODO change all "isinstance(x, ImmutableClass)" to "self.__class__ == x.__class__"

@@ -1,11 +1,11 @@
 from collections import OrderedDict
 
-
-from tichu.agents.baseagent import DefaultAgent
-from tichu.agents.partialagents import RandomSwappingCardsPartialAgent
-from tichu.cards.card import Card
-from tichu.cards.card import CardValue
-from tichu.game.gameutils import CombinationAction, Trick, RoundState, PassAction, CombinationTichuAction
+from game.tichu.states import RoundState
+from game.tichu.tichu_actions import PassAction, CombinationAction, CombinationTichuAction
+from game.tichu.trick import Trick
+from .baseagent import DefaultAgent
+from .partialagents import RandomSwappingCardsPartialAgent
+from ..cards import Card, CardValue
 
 
 class HumanInputAgent(RandomSwappingCardsPartialAgent, DefaultAgent):
@@ -81,7 +81,7 @@ class HumanInputAgent(RandomSwappingCardsPartialAgent, DefaultAgent):
         print(f"You have following cards: {sorted(self._hand_cards)}")
         if wish:
             print(f"If you can you have to play a {wish} because this is the wish of the MAHJONG.")
-        possible_combs = [a.combination for a in self._possible_actions(round_history=round_history, trick_on_table=Trick([]), wish=wish)]
+        possible_combs = [a.combination for a in self._possible_actions(round_history=round_history, trick_on_table=Trick(), wish=wish)]
         # sort combs
         possible_combs = sorted(possible_combs, key=lambda c: (len(c), c.height))
 

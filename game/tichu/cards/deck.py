@@ -1,5 +1,5 @@
-from tichu.cards.card import Card
-from tichu.cards.cards import ImmutableCards
+from .card import Card
+from .cards import ImmutableCards
 
 import random as rnd
 

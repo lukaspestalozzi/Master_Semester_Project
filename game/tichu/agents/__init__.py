@@ -1,0 +1,6 @@
+from .baseagent import BaseAgent, DefaultAgent
+from .human_agent import HumanInputAgent
+from .minimaxagent import MiniMaxPIAgent
+from .monetcarloagents import SimpleMonteCarloPerfectInformationAgent
+from .partialagents import DragonTrickPartialAgent, NoTichuAnnouncePartialAgent, PlayNoBombPartialAgent, RandomSwappingCardsPartialAgent, SimplePartialAgent, WishSwappedCardPartialAgent
+from .randomagent import RandomAgent

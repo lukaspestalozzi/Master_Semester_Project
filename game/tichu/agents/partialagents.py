@@ -1,8 +1,9 @@
 import abc
 
-from tichu.agents.baseagent import BaseAgent, DefaultAgent
-from tichu.exceptions import LogicError
-from tichu.game.gameutils import SwapCardAction
+
+from .baseagent import BaseAgent, DefaultAgent
+from ..exceptions import LogicError
+# from game.tichu.tichu_actions import SwapCardAction INFO: Imported later
 
 
 class DragonTrickPartialAgent(BaseAgent, metaclass=abc.ABCMeta):
@@ -33,6 +34,7 @@ class WishSwappedCardPartialAgent(BaseAgent, metaclass=abc.ABCMeta):
     """
 
     def wish(self, round_history):
+        from game.tichu.tichu_actions import SwapCardAction
         for e in round_history.events:
             if isinstance(e, SwapCardAction) and e.from_ == self.position and e.to == (self.position + 1) % 4:
                 return e.card.card_value
@@ -49,6 +51,7 @@ class RandomSwappingCardsPartialAgent(BaseAgent, metaclass=abc.ABCMeta):
     """
 
     def swap_cards(self):
+        from game.tichu.tichu_actions import SwapCardAction
         sc = self.hand_cards.random_cards(3)
         scards = [
             SwapCardAction(player_from=self._position, card=sc[0], player_to=(self.position + 1) % 4),

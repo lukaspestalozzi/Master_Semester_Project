@@ -3,13 +3,15 @@ import logging
 from collections import defaultdict
 from time import time
 
-from tichu.cards.card import Card
-from tichu.cards.cards import ImmutableCards
-from tichu.cards.deck import Deck
-from tichu.exceptions import IllegalActionException, LogicError
-from tichu.game.gameutils import Team, GameHistoryBuilder, HandCardSnapshot, SwapCardAction, PassAction, TichuAction, \
-    FinishEvent, WinTrickEvent, RoundEndEvent, RoundStartEvent, GrandTichuAction
-from tichu.utils import *
+from game.tichu.handcardsnapshot import HandCardSnapshot
+from game.tichu.states import GameHistoryBuilder
+from game.tichu.team import Team
+from game.tichu.tichu_actions import PassAction, TichuAction, FinishEvent, WinTrickEvent, SwapCardAction, \
+    GrandTichuAction
+from .cards import Card, ImmutableCards, Deck
+from .exceptions import IllegalActionException, LogicError
+
+from ..utils import *
 
 
 class TichuGame(object):

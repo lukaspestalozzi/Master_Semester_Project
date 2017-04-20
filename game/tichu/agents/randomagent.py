@@ -5,9 +5,9 @@ import random
 import logging
 from collections import defaultdict
 
-from tichu.agents.baseagent import DefaultAgent
-from tichu.cards.card import CardValue
-from tichu.game.gameutils import PassAction, CombinationAction, SwapCardAction
+from .baseagent import DefaultAgent
+from ..cards import CardValue
+from ..tichu_actions import PassAction, CombinationAction, SwapCardAction
 
 
 class RandomAgent(DefaultAgent):
@@ -36,7 +36,7 @@ class RandomAgent(DefaultAgent):
         comb = random.choice(possible_combs) if len(possible_combs) > 0 else None
 
         # try to fulfill wish:
-        w = self._play_wish(self.hand_cards, possible_combs, wish)
+        w = self._play_wish(possible_combs, wish)
         if w is not None:
             comb = w
 
@@ -54,7 +54,7 @@ class RandomAgent(DefaultAgent):
 
         # try to fulfill wish:
         comb = None
-        w = self._play_wish(self.hand_cards, possible_combs, wish)
+        w = self._play_wish(possible_combs, wish)
         if w is not None:
             comb = w
         else:

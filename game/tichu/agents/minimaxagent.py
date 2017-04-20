@@ -6,11 +6,10 @@ from multiprocessing.pool import ThreadPool, Pool
 
 import time
 
-from tichu.agents.baseagent import DefaultAgent
-from tichu.cards.card import CardValue, Card
-from tichu.cards.cards import Cards, ImmutableCards
-from tichu.game.gameutils import HandCardSnapshot, PassAction, CombinationAction, SwapCardAction
-from tichu.utils import indent, check_param
+from .baseagent import DefaultAgent
+from ..cards import Card, Cards, ImmutableCards
+from ..tichu_actions import HandCardSnapshot, PassAction, CombinationAction
+from game.utils import indent, check_param
 
 
 class GameState(namedtuple("GameState", ["player_pos", "hand_cards", "tricks", "combination_on_table", "wish", "ranking", "nbr_passed"])):

@@ -2,9 +2,9 @@ import logging
 
 import time
 
-from tichu.agents.partialagents import *
-from tichu.game.gameutils import Trick
-from tichu.montecarlo import MctsState, DefaultMonteCarloTreeSearch
+from .partialagents import *
+from ..trick import Trick
+from ..montecarlo import MctsState, DefaultMonteCarloTreeSearch
 
 
 class SimpleMonteCarloPerfectInformationAgent(SimplePartialAgent):

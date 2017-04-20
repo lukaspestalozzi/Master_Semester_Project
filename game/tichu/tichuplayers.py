@@ -2,12 +2,11 @@ import abc
 import logging
 import uuid
 
-
-from tichu.agents.baseagent import BaseAgent
-from tichu.cards.cards import Cards, ImmutableCards
-from tichu.exceptions import IllegalActionException
-from tichu.game.gameutils import SwapCardAction, PassAction, CombinationAction, GiveDragonAwayAction, WishAction
-from tichu.utils import check_true, check_isinstance, ignored
+from .agents import BaseAgent
+from .cards import Cards, ImmutableCards
+from .exceptions import IllegalActionException
+from .tichu_actions import SwapCardAction, PassAction, CombinationAction, GiveDragonAwayAction, WishAction
+from game.utils import check_true, check_isinstance, ignored
 
 
 class TichuPlayer(metaclass=abc.ABCMeta):

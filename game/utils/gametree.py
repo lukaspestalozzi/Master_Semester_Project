@@ -1,7 +1,7 @@
 import logging
 
 from pprint import pformat
-from tichu.utils import check_isinstance
+from game.utils import check_isinstance
 
 
 u2514 = u'\u2514'  # 'L'
