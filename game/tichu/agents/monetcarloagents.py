@@ -1,10 +1,9 @@
 import logging
-
 import time
 
+from game.montecarlo.montecarlo import MctsState, DefaultMonteCarloTreeSearch
 from .partialagents import *
 from ..trick import Trick
-from ..montecarlo import MctsState, DefaultMonteCarloTreeSearch
 
 
 class SimpleMonteCarloPerfectInformationAgent(SimplePartialAgent):

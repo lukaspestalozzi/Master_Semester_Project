@@ -10,6 +10,9 @@ class GameState(metaclass=abc.ABCMeta):
     The interface of a general GameState
     """
 
+    def __init__(self):
+        self._reward_vector = None
+
     @abc.abstractmethod
     def is_terminal(self) -> bool:
         """
@@ -50,11 +53,30 @@ class GameState(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def evaluate(self) -> dict:
+    def evaluate(self) -> tuple:
         """
         The behaviour of this function is undefined when the state is not terminal.
         
-        :return: A dict containing the score for each player in this state (mapping player.id() -> score).
+        :return: A tuple containing the score for each player in this state (index player.id() -> score).
+        """
+
+    def reward_vector(self) -> tuple:
+        """
+        Note: The behaviour of this function is undefined when the state is not terminal.
+        Note: caches the result of self.evaluate().
+        :return: The reward vector of this state.
+        """
+        if self._reward_vector is None:
+            self._reward_vector = self.evaluate()
+        return tuple(self._reward_vector)
+
+    @abc.abstractmethod
+    def unique_hash(self) -> int:
+        """
+        A function that allows equality testing: 
+        So A.unique_hash() == B.unique_hash() always gives the same result as A == B
+        
+        :return: A unique int for this instance
         """
 
 

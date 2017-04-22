@@ -1,12 +1,11 @@
+import logging
 import time
 
-import logging
+from game.montecarlo.montecarlo import DefaultMonteCarloTreeSearch, MctsState
+from .tichu import logginginit
 from .tichu.cards.card import Card
 from .tichu.cards.deck import Deck
 from .tichu.gameutils import Trick, RoundStartEvent, HandCardSnapshot
-
-from .tichu.montecarlo import DefaultMonteCarloTreeSearch, MctsState
-from .tichu import logginginit
 
 
 class MonteCarloGameSimulation(DefaultMonteCarloTreeSearch):

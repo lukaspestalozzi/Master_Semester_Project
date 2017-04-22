@@ -6,8 +6,8 @@ import numpy as np
 import random
 
 from game.tichu.tichu_actions import PlayerAction
-from .states import RoundState
-from ..utils import GameTree, GameTreeNode, check_isinstance, check_all_isinstance
+from game.tichu.states import RoundState
+from game.utils import GameTree, GameTreeNode, check_isinstance, check_all_isinstance
 
 
 class MctsState(RoundState):

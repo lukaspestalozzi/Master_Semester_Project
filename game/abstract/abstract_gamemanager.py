@@ -17,6 +17,13 @@ class GameManager(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
+    @verbosity.setter
+    def verbosity(self, v):
+        """
+        Setter for the verbosity property
+        """
+
+    @abc.abstractmethod
     def start_game(self, players: Collection) -> object:
         """
         Runs an entire Game
