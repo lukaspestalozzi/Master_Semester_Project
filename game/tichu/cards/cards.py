@@ -2,6 +2,7 @@ import random
 from collections import abc as collectionsabc
 import abc
 from collections import defaultdict
+import base64 as b64
 
 import itertools
 
@@ -535,6 +536,18 @@ class ImmutableCards(collectionsabc.Collection):
         random.shuffle(cds)
         return cds[:n]
 
+    def unique_id(self) -> str:
+        """
+        A string that has following property: 
+        
+        - A.unique_id() == B.unique_id() implies A == B
+        - A.unique_id() != B.unique_id() implies A != B
+        
+        :return: A unique string for this instance 
+        """
+        s = ''.join([str(c) for c in sorted(c.number for c in self._cards)])
+        return b64.b64encode(s.encode()).decode()
+
     def pretty_string(self):
         # TODO
         return self._str
@@ -654,7 +667,8 @@ class Combination(metaclass=abc.ABCMeta):
     def cards(self):
         return self._cards
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def height(self):
         raise NotImplementedError()
 
@@ -730,6 +744,17 @@ class Combination(metaclass=abc.ABCMeta):
             return other_comb is None or other_comb < self
         except TypeError:
             return False
+
+    def unique_id(self) -> str:
+        """
+        A string that has following property: 
+
+        - A.unique_id() == B.unique_id() implies A == B
+        - A.unique_id() != B.unique_id() implies A != B
+
+        :return: A unique string for this instance 
+        """
+        return self.cards.unique_id()
 
     def __iter__(self):
         return iter(self._cards)

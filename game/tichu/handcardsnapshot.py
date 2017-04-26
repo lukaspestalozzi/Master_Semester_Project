@@ -1,4 +1,3 @@
-import logging
 
 from collections import namedtuple
 
@@ -50,6 +49,17 @@ class HandCardSnapshot(namedtuple("HCS", ["handcards0", "handcards1", "handcards
             return HandCardSnapshot(*empty_hc)
         else:
             raise ValueError("save must be one of [False, 0, 1, 2, 3] but was: " + str(save))
+
+    def unique_id(self) -> str:
+        """
+        A string that has following property: 
+        
+        - A.unique_id() == B.unique_id() implies A == B
+        - A.unique_id() != B.unique_id() implies A != B
+        
+        :return: A unique string for this instance 
+        """
+        return self.handcards0.unique_id() + self.handcards1.unique_id() + self.handcards2.unique_id() + self.handcards3.unique_id()
 
     def pretty_string(self, indent_: int = 0) -> str:
         ind = indent(indent_, s=" ")

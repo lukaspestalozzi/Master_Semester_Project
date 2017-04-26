@@ -8,16 +8,16 @@ class GameManager(metaclass=abc.ABCMeta):
     Manages a Game and enforces the Rules
     """
 
-    @abc.abstractmethod
     @property
+    @abc.abstractmethod
     def verbosity(self):
         """
         
         :return: The verbosity 
         """
 
-    @abc.abstractmethod
     @verbosity.setter
+    @abc.abstractmethod
     def verbosity(self, v):
         """
         Setter for the verbosity property

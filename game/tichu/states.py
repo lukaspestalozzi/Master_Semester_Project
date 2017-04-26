@@ -271,15 +271,6 @@ class GameHistory(namedtuple("GH", ["team1", "team2", "winner_team", "points", "
     def points_team2(self):
         return self.points[1]
 
-    def pretty_string_old(self, indent=0):
-        # TODO use pformat
-        ind_str = "".join(" " for _ in range(indent))
-        rounds_str = ("\n" + ind_str).join(r.pretty_string(indent=1) for r in self.rounds)
-        s = (
-        "{ind_str}game result: {gh.points[0]}:{gh.points[1]}\n{ind_str}number of rounds: {nbr_rounds}\n{ind_str}----------- Rounds  -----------------\n{ind_str}{rrs}"
-        .format(gh=self, nbr_rounds=len(self.rounds), rrs=rounds_str, ind_str=ind_str))
-        return s
-
     def pretty_string(self, indent_=0):
         ind = indent(indent_, s=" ")
         s =  f"{ind}Game Result: {self.points}\n"

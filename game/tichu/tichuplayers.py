@@ -297,6 +297,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param game_history: The history of the tichu game so far.
         :return: The WishAction to be wished
         """
+        logging.debug(f"player {self.position} determines wish")
         w = self._agent.wish(game_history.current_round.build(save=self._copy_savely))
         wish_action = WishAction(player_from=self._position, cardvalue=w)
         return wish_action

@@ -9,8 +9,8 @@ class Player(metaclass=abc.ABCMeta):
     The interface for a general player
     """
 
-    @abc.abstractmethod
     @property
+    @abc.abstractmethod
     def id(self) -> int:
         """
         For example the position on the playing table.

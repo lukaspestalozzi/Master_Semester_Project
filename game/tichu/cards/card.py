@@ -33,6 +33,7 @@ class ComparableEnum(Enum):
             return self.value < other.value
         self._raise_cant_compare(other)
 
+
 # TODO change to 'CardRank'
 class CardValue(ComparableEnum):
     TWO = 2
@@ -162,6 +163,12 @@ class CardSuit(ComparableEnum):
         self._unicode = unicode
         self._shortname = self._name_[:2]
         self._repr = "Suit({})".format(self.name)
+        self._nbr = (0 if self._name_ == 'SWORD' else
+                     1 if self._name_ == 'JADE' else
+                     2 if self._name_ == 'PAGODA' else
+                     3 if self._name_ == 'HOUSE' else
+                     4 if self._name_ == 'SPECIAL' else
+                     None)
 
     @property
     def unicode(self):
@@ -171,10 +178,23 @@ class CardSuit(ComparableEnum):
     def shortname(self):
         return self._shortname
 
+    @property
+    def number(self):
+        """
+        SWORD:   0
+        JADE:    1
+        PAGODA:  2
+        HOUSE:   3
+        SPECIAL: 4
+        
+        :return: The number for this suit
+        """
+        return self._nbr
+
     def __unicode__(self):
         return self._unicode
 
-    def  pretty_string(self):
+    def pretty_string(self):
         return self._unicode
 
     def __repr__(self):
@@ -185,70 +205,71 @@ class CardSuit(ComparableEnum):
 
 
 class Card(ComparableEnum):
-    DRAGON = (CardValue.DRAGON, CardSuit.SPECIAL)
-    PHOENIX = (CardValue.PHOENIX, CardSuit.SPECIAL)
-    MAHJONG = (CardValue.MAHJONG, CardSuit.SPECIAL)
-    DOG = (CardValue.DOG, CardSuit.SPECIAL)
+    DOG = (CardValue.DOG, CardSuit.SPECIAL, 0)
+    MAHJONG = (CardValue.MAHJONG, CardSuit.SPECIAL, 1)
+    DRAGON = (CardValue.DRAGON, CardSuit.SPECIAL, 2)
+    PHOENIX = (CardValue.PHOENIX, CardSuit.SPECIAL, 3)
 
-    TWO_JADE = (CardValue.TWO, CardSuit.JADE)
-    THREE_JADE = (CardValue.THREE, CardSuit.JADE)
-    FOUR_JADE = (CardValue.FOUR, CardSuit.JADE)
-    FIVE_JADE = (CardValue.FIVE, CardSuit.JADE)
-    SIX_JADE = (CardValue.SIX, CardSuit.JADE)
-    SEVEN_JADE = (CardValue.SEVEN, CardSuit.JADE)
-    EIGHT_JADE = (CardValue.EIGHT, CardSuit.JADE)
-    NINE_JADE = (CardValue.NINE, CardSuit.JADE)
-    TEN_JADE = (CardValue.TEN, CardSuit.JADE)
-    J_JADE = (CardValue.J, CardSuit.JADE)
-    Q_JADE = (CardValue.Q, CardSuit.JADE)
-    K_JADE = (CardValue.K, CardSuit.JADE)
-    A_JADE = (CardValue.A, CardSuit.JADE)
+    TWO_JADE = (CardValue.TWO, CardSuit.JADE, 4)
+    THREE_JADE = (CardValue.THREE, CardSuit.JADE, 5)
+    FOUR_JADE = (CardValue.FOUR, CardSuit.JADE, 6)
+    FIVE_JADE = (CardValue.FIVE, CardSuit.JADE, 7)
+    SIX_JADE = (CardValue.SIX, CardSuit.JADE, 8)
+    SEVEN_JADE = (CardValue.SEVEN, CardSuit.JADE, 9)
+    EIGHT_JADE = (CardValue.EIGHT, CardSuit.JADE, 10)
+    NINE_JADE = (CardValue.NINE, CardSuit.JADE, 11)
+    TEN_JADE = (CardValue.TEN, CardSuit.JADE, 12)
+    J_JADE = (CardValue.J, CardSuit.JADE, 13)
+    Q_JADE = (CardValue.Q, CardSuit.JADE, 14)
+    K_JADE = (CardValue.K, CardSuit.JADE, 15)
+    A_JADE = (CardValue.A, CardSuit.JADE, 16)
 
-    TWO_HOUSE = (CardValue.TWO, CardSuit.HOUSE)
-    THREE_HOUSE = (CardValue.THREE, CardSuit.HOUSE)
-    FOUR_HOUSE = (CardValue.FOUR, CardSuit.HOUSE)
-    FIVE_HOUSE = (CardValue.FIVE, CardSuit.HOUSE)
-    SIX_HOUSE = (CardValue.SIX, CardSuit.HOUSE)
-    SEVEN_HOUSE = (CardValue.SEVEN, CardSuit.HOUSE)
-    EIGHT_HOUSE = (CardValue.EIGHT, CardSuit.HOUSE)
-    NINE_HOUSE = (CardValue.NINE, CardSuit.HOUSE)
-    TEN_HOUSE = (CardValue.TEN, CardSuit.HOUSE)
-    J_HOUSE = (CardValue.J, CardSuit.HOUSE)
-    Q_HOUSE = (CardValue.Q, CardSuit.HOUSE)
-    K_HOUSE = (CardValue.K, CardSuit.HOUSE)
-    A_HOUSE = (CardValue.A, CardSuit.HOUSE)
+    TWO_HOUSE = (CardValue.TWO, CardSuit.HOUSE, 17)
+    THREE_HOUSE = (CardValue.THREE, CardSuit.HOUSE, 18)
+    FOUR_HOUSE = (CardValue.FOUR, CardSuit.HOUSE, 19)
+    FIVE_HOUSE = (CardValue.FIVE, CardSuit.HOUSE, 20)
+    SIX_HOUSE = (CardValue.SIX, CardSuit.HOUSE, 21)
+    SEVEN_HOUSE = (CardValue.SEVEN, CardSuit.HOUSE, 22)
+    EIGHT_HOUSE = (CardValue.EIGHT, CardSuit.HOUSE, 23)
+    NINE_HOUSE = (CardValue.NINE, CardSuit.HOUSE, 24)
+    TEN_HOUSE = (CardValue.TEN, CardSuit.HOUSE, 25)
+    J_HOUSE = (CardValue.J, CardSuit.HOUSE, 26)
+    Q_HOUSE = (CardValue.Q, CardSuit.HOUSE, 27)
+    K_HOUSE = (CardValue.K, CardSuit.HOUSE, 28)
+    A_HOUSE = (CardValue.A, CardSuit.HOUSE, 29)
 
-    TWO_SWORD = (CardValue.TWO, CardSuit.SWORD)
-    THREE_SWORD = (CardValue.THREE, CardSuit.SWORD)
-    FOUR_SWORD = (CardValue.FOUR, CardSuit.SWORD)
-    FIVE_SWORD = (CardValue.FIVE, CardSuit.SWORD)
-    SIX_SWORD = (CardValue.SIX, CardSuit.SWORD)
-    SEVEN_SWORD = (CardValue.SEVEN, CardSuit.SWORD)
-    EIGHT_SWORD = (CardValue.EIGHT, CardSuit.SWORD)
-    NINE_SWORD = (CardValue.NINE, CardSuit.SWORD)
-    TEN_SWORD = (CardValue.TEN, CardSuit.SWORD)
-    J_SWORD = (CardValue.J, CardSuit.SWORD)
-    Q_SWORD = (CardValue.Q, CardSuit.SWORD)
-    K_SWORD = (CardValue.K, CardSuit.SWORD)
-    A_SWORD = (CardValue.A, CardSuit.SWORD)
+    TWO_SWORD = (CardValue.TWO, CardSuit.SWORD, 30)
+    THREE_SWORD = (CardValue.THREE, CardSuit.SWORD, 31)
+    FOUR_SWORD = (CardValue.FOUR, CardSuit.SWORD, 32)
+    FIVE_SWORD = (CardValue.FIVE, CardSuit.SWORD, 33)
+    SIX_SWORD = (CardValue.SIX, CardSuit.SWORD, 34)
+    SEVEN_SWORD = (CardValue.SEVEN, CardSuit.SWORD, 35)
+    EIGHT_SWORD = (CardValue.EIGHT, CardSuit.SWORD, 36)
+    NINE_SWORD = (CardValue.NINE, CardSuit.SWORD, 37)
+    TEN_SWORD = (CardValue.TEN, CardSuit.SWORD, 38)
+    J_SWORD = (CardValue.J, CardSuit.SWORD, 39)
+    Q_SWORD = (CardValue.Q, CardSuit.SWORD, 40)
+    K_SWORD = (CardValue.K, CardSuit.SWORD, 41)
+    A_SWORD = (CardValue.A, CardSuit.SWORD, 42)
 
-    TWO_PAGODA = (CardValue.TWO, CardSuit.PAGODA)
-    THREE_PAGODA = (CardValue.THREE, CardSuit.PAGODA)
-    FOUR_PAGODA = (CardValue.FOUR, CardSuit.PAGODA)
-    FIVE_PAGODA = (CardValue.FIVE, CardSuit.PAGODA)
-    SIX_PAGODA = (CardValue.SIX, CardSuit.PAGODA)
-    SEVEN_PAGODA = (CardValue.SEVEN, CardSuit.PAGODA)
-    EIGHT_PAGODA = (CardValue.EIGHT, CardSuit.PAGODA)
-    NINE_PAGODA = (CardValue.NINE, CardSuit.PAGODA)
-    TEN_PAGODA = (CardValue.TEN, CardSuit.PAGODA)
-    J_PAGODA = (CardValue.J, CardSuit.PAGODA)
-    Q_PAGODA = (CardValue.Q, CardSuit.PAGODA)
-    K_PAGODA = (CardValue.K, CardSuit.PAGODA)
-    A_PAGODA = (CardValue.A, CardSuit.PAGODA)
+    TWO_PAGODA = (CardValue.TWO, CardSuit.PAGODA, 43)
+    THREE_PAGODA = (CardValue.THREE, CardSuit.PAGODA, 44)
+    FOUR_PAGODA = (CardValue.FOUR, CardSuit.PAGODA, 45)
+    FIVE_PAGODA = (CardValue.FIVE, CardSuit.PAGODA, 46)
+    SIX_PAGODA = (CardValue.SIX, CardSuit.PAGODA, 47)
+    SEVEN_PAGODA = (CardValue.SEVEN, CardSuit.PAGODA, 48)
+    EIGHT_PAGODA = (CardValue.EIGHT, CardSuit.PAGODA, 49)
+    NINE_PAGODA = (CardValue.NINE, CardSuit.PAGODA, 50)
+    TEN_PAGODA = (CardValue.TEN, CardSuit.PAGODA, 51)
+    J_PAGODA = (CardValue.J, CardSuit.PAGODA, 52)
+    Q_PAGODA = (CardValue.Q, CardSuit.PAGODA, 53)
+    K_PAGODA = (CardValue.K, CardSuit.PAGODA, 54)
+    A_PAGODA = (CardValue.A, CardSuit.PAGODA, 55)
 
-    def __init__(self, cardvalue, cardsuit):
+    def __init__(self, cardvalue, cardsuit, number):
         self._suit = cardsuit
         self._cardvalue = cardvalue
+        self._nbr = number
 
         # precompute strings and hash
         self._hash = hash((cardvalue, cardsuit))
@@ -272,6 +293,15 @@ class Card(ComparableEnum):
     @property
     def points(self):
         return self._cardvalue.points
+
+    @property
+    def number(self):
+        """
+        The cards are numerated from 0 to 55.
+        
+        :return: The unique number for this card.
+        """
+        return self._nbr
 
     def __eq__(self, other):  # TODO question, raise error when classes not the same?
         return self.__class__ is other.__class__ and self.card_value == other.card_value and self._suit == other.suit

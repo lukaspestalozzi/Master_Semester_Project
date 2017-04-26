@@ -51,6 +51,20 @@ class BaseTrick(metaclass=abc.ABCMeta):
     def is_empty(self):
         return len(self) == 0
 
+    def unique_id(self) -> str:
+        """
+        A string that has following property: 
+
+        - A.unique_id() == B.unique_id() implies A == B
+        - A.unique_id() != B.unique_id() implies A != B
+
+        :return: A unique string for this instance 
+        """
+        idstr = ''
+        for comb_action in self:
+            idstr += str(comb_action.player_pos) + comb_action.combination.unique_id()
+        return idstr
+
     def pretty_string(self, indent_=0):
         ind_str = indent(indent_, s=" ")
         if self.is_empty():

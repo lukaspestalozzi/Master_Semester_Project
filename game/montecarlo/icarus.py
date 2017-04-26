@@ -6,9 +6,9 @@ Monte Carlo Tree Search for games with Hidden Information and Uncertainty, by Da
 import abc
 import random
 from collections import Sequence
-from array import array
 from math import sqrt, log
 
+import logging
 import networkx as nx
 
 from game.abstract import GameState
@@ -25,7 +25,17 @@ class MoveHistory(object):
 
     @property
     def last_state(self):
-        return self._states[-1]
+        try:
+            return self._states[-1]
+        except IndexError:
+            return None
+
+    @property
+    def last_action(self):
+        try:
+            return self._actions[-1]
+        except IndexError:
+            return None
 
     def state_iter(self, from_=None):
         """
@@ -47,7 +57,7 @@ class MoveHistory(object):
     def state_action_iter(self, from_=None):
         """
         :param from_: if not None, starts the iterator with the given state. Raises ValueError If the state is not in the history.
-        :return: generator yielding 2-tuples(state, action). Where the action is the action played in the state of None
+        :return: generator yielding 2-tuples(state, action). Where the action is the action played in the state, or None (if it is the last state)
         """
         if from_ is None:
             yield from zip(self._states, self._actions)
@@ -58,6 +68,9 @@ class MoveHistory(object):
     def append(self, state, action):
         self._states.append(state)
         self._actions.append(action)
+
+    def __repr__(self):
+        return '->'.join((str(e) for e in self.state_action_iter()))
 
     def __len__(self):
         return len(self._states)
@@ -89,6 +102,7 @@ class Icarus(object, metaclass=abc.ABCMeta):
         self.capture_contexts = set()
 
     def search(self, start_infoset: TichuInfoSet, iterations: int) -> TichuAction:
+        logging.debug(f"Starting Icarus search for {iterations} iterations")
         # initialisation
         self.search_init(start_infoset)
 
@@ -97,22 +111,21 @@ class Icarus(object, metaclass=abc.ABCMeta):
             history = MoveHistory()
             root_state = start_infoset.determinization()
             state = root_state
-            while not state.is_terminal:
-                action = self.policy(history, state)
+            while not state.is_terminal():
+                action = self.policy(history=history, state=state)
                 history.append(state=state, action=action)
                 next_state = state.next_state(action)
                 state = next_state
-            # state is terminal
+
+            # state is now terminal
             history.append(state=state, action=None)
-            reward_vector = state.evaluate()
+            reward_vector = state.reward_vector()
 
             # backpropagation
             for record, capture_context in self.capture(history, root_state):
                 self.backpropagation(record, capture_context, reward_vector)
-                if record not in self.records:
-                    self.records.add(record)
 
-            return self.best_action(start_infoset)
+        return self.best_action(start_infoset)
 
     @abc.abstractmethod
     def search_init(self, infoset: TichuInfoSet) -> None:
@@ -169,15 +182,16 @@ class Icarus(object, metaclass=abc.ABCMeta):
 class BaseRecord(Record):
     """The Record used in the BaseIcarus Algorithm"""
 
-    __slots__ = ()
+    __slots__ = ("_utc_cache",)
 
     def __init__(self):
-        init_reward_vector = array('l', [0, 0, 0, 0])  # 4 players
-        super().__init__(array('l', [init_reward_vector, 0, 0]))  # triple (total reward vector, a number of visits, availability count)
+        init_reward_vector = [0, 0, 0, 0]  # 4 players
+        super().__init__([init_reward_vector, 0, 0])  # triple (total reward vector, a number of visits, availability count)
+        self._utc_cache = None
 
     @property
     def total_reward(self):
-        return self.info[0]
+        return self._info[0]
 
     def add_reward(self, amounts):
         """
@@ -185,24 +199,27 @@ class BaseRecord(Record):
         :param amounts: sequence of length 4
         :return: 
         """
-        arr = self.info[0]
+        self._utc_cache = None
+        arr = self._info[0]
         assert len(arr) == len(amounts)
         for k in range(len(amounts)):
             arr[k] += amounts[k]
 
     @property
     def number_visits(self):
-        return self.info[1]
+        return self._info[1]
 
     def increase_number_visits(self, amount=1):
-        self.info[1] += amount
+        self._utc_cache = None
+        self._info[1] += amount
 
     @property
     def availability_count(self):
-        return self.info[2]
+        return self._info[2]
 
     def increase_availability_count(self, amount=1):
-        self.info[2] += amount
+        self._utc_cache = None
+        self._info[2] += amount
 
     def uct(self, p, c=0.7):
         """
@@ -215,11 +232,17 @@ class BaseRecord(Record):
         :param c: 
         :return: The UCT value of this record
         """
-        # TODO speed (cache result)
+        if self._utc_cache is not None:
+            return self._utc_cache
         r = self.total_reward[p]
         n = self.number_visits
         m = self.availability_count
-        return (r / n) + c * sqrt(log(m) / n)
+        if n == 0 or m == 0:
+            res = float('inf')
+        else:
+            res = (r / n) + c * sqrt(log(m) / n)
+        self._utc_cache = res
+        return res
 
 
 class BaseIcarus(Icarus):
@@ -262,7 +285,8 @@ class BaseIcarus(Icarus):
         self.graph = nx.DiGraph(name='BaseGameGraph')
 
     def policy(self, history: MoveHistory, state: TichuState) -> TichuAction:
-        if state.unique_hash() in self.graph:
+        sid = state.unique_id()
+        if sid in self.graph and self.graph.out_degree(sid) > 0:
             return self._tree_policy(history, state)
         else:
             return self._rollout_policy(history, state)
@@ -275,32 +299,40 @@ class BaseIcarus(Icarus):
         :return: The selected action
         """
 
-        sid = state.unique_hash()
-        nabo_action_gen = ((to, action) for from_, to, action
-                           in self.graph.out_edges_iter(sid, data='action', default=None))
+        sid = state.unique_id()
+        # TODO read and handle information set
+        nabo_action_gen = ((to, action) for from_, to, action in self.graph.out_edges_iter(nbunch=[sid], data='action', default=None))
         # return uniformly at random from max utc
         max_val = 0
-        max_nodes = set()
-        for child_n, action in nabo_action_gen:
-            val = child_n['record'].uct(p=child_n['state'].current_player())
+        max_actions = list()
+        for child_sid, action in nabo_action_gen:
+            child_n = self.graph.node[child_sid]
+            val = child_n['record'].uct(p=child_n['state'].player_id)
             if val == float('inf'):
-                return action  # TODO INFO: not really uniformly random, but faster
+                max_actions = [action]
+                break  # TODO INFO: not really uniformly random, but faster
             if max_val == val:
-                max_nodes.add((child_n, action))
+                max_actions.append(action)
             elif max_val < val:
                 max_val = val
-                max_nodes = {(child_n, action)}
+                max_actions = [action]
 
-        return random.choice(max_nodes)[1]
+        ret = random.choice(max_actions)
+        logging.debug(f"tree policy -> {ret}")
+        return ret
 
     def _rollout_policy(self, history, state) -> TichuAction:
-        return state.random_action()
+        ret = state.random_action()
+        logging.debug(f"tree policy -> {ret}")
+        return ret
 
     def backpropagation(self, record: BaseRecord, capture_context, reward_vector: tuple) -> None:
         record.increase_availability_count()
         if capture_context:
             record.increase_number_visits()
             record.add_reward(reward_vector)
+        if record not in self.records:
+            self.records.add(record)
 
     def capture(self, history: MoveHistory, root_state: TichuState) -> Sequence:
         """
@@ -308,25 +340,33 @@ class BaseIcarus(Icarus):
         'available' records have only their availability count increased, 
         while 'visit' also update their visit count and total reward.
         
+        Note: as a sideeffect, this function expands the last visited leaf-node in the game-graph.
+        
         :param history: 
         :param root_state: 
         :return: generator yielding 3-tuples(record, bool (True if capture context is 'visit'), reward_vector)
         """
-        reward_vector = history.last_state.reward_vector()
+        prev_intree = (True, None)
+        # print('capture history: ', history)
         for state, played_action in history.state_action_iter(from_=root_state):
-            sid = state.unique_hash()
+            # logging.debug("capture {}, {}".format(state, played_action))
+            sid = state.unique_id()
             if sid in self.graph:
-                node = self.graph[sid]
-                yield (node['record'], True, reward_vector)
+                prev_intree = (True, state)
+                node = self.graph.node[sid]
+                yield (node['record'], True)
                 if played_action is not None:
                     for from_, to, action in self.graph.out_edges_iter(sid, data='action', default=None):
                         if played_action != action:
-                            yield (to['record'], False, reward_vector)
+                            yield (self.graph.node[to]['record'], False)
+            elif prev_intree[0]:
+                leaf_state = prev_intree[1]
+                prev_intree = (False, None)
+                self._expand_tree(leaf_state=leaf_state)
 
     def best_action(self, infoset: TichuState) -> TichuAction:
-        gen = ((to['record'].number_visits, action) for from_, to, action
-               in self.graph.out_edges_iter(infoset.unique_hash(), data='action', default=None))
-        return max(gen, key=lambda t: t[0])[1]
+        val_action = [(self.graph.node[to]['record'].number_visits, action) for from_, to, action in self.graph.out_edges_iter(infoset.unique_id(), data='action', default=None)]
+        return max(val_action, key=lambda t: t[0])[1]
 
     def init_records(self) -> set:
         return set()
@@ -335,13 +375,13 @@ class BaseIcarus(Icarus):
         self._add_new_node_if_not_yet_added(infoset)
 
     def _add_new_node_if_not_yet_added(self, state: GameState)->None:
-        sid = state.unique_hash()
+        sid = state.unique_id()
         if sid not in self.graph:
             self.graph.add_node(sid, attr_dict={'record': BaseRecord(), 'state': state})
 
     def _add_new_edge(self, from_state: TichuState, action: TichuAction, to_state: TichuState)->None:
-        fsid = from_state.unique_hash()
-        tsid = to_state.unique_hash()
+        fsid = from_state.unique_id()
+        tsid = to_state.unique_id()
         # TODO if the edge is already in the graph, updates the attr_dict. Should not be a problem? -> check again later.
         self.graph.add_edge(u=fsid, v=tsid, attr_dict={'action': action})
 

@@ -2,7 +2,6 @@ import abc
 from collections import Collection, Generator
 
 from .abstract_action import Action
-from .abstract_player import Player
 
 
 class GameState(metaclass=abc.ABCMeta):
@@ -40,9 +39,9 @@ class GameState(metaclass=abc.ABCMeta):
         yield from self.possible_actions()
 
     @abc.abstractmethod
-    def current_player(self) -> Player:
+    def current_player_id(self) -> int:
         """
-        :return: The player whose turn it is in this state
+        :return: The player_id whose turn it is in this state
         """
 
     @abc.abstractmethod
@@ -71,12 +70,14 @@ class GameState(metaclass=abc.ABCMeta):
         return tuple(self._reward_vector)
 
     @abc.abstractmethod
-    def unique_hash(self) -> int:
+    def unique_id(self) -> str:
         """
-        A function that allows equality testing: 
-        So A.unique_hash() == B.unique_hash() always gives the same result as A == B
+        A string that has following property: 
         
-        :return: A unique int for this instance
+        - A.unique_id() == B.unique_id() implies A == B
+        - A.unique_id() != B.unique_id() implies A != B
+        
+        :return: A unique string for this instance 
         """
 
 
@@ -85,9 +86,9 @@ class GameInfoSet(GameState, metaclass=abc.ABCMeta):
     The Information Set of a GameState from the perspective of a particular observer (player).
     """
 
-    @abc.abstractmethod
     @property
-    def player_id(self):
+    @abc.abstractmethod
+    def observer_id(self):
         """
         :return: The id of the observer player
         """

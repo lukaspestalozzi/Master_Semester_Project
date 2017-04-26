@@ -260,7 +260,7 @@ class WishAction(PlayerAction):
     def __init__(self, player_from, cardvalue):
         if cardvalue is not None:
             check_isinstance(cardvalue, CardValue)
-            check_param(cardvalue not in {CardValue.PHOENIX, CardValue.DRAGON, CardValue.DOG, CardValue.MAHJONG}, msg="Wish can't be a special card.")
+            check_param(cardvalue not in {CardValue.PHOENIX, CardValue.DRAGON, CardValue.DOG, CardValue.MAHJONG}, msg="Wish can't be a special card, but was "+str(cardvalue))
         super().__init__(player_pos=player_from)
         self._cardval = cardvalue
 

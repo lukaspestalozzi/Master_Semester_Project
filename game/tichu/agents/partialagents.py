@@ -1,6 +1,6 @@
 import abc
 
-
+from game.tichu.cards import CardValue
 from .baseagent import BaseAgent, DefaultAgent
 from ..exceptions import LogicError
 # from game.tichu.tichu_actions import SwapCardAction INFO: Imported later
@@ -37,7 +37,7 @@ class WishSwappedCardPartialAgent(BaseAgent, metaclass=abc.ABCMeta):
         from game.tichu.tichu_actions import SwapCardAction
         for e in round_history.events:
             if isinstance(e, SwapCardAction) and e.from_ == self.position and e.to == (self.position + 1) % 4:
-                return e.card.card_value
+                return e.card.card_value if e.card.card_value not in (CardValue.PHOENIX, CardValue.DRAGON, CardValue.DOG, CardValue.MAHJONG) else None
         raise LogicError("No Swap-cards to the right")
 
 

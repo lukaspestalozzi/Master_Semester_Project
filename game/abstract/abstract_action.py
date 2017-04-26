@@ -1,6 +1,5 @@
 
 import abc
-from .abstract_player import Player
 
 
 class Action(metaclass=abc.ABCMeta):
@@ -9,9 +8,9 @@ class Action(metaclass=abc.ABCMeta):
     """
 
     @abc.abstractmethod
-    def played_by(self) -> Player:
+    def played_by(self) -> int:
         """
         Use a 'Enviroment' Player to model actions played by the enviroment such as chance events.
         
-        :return: The Player that played the action. 
+        :return: The player_id of the player that played the action. 
         """
