@@ -1,7 +1,7 @@
 import logging
 import time
 
-from game.montecarlo.montecarlo import DefaultMonteCarloTreeSearch, MctsState
+from game.montecarlo.old_montecarlo import DefaultMonteCarloTreeSearch, MctsState
 from .tichu import logginginit
 from .tichu.cards.card import Card
 from .tichu.cards.deck import Deck

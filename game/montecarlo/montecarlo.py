@@ -1,518 +1,305 @@
+import uuid
+from operator import itemgetter
+from typing import Optional
+from game.tichu.new_.tichu_states import TichuInfoSet
 import abc
-
-import logging
-import numpy as np
-
 import random
+from math import sqrt, log
+from time import time
+import logging
+import networkx as nx
+import matplotlib.pyplot as plt
 
-from game.tichu.tichu_actions import PlayerAction
-from game.tichu.states import RoundState
-from game.utils import GameTree, GameTreeNode, check_isinstance, check_all_isinstance
+from game.tichu.new_.tichu_states import TichuState
+from game.tichu.tichu_actions import TichuAction
+from game.utils import check_param
 
 
-class MctsState(RoundState):
+class UCB1Record(object):
+    """The Record to store UTC infos"""
 
-    def __new__(cls, *args, action_leading_here=None, **kwargs):
-        return super().__new__(cls, *args, **kwargs)
+    __slots__ = ("_utc_cache", "total_reward", "visit_count", "availability_count", "_uuid")
 
-    def __init__(self, *args, action_leading_here=None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self):
+        self.total_reward = [0, 0, 0, 0]
+        self.visit_count = 0
+        self.availability_count = 0
+        self._utc_cache = None
+        self._uuid = uuid.uuid4()
 
-        self._action_leading_here = action_leading_here
-
-    @property
-    def action_leading_here(self):
-        return self._action_leading_here
-
-    @classmethod
-    def from_roundstate(cls, roundstate, action_leading_here):
-        return cls(current_pos=roundstate.current_pos,
-                   hand_cards=roundstate.hand_cards,
-                   won_tricks=roundstate.won_tricks,
-                   trick_on_table=roundstate.trick_on_table,
-                   wish=roundstate.wish,
-                   ranking=roundstate.ranking,
-                   nbr_passed=roundstate.nbr_passed,
-                   announced_tichu=roundstate.announced_tichu,
-                   announced_grand_tichu=roundstate.announced_grand_tichu,
-                   action_leading_here=action_leading_here)
-
-    def state_for_action(self, action):
-        round_state = super().state_for_action(action)
-        return MctsState.from_roundstate(roundstate=round_state, action_leading_here=action)
-
-    def random_action(self):
+    def add_reward(self, amounts):
         """
-        :return: tuple(action, new_state) of a random legal action in this state.
+
+        :param amounts: sequence of length 4
+        :return: 
         """
-        action = random.choice(list(self.possible_actions()))
-        new_state = self.state_for_action(action)
-        return (action, new_state)
+        self._utc_cache = None
+        assert len(self.total_reward) == len(amounts) == 4
+        for k in range(len(amounts)):
+            self.total_reward[k] += amounts[k]
 
-    # TODO hash & equals??
+    def increase_number_visits(self, amount=1):
+        self._utc_cache = None
+        self.visit_count += amount
 
-    def __str__(self):
-        s = f"{self.__class__.__name__}\n"
-        s += f"\tcurrent_pos: {self.current_pos}\n"
-        s += f"\thand_cards: {str(self.hand_cards)}\n"
-        s += f"\twon_tricks: {self.won_tricks}\n"
-        s += f"\ttrick_on_table: {self.trick_on_table.pretty_string()}\n"
-        s += f"\twish: {self.wish}\n"
-        s += f"\tranking: {self.ranking}\n"
-        s += f"\tnbr_passed: {self.nbr_passed}\n"
-        s += f"\tannounced_tichu: {self.current_pos}, announced_grand_tichu: {self.announced_grand_tichu}\n"
-        s += f"\tpossible_actions: {self._possible_actions}\n"
-        s += f"\taction_state_transitions: {self._action_state_transitions}\n"
-        s += f"\tcan_pass: {self._can_pass}\n"
-        s += f"\taction_leading_here: {self._action_leading_here}\n"
-        return s
+    def increase_availability_count(self, amount=1):
+        self._utc_cache = None
+        self.availability_count += amount
 
-
-class MonteCarloTree(GameTree, metaclass=abc.ABCMeta):
-
-    @abc.abstractmethod
-    def actions_to_expand(self, state, possible_actions):
+    def ucb(self, p: int, c: float=0.7):
         """
-        Overwrite this method to customize the expanding of the Tree.
+        The UCT value is defined as:
+        (r / n) + c * sqrt(log(m) / n)
+        where r is the total reward, n the visit count of this record and m the availability count and c is a exploration/exploitation therm
 
-        :param state: The state to be expanded
-        :param possible_actions: actions that can be expanded
-        :return: a collection of (state, action) tuples into which the tree expands to.
+        if either n or m are 0, the UCT value is infinity (float('inf'))
+        :param p: The index of the player in the reward_vector
+        :param c: 
+        :return: The UCT value of this record
         """
-        pass
-
-    @abc.abstractmethod
-    def node_value(self, node):
-        """
-        This value is used to compare nodes and to choose the best child.
-
-        Overwrite this method to customize the value of nodes.
-
-        :param node:
-        :return: a numeric value.
-        """
-        pass
-
-    def is_fully_expanded(self, state):
-        """
-        :param state: the game-state
-        :return: True if all possible actions in this state are already present as children in this tree.
-        """
-        return self._node(state).is_fully_expanded()
-
-    def expand(self, state):
-        """
-        Expands the node corresponding to the state and returns a list of tuples (state, action) of newly added states with the corresponding action.
-
-        :param state: the state to expand
-        :return: list of tuples (state, action) of newly added states with the corresponding action.
-        """
-        expanding_node = self._node(state)
-        s_a = self.actions_to_expand(state, expanding_node.remaining_actions)
-        for child_state, action in s_a:
-            expanding_node.expand_node(action)
-            self.add_child(parent=state, child=child_state)
-        return list(s_a)
-
-    def backup(self, leaf_state, rollout_result):
-        """
-        Backs the rollout_result through the Tree.
-
-        :param leaf_state: the state from which to back up the rollout_result.
-        :param rollout_result: A tuple of length 4 containing the value for each player at the corresponding index.
-        :return: self
-        """
-        node = self._node(leaf_state)
-        while node is not None:
-            node.backup(rollout_result=rollout_result)
-            node = node.parent_node
-        return self
-
-    def best_child_of(self, state):
-        """
-        Returns a Tuple(state, action) with the state and action corresponding to the highest value of the monte-carlo-node.
-        Overwrite the function 'node_value' to customize the value of a node.
-
-        :param state:
-        :return: Tuple(state, action) with the best action (child with the highest value) for the given state
-        """
-        child_nodes = self._node(state).children_nodes
-        val, max_node = max(((self.node_value(cn), cn) for cn in child_nodes), key=lambda tup: tup[0])
-        return (max_node.data, max_node.data.action_leading_here)
-
-    def main_line(self, hand_cards=False):
-        """
-        Traverses the Tree from the root, always taking the 'best child' from each node.
-
-        :param hand_cards: If True, returns tripple (game_state, action, handcards)
-        :return: The best Path from the root. Path is a sequence of tuples (game_state, action) with the root at position 0.
-        """
-        if hand_cards:
-            path = [(self._root_node.data, None, self._root_node.data.hand_cards)]
+        if self._utc_cache is not None:
+            return self._utc_cache
+        r = self.total_reward[p]
+        n = self.visit_count
+        av = self.availability_count
+        if n == 0 or av == 0:
+            res = float('inf')
         else:
-            path = [(self._root_node.data, None)]
-        curr_node = self._root_node
-        while not curr_node.is_leaf():
-            ch_state, action = self.best_child_of(curr_node.data)
-            curr_node = self._node(ch_state)
-            if hand_cards:
-                path.append((ch_state, action, ch_state.hand_cards))
-            else:
-                path.append((ch_state, action))
-        return path
-
-    def _create_node(self, parent, data):
-        return MonteCarloTreeNode(parent, data)
-
-
-class MonteCarloTreeNode(GameTreeNode):
-
-    def __init__(self, parent, state=None, initial_reward_ratio=float("inf")):
-        """
-
-        :param parent: MonteCarloTreeNode; The parent node of this None
-        :param state: MctsState of this none
-        :param initial_reward_ratio: The initial reward ratio (when the node was not yet visited)
-        """
-        check_isinstance(state, MctsState)
-        parent is None or check_isinstance(parent, MonteCarloTreeNode)
-        super().__init__(parent=parent, data=state)
-
-        self._visited_count = 0
-        self._reward_count = 0
-        self._reward_ratio = self._reward_count / self._visited_count if self._visited_count != 0 else initial_reward_ratio
-
-        self._possible_actions = set(state.possible_actions())
-        assert check_all_isinstance(self._possible_actions, PlayerAction)
-        self._expanded_actions = set()
-        self._remaining_actions = list(self._possible_actions)
-
-    @property
-    def remaining_actions(self):
-        return self._remaining_actions
-
-    @property
-    def visited_count(self):
-        return self._visited_count
-
-    @property
-    def reward_count(self):
-        return self._reward_count
-
-    @property
-    def reward_ratio(self):
-        return self._reward_ratio
-
-    def update_reward_count(self, amount):
-        """
-        Increases visited_count by 1 and adds the amount to the reward_count
-
-        :param amount:
-        :return: self
-        """
-        self._reward_count += amount
-        self._visited_count += 1
-        self._reward_ratio = self._reward_count / self._visited_count
-        return self
-
-    def is_fully_expanded(self):
-        """ :returns True iff the state is terminal or all actions are already expanded as children"""
-        res = self.data.is_terminal() or len(self._remaining_actions) == 0
-        assert len(self._children) == len(self._expanded_actions)
+            res = (r / n) + c * sqrt(log(av) / n)
+        self._utc_cache = res
         return res
 
-    def backup(self, rollout_result):
-        """
-        Updates the nodes visited_count and reward_count.
+    def __repr__(self):
+        return "{self.__class__.__name__} uuid:{self._uuid} (available:{self.availability_count}, visits:{self.visit_count}, rewards: {self.total_reward})".format(self=self)
 
-        :param rollout_result: A sequence of length 4 containing the value for each player at the corresponding index.
-        :return: self
-        """
-        if self.parent_node is not None:
-            self.update_reward_count(rollout_result[self.parent_node.data.current_pos])
-        return self
-
-    def expand_node(self, action):
-        """
-        Removes the action from the remaining_actions and adds it to the remaining_actions.
-
-        :param action:
-        :return: self
-        """
-        self._remaining_actions.remove(action)
-
-        # sanity checks
-        assert action not in self._expanded_actions
-        assert action not in self._remaining_actions
-
-        self._expanded_actions.add(action)
-
-        return self
-
-    def _short_label(self):
-        s = ''
-        if self.is_root():
-            s += 'Root'
-        s += f'{hash(self.data)} {self.data.action_leading_here} ratio:{self.reward_ratio:.2f} (visited:{self._visited_count}, reward:{self.reward_count})'
-        return s
+    def __str__(self):
+        return "{self.__class__.__name__}(av:{self.availability_count}, v:{self.visit_count}, rewards:{self.total_reward})".format(self=self)
 
 
-class BaseMonteCarloTreeSearch(MonteCarloTree, metaclass=abc.ABCMeta):
+NodeID = str
+
+
+class InformationSetMCTS(object):
     """
-    Implements the standard MonteCarloTreeSearch algorithm.
-
-    Overwrite following Functions to customize the search:
-
-    - **is_end_search:** To end the search
-    - **next_child:** Next node in the tree-strategy phase.
-    - **next_rollout_state:** Next state in the rollout-strategy phase
-    - **evaluate_state:** Generate the result of the rollout
-
+    
     """
 
-    def __init__(self, nbr_rollouts=1):
-        super().__init__()
-        check_isinstance(nbr_rollouts, int)
-        self._nbr_rollouts = nbr_rollouts
+    def __init__(self):
 
-    def search(self, start_state):
-        check_isinstance(start_state, MctsState)
-        if start_state not in self:
-            _ = self.clear()
-            self.add_root(start_state)
+        self.graph = nx.DiGraph(name='BaseIcarus-GameGraph')
+        self.observer_id = None
+        self._visited_records = set()
+        self._available_records = set()
+
+    def search(self, start_infoset: TichuInfoSet, observer_id: int, iterations: int, cheat: bool=False) -> TichuAction:
+        logging.debug(f"started InformationSetMCTS with observer {observer_id}, for {iterations} iterations and cheat={cheat}")
+        check_param(observer_id in range(4))
+        self.observer_id = observer_id
+
+        if start_infoset not in self.graph:
+            _ = self.graph.clear()
+            self.add_root(start_infoset)
+        else:
+            logging.debug("Could keep the graph :)")
 
         iteration = 0
-        while not self.is_end_search(iteration):
+        while iteration < iterations:
             iteration += 1
-            leaf_states = self._tree_policy(start_state)
-            for ls in leaf_states*self._nbr_rollouts:
-                rollout_result, final_state = self._rollout_policy(ls)
-                self.backup(ls, rollout_result)
-        action = self.best_action(start_state)
+            self._init_iteration()
+            # logging.debug("iteration "+str(iteration))
+            start_state = start_infoset.determinization(observer_id=self.observer_id, cheat=cheat)
+            # logging.debug("Tree policy")
+            leaf_state = self.tree_policy(start_state)
+            # logging.debug("rollout")
+            rollout_result = self.rollout_policy(leaf_state)
+            # logging.debug("backpropagation")
+            assert len(rollout_result) == 4
+            self.backpropagation(reward_vector=rollout_result)
+
+        action = self.best_action(start_infoset)
+        logging.debug(f"size of graph after search: {len(self.graph)}")
         return action
 
-    @abc.abstractmethod
-    def is_end_search(self, iteration):
-        """
-        :return: [boolean] whether the search should be ended
-        """
-        pass
+    def _init_iteration(self)->None:
+        self._visited_records = set()
+        self._available_records = set()
 
-    @abc.abstractmethod
-    def next_rollout_state(self, state):
+    def _graph_node_id(self, state: TichuState) -> NodeID:
+        return state.unique_infoset_id(self.observer_id)
         """
-        Overwrite this action to customize the rollout strategy.
-
-        :param state: game state
-        :return: A state that can be reached from the given state by a legal action.
-        """
-        pass
-
-    @abc.abstractmethod
-    def evaluate_state(self, state):
+        if isinstance(state, TichuInfoSet):
+            return state
+        else:
+            return TichuInfoSet.from_tichustate(state, self.observer_id)
         """
 
-        :param state:
-        :return: A tuple of length 4 containing the value for each player at the corresponding index. ie (player0_result, player1_result, ..., ...)
+    def add_child_node(self, from_nid: Optional[NodeID], to_nid: Optional[NodeID], action: Optional[TichuAction]) -> None:
         """
-        pass
+        Adds a node for each infoset (if not already in graph) and an edge from the from_infoset to the to_infoset
+        
+        :param from_nid: 
+        :param to_nid: 
+        :param action: 
+        :return: None
+        """
 
-    @abc.abstractmethod
-    def next_child(self, state):
-        """
-        Overwrite this action to customize the tree policy.
+        # assert from_infoset is None or isinstance(from_infoset, TichuInfoSet)
+        # assert to_infoset is None or isinstance(to_infoset, TichuInfoSet)
 
-        :param state: current state
-        :return: The next child to be visited in the tree traversal in tree-policy.
-        """
-        pass
+        def add_node(nid: str):
+            self.graph.add_node(nid, attr_dict={'record': UCB1Record()})
 
-    @abc.abstractmethod
-    def best_action(self, state):
-        """
-        :param state:
-        :return: the best action from the given state according to the current search-tree.
-        """
-        pass
+        if from_nid is not None and from_nid not in self.graph:
+            add_node(from_nid)
 
-    def _tree_policy(self, state):
+        if to_nid is not None and to_nid not in self.graph:
+            add_node(to_nid)
+
+        if action is not None and from_nid is not None and to_nid is not None:  # if all 3 are not none
+            self.graph.add_edge(u=from_nid, v=to_nid, attr_dict={'action': action})
+
+    def add_root(self, nid: NodeID)->None:
+        if not isinstance(nid, NodeID):
+            nid = self._graph_node_id(nid)
+        self.add_child_node(from_nid=nid, to_nid=None, action=None)
+
+    def expand(self, leaf_state: TichuState)->None:
+        leaf_nid = self._graph_node_id(leaf_state)
+        for action in leaf_state.possible_actions_gen():
+            to_nid = self._graph_node_id(state=leaf_state.next_state(action))
+            self.add_child_node(from_nid=leaf_nid, to_nid=to_nid, action=action)
+
+    def tree_policy(self, state: TichuState) -> TichuState:
         """
         Traverses the Tree and selects a leaf-node to be expanded (and expands it).
-
-        :param state: The starting state of the search
-        :return: state: A list of leaf-states that have been expanded into
+        
+        :param state: 
+        :return: The leaf_state used for simulation (rollout) policy
         """
         curr_state = state
         while not curr_state.is_terminal():
-            if not self.is_fully_expanded(curr_state):
-                expanded_s_a = self.expand(curr_state)
-                return [s for s, a in expanded_s_a]
+            isid = self._graph_node_id(curr_state)
+            if not self.is_fully_expanded(isid):
+                self.expand(isid)
+                # logging.debug("tree_policy expand and return")
+                return self.tree_selection(isid)
             else:
-                curr_state = self.next_child(curr_state)
-        return [curr_state]
+                curr_state = self.tree_selection(isid)
 
-    def _rollout_policy(self, state):
+        # logging.debug("tree_policy return (state is terminal)")
+        return curr_state
+
+    def is_fully_expanded(self, state: TichuState) -> bool:
+        poss_acs = set(state.possible_actions())
+        existing_actions = {action for _, _, action in
+                            self.graph.out_edges_iter(nbunch=[self._graph_node_id(state)], data='action', default=None)}
+        if len(existing_actions) < len(poss_acs):
+            return False
+
+        # if all possible actions already exist -> is fully expanded
+        return poss_acs.issubset(existing_actions)
+
+    def tree_selection(self, state: TichuState) -> TichuState:
         """
-        Simulates a rollout from the given state.
-        Calls and returns the 'evaluate_state' function with the final state.
+        
+        :param state:
+        :return: 
+        """
+        # logging.debug("Tree selection")
+        isid = self._graph_node_id(state)
+        # store record for backpropagation
+        rec = self.graph.node[isid]['record']
+        self._visited_records.add(rec)
+        self._available_records.add(rec)
 
-        :param state: state to start the rollout
-        :return: Tuple of the result of the rollout and the terminal state.
+        # find max (return uniformly at random from max UCB1 value)
+        poss_actions = set(state.possible_actions())
+        max_val = -float('inf')
+        max_actions = list()
+        for _, to_nid, action in self.graph.out_edges_iter(nbunch=[isid], data='action', default=None):
+            # logging.debug("Tree selection looking at "+str(action))
+            if action in poss_actions:
+                child_record = self.graph.node[to_nid]['record']
+                self._available_records.add(child_record)
+                val = child_record.ucb(p=state.player_id)
+                if max_val == val:
+                    max_actions.append(action)
+                elif max_val < val:
+                    max_val = val
+                    max_actions = [action]
+
+        next_action = random.choice(max_actions)
+        # logging.debug(f"Tree selection -> {next_action}")
+        return state.next_state(next_action)
+
+    def rollout_policy(self, state: TichuState)->tuple:
+        """
+        Does a rollout from the given state and returns the reward vector
+        
+        :param state: 
+        :return: the reward vector of this rollout
         """
         rollout_state = state
         while not rollout_state.is_terminal():
-            rollout_state = self.next_rollout_state(rollout_state)
-        return (self.evaluate_state(rollout_state), rollout_state)
+            rollout_state = rollout_state.next_state(rollout_state.random_action())
+        return self.evaluate_state(rollout_state)
+
+    def evaluate_state(self, state: TichuState)->tuple:
+        """
+        
+        :param state: 
+        :return: 
+        """
+        points = state.count_points()
+
+        assert points[0] == points[2] and points[1] == points[3], str(points)
+        return points
+
+    def backpropagation(self, reward_vector: tuple)->None:
+        """
+        Called at the end with the rollout result.
+        
+        Updates the search state.
+        
+        :param reward_vector: 
+        :return: 
+        """
+
+        assert self._visited_records.issubset(self._available_records)
+
+        # logging.debug(f"visited: {len(self._visited_records)}, avail: {len(self._available_records)})")
+        for record in self._available_records:
+            record.increase_availability_count()
+
+        for record in self._visited_records:
+            # logging.debug("record: {}".format(record))
+            record.increase_number_visits()
+            record.add_reward(reward_vector)
+
+    def best_action(self, infoset: TichuInfoSet) -> TichuAction:
+        """
+        
+        :param infoset: 
+        :return: The best action to play from the given infoset
+        """
+        max_a = None
+        max_v = -float('inf')
+        for _, to_nid, action in self.graph.out_edges_iter(infoset, data='action', default=None):
+            rec = self.graph.node[to_nid]['record']
+            if rec.visit_count > max_v:
+                max_v = rec.visit_count
+                max_a = action
+
+            # logging.debug(f"   {action}: {rec}")
+
+        # logging.debug(f"best action -> {max_a}")
+        return max_a
 
 
-# ----------------------------- Rollout Strategies --------------------------------- #
-
-class MCTSRolloutStrategy(BaseMonteCarloTreeSearch, metaclass=abc.ABCMeta):
+class MCTS(InformationSetMCTS):
     """
-
+    'Normal' MCTS. One searchtree for each determinization.
+    
     """
-    @abc.abstractmethod
-    def next_rollout_state(self, state):
-        pass
-
-
-class MCTSEvaluateStrategy(BaseMonteCarloTreeSearch, metaclass=abc.ABCMeta):
-    """
-
-    """
-    @abc.abstractmethod
-    def evaluate_state(self, state):
-        pass
-
-
-class MCTSTreeStrategy(BaseMonteCarloTreeSearch, metaclass=abc.ABCMeta):
-    """
-
-    """
-    @abc.abstractmethod
-    def next_child(self, state):
-        pass
-
-
-class MCTSBestActionStrategy(BaseMonteCarloTreeSearch, metaclass=abc.ABCMeta):
-    """
-
-    """
-    @abc.abstractmethod
-    def best_action(self, state):
-        pass
-
-
-class MCTSExpandStrategy(BaseMonteCarloTreeSearch, metaclass=abc.ABCMeta):
-    """
-
-    """
-    @abc.abstractmethod
-    def actions_to_expand(self, state, possible_actions):
-        pass
-
-
-class MCTSNodeValueStrategy(BaseMonteCarloTreeSearch, metaclass=abc.ABCMeta):
-    """
-
-    """
-    @abc.abstractmethod
-    def node_value(self, node):
-        pass
-
-# ----------------------------- Concrete Rollout Strategies --------------------------------- #
-
-
-# Expand
-class RandomExpandStrategy(MCTSExpandStrategy, metaclass=abc.ABCMeta):
-
-    def actions_to_expand(self, state, possible_actions):
-        action = random.choice(possible_actions)
-        new_state = state.state_for_action(action)
-        return [(new_state, action)]
-
-
-class AllExpandStrategy(MCTSExpandStrategy, metaclass=abc.ABCMeta):
-    """
-    Expands all possible actions at once
-    """
-
-    def actions_to_expand(self, state, possible_actions):
-        return [(state.state_for_action(action), action) for action in possible_actions]
-
-
-# NodeValue
-class UCTNodeValueStrategy(MCTSNodeValueStrategy, metaclass=abc.ABCMeta):
-
-    def node_value(self, node):
-        if node.visited_count == 0 or node.parent_node.visited_count == 0:
-            return float("inf")
-        C = 0.707106781186  # 1.0 / np.sqrt(2)  # value may be improved, proposed on p.9 in "A Survey of Monte Carlo Tree Search Methods"
-        return node.reward_ratio + C * np.sqrt(2 * np.log(node.parent_node.visited_count) / node.visited_count)
-
-
-# Rollout
-class RandomRolloutStrategy(MCTSRolloutStrategy, metaclass=abc.ABCMeta):
-    """
-
-    """
-    def next_rollout_state(self, state):
-        return state.random_action()[1]
-
-
-# Evaluate Final State
-class RankBasedEvaluateStrategy(MCTSEvaluateStrategy, metaclass=abc.ABCMeta):
-    """
-
-    """
-    def evaluate_state(self, state):
-        res = [0, 0, 0, 0]
-        for rank, pos in enumerate(state.ranking):
-            res[pos] = (4 - rank) ** 2
-        return tuple(res)
-
-
-class PointsEvaluateStrategy(MCTSEvaluateStrategy, metaclass=abc.ABCMeta):
-    """
-
-    """
-    def evaluate_state(self, state):
-        return state.calculate_points()
-
-
-# Tree
-class HighestValueTreeStrategy(MCTSTreeStrategy, metaclass=abc.ABCMeta):
-    """
-
-    """
-    def next_child(self, state):
-        child = self.best_child_of(state)[0]
-        return child
-
-
-# Beest Action
-class HighestValueBestActionStrategy(MCTSBestActionStrategy, metaclass=abc.ABCMeta):
-    """
-
-    """
-    def best_action(self, state):
-        child, action = self.best_child_of(state)
-        return action
-
-
-# ------------------------- Concrete MonteCarlo Classes -------------------------------------- #
-
-class DefaultMonteCarloTreeSearch(AllExpandStrategy,  # RandomExpandStrategy
-                                  UCTNodeValueStrategy,
-                                  RandomRolloutStrategy,
-                                  PointsEvaluateStrategy,
-                                  HighestValueTreeStrategy,
-                                  HighestValueBestActionStrategy):
-
-    def __init__(self, search_iterations=50, nbr_rollouts=5):
-        super().__init__(nbr_rollouts=nbr_rollouts)
-        self._search_iterations = search_iterations
-
-    def is_end_search(self, iteration):
-        return iteration > self._search_iterations
+    pass
 

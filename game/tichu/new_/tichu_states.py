@@ -1,6 +1,7 @@
 import random
-import base64 as b64
 from collections import Generator, namedtuple
+
+import logging
 
 from game.abstract import GameInfoSet, GameState
 from game.tichu.cards import Card, CardValue
@@ -8,7 +9,7 @@ from game.tichu.exceptions import IllegalActionException
 from game.tichu.handcardsnapshot import HandCardSnapshot
 from game.tichu.tichu_actions import TichuAction, CombinationAction, PassAction
 from game.tichu.trick import Trick
-from game.utils import check_param, flatten
+from game.utils import flatten, check_param
 
 
 class TichuState(GameState, namedtuple("S", [
@@ -21,7 +22,7 @@ class TichuState(GameState, namedtuple("S", [
             "announced_tichu",
             "announced_grand_tichu"
         ])):
-    def __init__(self, player_id, hand_cards, won_tricks, trick_on_table, wish, ranking, announced_tichu, announced_grand_tichu):
+    def __init__(self, player_id: int, hand_cards: HandCardSnapshot, won_tricks: tuple, trick_on_table: Trick, wish: CardValue, ranking: tuple, announced_tichu: frozenset, announced_grand_tichu: frozenset):
         super().__init__()
 
         # some paranoid checks
@@ -50,13 +51,19 @@ class TichuState(GameState, namedtuple("S", [
         self._can_pass = None
         self._possible_combs = None
         self._possible_combinations()  # init possible combs
-        self._unique_id_cache = None
+
+        self._infosets_ids = [None]*4
 
     def current_player_id(self) -> int:
         return self.player_id
 
     def next_state(self, action: TichuAction):
-        if not action.player_pos == self.player_id:
+        """
+        
+        :param action: 
+        :return: 
+        """
+        if action.player_pos != self.player_id:
             raise IllegalActionException(f"Only player:{self.player_id} can play in this case, but action was: {action}")
         if action in self._action_state_transitions:
             return self._action_state_transitions[action]
@@ -72,16 +79,68 @@ class TichuState(GameState, namedtuple("S", [
         self._action_state_transitions[action] = new_state
         return new_state
 
+    def count_points(self) -> tuple:
+        """
+        Only correct if the state is terminal
+        :return: tuple of length 4 with the points of each player at the corresponding index.
+        """
+        # TODO Test
+
+        if not self.is_terminal():
+            logging.warning("Calculating points of a NON terminal state! Result may be incorrect.")
+
+        # calculate tichu points
+        tichu_points = [0, 0, 0, 0]
+        for gt_pos in self.announced_grand_tichu:
+            tichu_points[gt_pos] += 200 if gt_pos == self.ranking[0] else -200
+        for t_pos in self.announced_tichu:
+            tichu_points[t_pos] += 100 if t_pos == self.ranking[0] else -100
+        points = tichu_points
+
+        # fill the ranking to 4
+        final_ranking = list(self.ranking) + [ppos for ppos in range(4) if ppos not in self.ranking]
+        assert len(final_ranking) == 4, "{} -> {}".format(self.ranking, final_ranking)
+
+        if self.is_double_win():
+            # double win (200 for winner team, -200 for loosers)
+            points[final_ranking[0]] += 100
+            points[final_ranking[1]] += 100
+            points[final_ranking[2]] -= 100
+            points[final_ranking[3]] -= 100
+        else:
+            # not double win
+            for rank in range(3):  # first 3 players get the points in their won tricks
+                player_pos = final_ranking[rank]
+                points[player_pos] += sum(t.points for t in self.won_tricks[player_pos])
+
+            # first player gets the points of the last players tricks
+            winner = final_ranking[0]
+            looser = final_ranking[3]
+            points[winner] += sum(t.points for t in self.won_tricks[looser])
+
+            # the handcards of the last player go to the enemy team
+            points[(looser + 1) % 4] += sum(t.points for t in self.hand_cards[looser])
+        # fi
+
+        # sum the points of each team
+        t1 = points[0] + points[2]
+        t2 = points[1] + points[3]
+        points[0] = t1
+        points[2] = t1
+        points[1] = t2
+        points[3] = t2
+
+        assert len(points) == 4
+        assert points[0] == points[2] and points[1] == points[3], str(points)
+        return tuple(points)
+
     def evaluate(self) -> tuple:
-        res = [0, 0, 0, 0]
-        for rank, pos in enumerate(self.ranking):
-            res[pos] = (4 - rank) ** 2
-        return tuple(res)
+        return self.count_points()
 
     def is_terminal(self) -> bool:
         return len(self.ranking) >= 3 or self.is_double_win()
 
-    def is_double_win(self):
+    def is_double_win(self)->bool:
         return len(self.ranking) >= 2 and self.ranking[0] == (self.ranking[1] + 2) % 4
 
     def possible_actions(self) -> frozenset:
@@ -91,47 +150,12 @@ class TichuState(GameState, namedtuple("S", [
         poss_acs = {CombinationAction(player_pos=self.player_id, combination=comb) for comb in poss_combs}
         if self._can_pass:
             poss_acs.add(PassAction(self.player_id))
-        assert self._possible_actions is None  # sanity check
+
         self._possible_actions = frozenset(poss_acs)
         return frozenset(poss_acs)
 
     def possible_actions_gen(self) -> Generator:
         yield from self.possible_actions()
-
-    def unique_id(self) -> str:
-        """
-        Guaranties to return different id's for different states in one game.
-        Relies on the integrity of the game rules. Different States of different games may have the same unique_hash (by chance)
-        - each card appears exactly once in the union of following attributes: hand_cards, won_tricks or trick_on_table
-        - players is the same for all states in one particular game
-        
-        """
-        if self._unique_id_cache is not None:
-            return self._unique_id_cache
-
-        def to64(s):
-            return b64.b64encode(s.encode()).decode()
-
-        def encode_collection(col):
-            return ''.join([to64(str(e)) for e in sorted(col)])
-
-        won_tricks = ''
-        for tricks in self.won_tricks:
-            won_tricks += ''.join([t.unique_id() for t in tricks])
-
-        idstr = '.'.join([
-            self.player_id,
-            self.wish.height if self.wish is not None else '',
-            encode_collection(self.ranking),
-            encode_collection(self.announced_tichu),
-            encode_collection(self.announced_grand_tichu),
-            self.hand_cards.unique_id(),
-            won_tricks,
-            self.trick_on_table.unique_id()
-        ])
-
-        self._unique_id_cache = idstr
-        return idstr
 
     def random_action(self) -> TichuAction:
         """
@@ -228,8 +252,29 @@ class TichuState(GameState, namedtuple("S", [
 
         return ts
 
+    def unique_infoset_id(self, observer_id: int):
+        """
+        
+        :param observer_id: 
+        :return: Unique (deterministic) id for the information-set observed by the given observer_id
+        """
+        if self._infosets_ids[observer_id] is None:
+            self._infosets_ids[observer_id] = '|'.join(
+                    [str(e) for e in (
+                        self.player_id,
+                        self.wish.height if self.wish else 'NoWish',
+                        self.ranking,
+                        sorted(self.announced_tichu),
+                        sorted(self.announced_grand_tichu),
+                        self.trick_on_table.unique_id(),
+                        *[t.unique_id() for t in (wt for wt in self.won_tricks)],  # TODO
+                        *[len(hc) for hc in self.hand_cards],  # length of handcards.
+                        self.hand_cards[observer_id].unique_id()
+            )])
+        return self._infosets_ids[observer_id]
 
-class TichuInfoSet(GameInfoSet, TichuState):
+
+class TichuInfoSet(TichuState, GameInfoSet):
 
     def __new__(cls, observer_id, *args, **kwargs):
         return super().__new__(cls, *args, **kwargs)
@@ -237,82 +282,84 @@ class TichuInfoSet(GameInfoSet, TichuState):
     def __init__(self, observer_id, *args, **kwargs):
         super().__init__(*args, **kwargs)
         check_param(observer_id in range(4))
-        self._pid = observer_id
-        self._unique_id_cache = None
+        self._observer_id = observer_id
+        self.__hash_cache = None
 
     @property
     def observer_id(self):
-        return self._pid
+        return self._observer_id
 
-    def to_gamestate(self, handcards=None) -> TichuState:
-        """
-        
-        :param handcards: If None, takes the handcards of this state, otherwise this are the handcards of the returned state
-        :return: 
-        """
-        return TichuState(player_id=self.player_id,
-                          hand_cards=self.hand_cards if handcards is not None else handcards,
-                          won_tricks=self.won_tricks,
-                          trick_on_table=self.trick_on_table,
-                          wish=self.wish,
-                          ranking=self.ranking,
-                          announced_tichu=self.announced_tichu,
-                          announced_grand_tichu=self.announced_grand_tichu)
+    @classmethod
+    def from_tichustate(cls, state: TichuState, observer_id: int):
+        if isinstance(state, TichuInfoSet) and state.observer_id == observer_id:
+            logging.warning("from_tichustate called with a TichuInfoSet!!")
+            return state
+        infoset = TichuInfoSet(observer_id, *state)
+        return infoset
 
-    def determinization(self, cheat: bool=False) -> TichuState:
+    def determinization(self, observer_id: int, cheat: bool=False):
         """
-        
-        :param cheat: if True, returns the real state.
-        :return: A uniform random determinization of this information set.
+        :param observer_id:
+        :param cheat: if True, returns self (the real state).
+        :return: A uniform random determinization of this information set (as a TichuInfoSet class).
         """
         if cheat:
-            return self.to_gamestate()
+            return self
         else:
-            unknown_cards = list(flatten((hc for idx, hc in enumerate(self.hand_cards) if idx != self.player_id)))
+            unknown_cards = list(flatten((hc for idx, hc in enumerate(self.hand_cards) if idx != observer_id)))
+            # logging.debug('unknown cards: '+str(unknown_cards))
             random.shuffle(unknown_cards)
             new_hc_list = [None]*4
             for idx in range(4):
-                if idx == self.player_id:
+                if idx == observer_id:
                     new_hc_list[idx] = self.hand_cards[idx]
                 else:
                     l = len(self.hand_cards[idx])
                     det_cards = unknown_cards[:l]
                     unknown_cards = unknown_cards[l:]
                     new_hc_list[idx] = det_cards
+            new_handcards = HandCardSnapshot.from_cards_lists(*new_hc_list)
             assert all(c is not None for c in new_hc_list)
-            return self.to_gamestate(handcards=HandCardSnapshot.from_cards_lists(*new_hc_list))
+            assert sum(len(hc) for hc in new_handcards) == sum(len(hc) for hc in self.hand_cards)
+            ts = TichuInfoSet(observer_id=observer_id,
+                              player_id=self.player_id,
+                              hand_cards=new_handcards,  # The only hidden Information are the others handcards
+                              won_tricks=self.won_tricks,
+                              trick_on_table=self.trick_on_table,
+                              wish=self.wish,
+                              ranking=self.ranking,
+                              announced_tichu=self.announced_tichu,
+                              announced_grand_tichu=self.announced_grand_tichu)
 
-    def unique_id(self) -> str:
-        """
-        Guaranties to return different id's for different states in one game.
-        Relies on the integrity of the game rules. Different States of different games may have the same unique_hash (by chance)
-        - each card appears exactly once in the union of following attributes: hand_cards, won_tricks or trick_on_table
-        - players is the same for all states in one particular game
+            assert ts == self  # just checking that the infoset is indistinguishable from the new.
+            return ts
 
-        """
-        if self._unique_id_cache is not None:
-            return self._unique_id_cache
+    def observer_handcards(self):
+        return self.hand_cards[self._observer_id]
 
-        def to64(s):
-            return b64.b64encode(s.encode()).decode()
+    __hash__ = None
+    """
+    def __hash__(self):
+        if self.__hash_cache is None:
+            self.__hash_cache = hash((self.player_id,
+                                     self.wish.height if self.wish is not None else 0,
+                                     *self.ranking,
+                                     *sorted(self.announced_tichu),
+                                     *sorted(self.announced_grand_tichu),
+                                     *[len(hc) for hc in self.hand_cards],
+                                     self.observer_handcards(),  # observers handcards
+                                     *self.won_tricks,
+                                     self.trick_on_table))
+        return self.__hash_cache
+    """
+    def __eq__(self, other):
 
-        def encode_collection(col):
-            return to64(''.join([str(e) for e in sorted(col)]))
-
-        won_tricks = ''
-        for tricks in self.won_tricks:
-            won_tricks += ''.join([t.unique_id() for t in tricks])
-
-        idstr = '.'.join([
-            self.player_id,
-            self.wish.height if self.wish is not None else '',
-            encode_collection(self.ranking),
-            encode_collection(self.announced_tichu),
-            encode_collection(self.announced_grand_tichu),
-            encode_collection([len(hc) for hc in self.hand_cards]),
-            won_tricks,
-            self.trick_on_table.unique_id()
-        ])
-
-        self._unique_id_cache = idstr
-        return idstr
+        return (self.player_id == other.player_id
+                and self.wish == other.wish
+                and self.ranking == other.ranking
+                and self.announced_tichu == other.announced_tichu
+                and self.announced_grand_tichu == other.announced_grand_tichu
+                and self.observer_handcards() == other.observer_handcards()
+                and all(len(shc) == len(ohc) for shc, ohc in zip(self.hand_cards, other.hand_cards))
+                and self.won_tricks == other.won_tricks
+                and self.trick_on_table == other.trick_on_table)

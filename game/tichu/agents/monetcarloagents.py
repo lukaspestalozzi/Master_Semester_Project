@@ -1,16 +1,16 @@
 import logging
 import time
 
-from game.montecarlo.montecarlo import MctsState, DefaultMonteCarloTreeSearch
+from game.montecarlo.old_montecarlo import MctsState, DefaultMonteCarloTreeSearch
 from .partialagents import *
 from ..trick import Trick
 
 
 class SimpleMonteCarloPerfectInformationAgent(SimplePartialAgent):
 
-    def __init__(self):
+    def __init__(self, iterations: int=100):
         super().__init__()
-        self._mcts = DefaultMonteCarloTreeSearch(search_iterations=50, nbr_rollouts=5)
+        self._mcts = DefaultMonteCarloTreeSearch(search_iterations=iterations, nbr_rollouts=1)
 
     def play_combination(self, wish, round_history):
         nbr_passed = round_history.nbr_passed()

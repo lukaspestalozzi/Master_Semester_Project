@@ -182,7 +182,7 @@ class TichuGame(object):
                     # (3rd to win automatically gets the last trick)
                     if len(rhb.ranking) == 3:
                         rhb.append_event(FinishEvent(player_pos=self._next_to_play(current_player.position).position))  # add last players
-                        logging.debug("Trick ends. Dog trick.")
+                        logging.debug("Trick ends. 3 player finished.")
                         trick_ended = True
 
                     logging.debug(f"Ranking: {rhb.ranking}")
@@ -193,6 +193,7 @@ class TichuGame(object):
                     leading_player = self._players[current_player.team_mate]  # give lead to teammate
                     assert current_player.team_mate == (current_player.position + 2) % 4
                     trick_ended = True  # no one can play on the DOG
+                    logging.debug("Trick ends. Dog trick.")
             # fi is trick
 
             if not trick_ended:

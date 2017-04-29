@@ -59,27 +59,6 @@ class GameState(metaclass=abc.ABCMeta):
         :return: A tuple containing the score for each player in this state (index player.id() -> score).
         """
 
-    def reward_vector(self) -> tuple:
-        """
-        Note: The behaviour of this function is undefined when the state is not terminal.
-        Note: caches the result of self.evaluate().
-        :return: The reward vector of this state.
-        """
-        if self._reward_vector is None:
-            self._reward_vector = self.evaluate()
-        return tuple(self._reward_vector)
-
-    @abc.abstractmethod
-    def unique_id(self) -> str:
-        """
-        A string that has following property: 
-        
-        - A.unique_id() == B.unique_id() implies A == B
-        - A.unique_id() != B.unique_id() implies A != B
-        
-        :return: A unique string for this instance 
-        """
-
 
 class GameInfoSet(GameState, metaclass=abc.ABCMeta):
     """

@@ -14,7 +14,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
     'Save' Tichu Player. Checks whether it's agent moves are legal.
     """
 
-    def __init__(self, name, agent, perfect_information_mode=False):
+    def __init__(self, name, agent):
         """
         :param name: string, the name of the players, it is preferable that this is a unique name.
         :param agent: Agent, the agent deciding the players moves.
@@ -29,8 +29,6 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         self._hand_cards = Cards(cards=list())
         self._tricks = list()  # list of won tricks
         self._teammate_pos = None  # position of the teammate
-        self._pi_mode = perfect_information_mode
-        self._copy_savely = not perfect_information_mode
 
     @property
     def name(self):
@@ -211,7 +209,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :return: the combination the players wants to play as a CombinationAction.
         """
         assert len(self._hand_cards) > 0
-        action = self._agent.play_first(round_history=game_history.current_round.build(save=self._copy_savely),
+        action = self._agent.play_first(round_history=game_history.current_round.build(),
                                         wish=wish)
 
         action.check(has_cards=self, is_combination=True, not_pass=True)
@@ -228,7 +226,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :return: pass, or the combination the players wants to play as CombinationAction or PassAction.
         """
         assert len(self._hand_cards) > 0
-        action = self._agent.play_combination(wish=wish, round_history=game_history.current_round.build(save=self._copy_savely))
+        action = self._agent.play_combination(wish=wish, round_history=game_history.current_round.build())
 
         check_isinstance(action, (CombinationAction, PassAction))
         check_true(action.player_pos == self._position)
@@ -270,7 +268,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param game_history:The history of the tichu game so far.
         :return: the bomb (as CombinationAction) if the players wants to play a bomb. False or None otherwise
         """
-        bomb_comb = self._agent.play_bomb(round_history=game_history.current_round.build(save=self._copy_savely))
+        bomb_comb = self._agent.play_bomb(round_history=game_history.current_round.build())
         bomb_action = False
         if bomb_comb:
             bomb_action = CombinationAction(player_pos=self.position, combination=bomb_comb)
@@ -285,7 +283,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :param trick: The dragon Trick
         :return: id of the players to give the trick to.
         """
-        pos = self._agent.give_dragon_away(trick=trick, round_history=game_history.current_round.build(save=self._copy_savely))
+        pos = self._agent.give_dragon_away(trick=trick, round_history=game_history.current_round.build())
         try:
             dragon_action = GiveDragonAwayAction(player_from=self._position, player_to=pos, trick=trick)
             return dragon_action
@@ -298,7 +296,7 @@ class TichuPlayer(metaclass=abc.ABCMeta):
         :return: The WishAction to be wished
         """
         logging.debug(f"player {self.position} determines wish")
-        w = self._agent.wish(game_history.current_round.build(save=self._copy_savely))
+        w = self._agent.wish(game_history.current_round.build())
         wish_action = WishAction(player_from=self._position, cardvalue=w)
         return wish_action
 

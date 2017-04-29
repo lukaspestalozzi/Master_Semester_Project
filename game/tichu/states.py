@@ -812,8 +812,7 @@ class RoundHistoryBuilder(object):
         if isinstance(event, CombinationAction):
             self._current_trick.append(event)
 
-    def build(self, save=False):
-        assert save is False, "save=True is not implemented"
+    def build(self):
         tks = list(self._tricks)
         additional_hcrds = []
         # print("tks before", tks, "current trick", self._current_trick)

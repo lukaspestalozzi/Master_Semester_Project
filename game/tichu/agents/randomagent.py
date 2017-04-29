@@ -19,8 +19,6 @@ class RandomAgent(DefaultAgent):
     - play_combination: a random action (that fulfills the wish if there is one). Only passes if no other action is possible
     - play_bomb: if there is one, plays one
     - swap_cards: 3 random cards
-    - announce_tichu:  with probability 0.3
-    - announce_grand_tichu: with probability 0.1
     """
 
     def wish(self, round_history):
@@ -94,11 +92,4 @@ class RandomAgent(DefaultAgent):
                     SwapCardAction(player_from=self._position, card=sc[2], player_to=(self.position + 3) % 4)
                 ]
         return scards
-
-    def announce_tichu(self, announced_tichu, announced_grand_tichu):
-        return random.random() > 0.7
-
-    def announce_grand_tichu(self, announced_grand_tichu):
-        return random.random() > 0.9
-
 

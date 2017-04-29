@@ -166,6 +166,17 @@ class PassAction(PlayerAction):
     def can_be_played_on_combination(self, comb):
         return comb is not None
 
+    def unique_id(self):
+        """
+        A string that has following property (A and B are instances of the same class): 
+
+        - A.unique_id() == B.unique_id() implies A == B
+        - A.unique_id() != B.unique_id() implies A != B
+
+        :return: A unique string for this instance 
+        """
+        return str(self._player_pos)
+
     def __str__(self):
         return f"Pass({self._player_pos})"
 
@@ -303,6 +314,17 @@ class CombinationAction(PlayerAction):
 
     def is_bomb(self):
         return isinstance(self._comb, Bomb)
+
+    def unique_id(self):
+        """
+        A string that has following property: 
+
+        - A.unique_id() == B.unique_id() implies A == B
+        - A.unique_id() != B.unique_id() implies A != B
+
+        :return: A unique string for this instance 
+        """
+        return str(self._player_pos)+self._comb.unique_id()
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self._player_pos}, {str(self._comb)})"

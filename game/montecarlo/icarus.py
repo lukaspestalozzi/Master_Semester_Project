@@ -7,21 +7,68 @@ import abc
 import random
 from collections import Sequence
 from math import sqrt, log
+from time import time
 
 import logging
 import networkx as nx
+import matplotlib.pyplot as plt
 
-from game.abstract import GameState
-from game.tichu.new_.tichu_states import TichuInfoSet, TichuState
+from game.tichu.new_.tichu_states import TichuState
 from game.tichu.tichu_actions import TichuAction
 
 
-class MoveHistory(object):
-
-    def __init__(self):
+class FrozenActionHistory(object):
+    def __init__(self, actions=()):
         super().__init__()
-        self._states = list()
-        self._actions = list()
+        self._actions = tuple(actions)
+        self._unique_id_cache = None
+
+    @property
+    def last_action(self):
+        try:
+            return self._actions[-1]
+        except IndexError:
+            return None
+
+    def action_iter(self):
+        """
+
+        :return: generator iterating over the actions in the history (starting from first to last)
+        """
+        yield from self._actions
+
+    def appended(self, action):
+        """
+        
+        :param action: 
+        :return: A new FrozenActionHistory with the given action appended
+        """
+        return FrozenActionHistory(actions=self._actions+(action,))
+
+    def unique_id(self) -> str:
+        """
+        A string that has following property: 
+        
+        - A.unique_id() == B.unique_id() implies A == B
+        - A.unique_id() != B.unique_id() implies A != B
+        
+        :return: A unique string for this instance 
+        """
+        return '.'.join(a.unique_id() for a in self._actions)
+
+    def __repr__(self):
+        return '->'.join((str(e) for e in self._actions))
+
+    def __len__(self):
+        return len(self._actions)
+
+
+class StateActionHistory(object):
+
+    def __init__(self, states: list=list(), actions: list=list()):
+        super().__init__()
+        self._actions = states
+        self._states = actions
 
     @property
     def last_state(self):
@@ -37,6 +84,27 @@ class MoveHistory(object):
         except IndexError:
             return None
 
+    def action_iter(self):
+        """
+
+        :return: generator iterating over the actions in the history (starting from first to last)
+        """
+        yield from self._actions
+
+    def to_frozen_action_history(self, appended=None) -> FrozenActionHistory:
+        """
+        :param appended: If not none, returns the frozenActionHistory with the given action appended
+        :return: 
+        """
+        accs = self._actions
+        if appended is not None:
+            accs = accs + [appended]
+        return FrozenActionHistory(accs)
+
+    def append(self, state, action):
+        self._states.append(state)
+        self._actions.append(action)
+
     def state_iter(self, from_=None):
         """
         :param from_: if not None, starts the iterator with the given state. Raises ValueError If the state is not in the history.
@@ -46,13 +114,6 @@ class MoveHistory(object):
             yield from self._states
         else:
             yield from self._states[self._states.index(from_):]
-
-    def action_iter(self):
-        """
-
-        :return: generator iterating over the actions in the history (starting from first to last)
-        """
-        yield from self._actions
 
     def state_action_iter(self, from_=None):
         """
@@ -65,18 +126,17 @@ class MoveHistory(object):
             idx = self._states.index(from_)
             yield from zip(self._states[idx:], self._actions[idx:])
 
-    def append(self, state, action):
-        self._states.append(state)
-        self._actions.append(action)
+    def copy(self):
+        return StateActionHistory(states=list(self._states), actions=list(self._actions))
+
+    def __getitem__(self, index):
+        return (self._states[index], self._actions[index])
 
     def __repr__(self):
         return '->'.join((str(e) for e in self.state_action_iter()))
 
     def __len__(self):
-        return len(self._states)
-
-    def __getitem__(self, index):
-        return (self._states[index], self._actions[index])
+        return len(self._actions)
 
 
 class Record(object):
@@ -99,22 +159,21 @@ class Icarus(object, metaclass=abc.ABCMeta):
 
     def __init__(self):
         self.records = self.init_records()
-        self.capture_contexts = set()
 
-    def search(self, start_infoset: TichuInfoSet, iterations: int) -> TichuAction:
-        logging.debug(f"Starting Icarus search for {iterations} iterations")
+    def search(self, start_infoset: TichuState, iterations: int, cheat: bool=False) -> TichuAction:
+        logging.debug(f"Starting Icarus search for {iterations} iterations; cheating: {cheat}")
         # initialisation
-        self.search_init(start_infoset)
+        base_history = self.search_init(start_infoset)
 
         for iteration in range(iterations):
             # playout
-            history = MoveHistory()
-            root_state = start_infoset.determinization()
+            history = base_history.copy()
+            root_state = start_infoset.determinization(observer_id=start_infoset.player_id, cheat=cheat)
             state = root_state
             while not state.is_terminal():
                 action = self.policy(history=history, state=state)
                 history.append(state=state, action=action)
-                next_state = state.next_state(action)
+                next_state = state.next_state(action, infoset=True)
                 state = next_state
 
             # state is now terminal
@@ -128,10 +187,14 @@ class Icarus(object, metaclass=abc.ABCMeta):
         return self.best_action(start_infoset)
 
     @abc.abstractmethod
-    def search_init(self, infoset: TichuInfoSet) -> None:
+    def search_init(self, infoset: TichuState) -> StateActionHistory:
         """
+        Called before each search starts. The root-set of the search is the given infoset.
+        
+        Must return a StateActionHistory, which is then used as a 'base' history leading to the given infoset
+        
         :param infoset:
-        :return: 
+        :return: The StateActionHistory leading to the infoset.
         """
 
     @abc.abstractmethod
@@ -142,7 +205,7 @@ class Icarus(object, metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def policy(self, history: MoveHistory, state: TichuState) -> TichuAction:
+    def policy(self, history: StateActionHistory, state: TichuState) -> TichuAction:
         """
         
         :param history: 
@@ -151,7 +214,7 @@ class Icarus(object, metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def capture(self, history: MoveHistory, root_state: TichuState) -> Sequence:
+    def capture(self, history: StateActionHistory, root_state: TichuState) -> Sequence:
         """
         
         :param history: 
@@ -171,7 +234,7 @@ class Icarus(object, metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def best_action(self, infoset: TichuInfoSet) -> TichuAction:
+    def best_action(self, infoset: TichuState) -> TichuAction:
         """
         
         :param infoset: 
@@ -282,49 +345,76 @@ class BaseIcarus(Icarus):
 
     def __init__(self):
         super().__init__()
-        self.graph = nx.DiGraph(name='BaseGameGraph')
+        self.graph = nx.DiGraph(name='BaseIcarus-GameGraph')
+        self._expanded = False  # stores whether the tree was already expanded in this search round
+        # stores the visited and possible records for backpropagation
+        self._possible = set()
+        self._visited = set()
 
-    def policy(self, history: MoveHistory, state: TichuState) -> TichuAction:
-        sid = state.unique_id()
-        if sid in self.graph and self.graph.out_degree(sid) > 0:
+    def policy(self, history: StateActionHistory, state: TichuState) -> TichuAction:
+        if state in self.graph and not self._expanded:
+            if self._must_expand(state=state):
+                self._expanded = True
+                self._expand_tree(leaf_state=state)
+                logging.debug('expanding tree')
+
             return self._tree_policy(history, state)
         else:
             return self._rollout_policy(history, state)
 
-    def _tree_policy(self, history: MoveHistory, state: TichuState) -> TichuAction:
+    def _tree_policy(self, history: StateActionHistory, state: TichuState) -> TichuAction:
         """
         
         :param history: 
-        :param state: Any state in the game_graph, but may be a leaf
+        :param state: Any Game-state in the game_graph, but may be a leaf
         :return: The selected action
         """
 
-        sid = state.unique_id()
-        # TODO read and handle information set
-        nabo_action_gen = ((to, action) for from_, to, action in self.graph.out_edges_iter(nbunch=[sid], data='action', default=None))
-        # return uniformly at random from max utc
+        self._visited.add(state)
+
+        # find max (return uniformly at random from max utc)
+        poss_actions = set(state.possible_actions())
         max_val = 0
         max_actions = list()
-        for child_sid, action in nabo_action_gen:
-            child_n = self.graph.node[child_sid]
-            val = child_n['record'].uct(p=child_n['state'].player_id)
-            if val == float('inf'):
-                max_actions = [action]
-                break  # TODO INFO: not really uniformly random, but faster
-            if max_val == val:
-                max_actions.append(action)
-            elif max_val < val:
-                max_val = val
-                max_actions = [action]
+        for _, to_infoset, action in self.graph.out_edges_iter(nbunch=[state], data='action', default=None):
+            if action in poss_actions:
+                child_n = self.graph.node[to_infoset]
+                self._possible.add(to_infoset)
+                val = child_n['record'].uct(p=to_infoset.player_id)
+                if max_val == val:
+                    max_actions.append(action)
+                elif max_val < val:
+                    max_val = val
+                    max_actions = [action]
 
         ret = random.choice(max_actions)
-        logging.debug(f"tree policy -> {ret}")
+        # logging.debug(f"tree policy -> {ret}")
         return ret
 
-    def _rollout_policy(self, history, state) -> TichuAction:
+    def _rollout_policy(self, history: StateActionHistory, state: TichuState) -> TichuAction:
         ret = state.random_action()
-        logging.debug(f"tree policy -> {ret}")
+        # logging.debug(f"rollout policy -> {ret}")
         return ret
+
+    def capture(self, history: StateActionHistory, root_state: TichuState) -> tuple:
+        """
+        Capture contexts can be either 'available' or 'visit'.
+        'available' records have only their availability count increased, 
+        while 'visit' also update their visit count and total reward.
+        
+        :param history: 
+        :param root_state: 
+        :return: generator yielding 2-tuples(record, bool (True if capture context is 'visit'))
+        """
+        for infoset in self._possible - self._visited:  # remove visited from possible.
+            yield (self.graph.node[infoset]['record'], False)
+
+        for infoset in self._visited:
+            yield (self.graph.node[infoset]['record'], True)
+
+        self._possible.clear()
+        self._visited.clear()
+        self._expanded = False
 
     def backpropagation(self, record: BaseRecord, capture_context, reward_vector: tuple) -> None:
         record.increase_availability_count()
@@ -334,65 +424,80 @@ class BaseIcarus(Icarus):
         if record not in self.records:
             self.records.add(record)
 
-    def capture(self, history: MoveHistory, root_state: TichuState) -> Sequence:
-        """
-        Capture contexts can be either 'available' or 'visit'.
-        'available' records have only their availability count increased, 
-        while 'visit' also update their visit count and total reward.
-        
-        Note: as a sideeffect, this function expands the last visited leaf-node in the game-graph.
-        
-        :param history: 
-        :param root_state: 
-        :return: generator yielding 3-tuples(record, bool (True if capture context is 'visit'), reward_vector)
-        """
-        prev_intree = (True, None)
-        # print('capture history: ', history)
-        for state, played_action in history.state_action_iter(from_=root_state):
-            # logging.debug("capture {}, {}".format(state, played_action))
-            sid = state.unique_id()
-            if sid in self.graph:
-                prev_intree = (True, state)
-                node = self.graph.node[sid]
-                yield (node['record'], True)
-                if played_action is not None:
-                    for from_, to, action in self.graph.out_edges_iter(sid, data='action', default=None):
-                        if played_action != action:
-                            yield (self.graph.node[to]['record'], False)
-            elif prev_intree[0]:
-                leaf_state = prev_intree[1]
-                prev_intree = (False, None)
-                self._expand_tree(leaf_state=leaf_state)
-
     def best_action(self, infoset: TichuState) -> TichuAction:
-        val_action = [(self.graph.node[to]['record'].number_visits, action) for from_, to, action in self.graph.out_edges_iter(infoset.unique_id(), data='action', default=None)]
-        return max(val_action, key=lambda t: t[0])[1]
+        val_action = [(self.graph.node[to]['record'].number_visits, action) for from_, to, action in self.graph.out_edges_iter(infoset, data='action', default=None)]
+        return max(val_action)[1]
 
     def init_records(self) -> set:
         return set()
 
-    def search_init(self, infoset: TichuInfoSet) -> None:
-        self._add_new_node_if_not_yet_added(infoset)
+    def search_init(self, infoset: TichuState) -> StateActionHistory:
+        self._expanded = False
+        self._possible = set()
+        self._visited = set()
 
-    def _add_new_node_if_not_yet_added(self, state: GameState)->None:
-        sid = state.unique_id()
-        if sid not in self.graph:
-            self.graph.add_node(sid, attr_dict={'record': BaseRecord(), 'state': state})
+        # Currently creates new graph for every search, TODO make graph available for the whole game
+        self._draw_graph(f"./graphs/graph_{time()}.png")
 
-    def _add_new_edge(self, from_state: TichuState, action: TichuAction, to_state: TichuState)->None:
-        fsid = from_state.unique_id()
-        tsid = to_state.unique_id()
+        logging.debug(f"size of graph: {len(self.graph)}")
+        nodes = [n for n in self.graph.nodes_iter() if n == infoset]
+
+        if len(nodes):
+            print(' Hit a node :) =================================================================================')
+        else:
+            self.graph.clear()
+        self._add_new_node_if_not_yet_added(infoset=infoset)
+        return StateActionHistory()
+
+    def _add_new_node_if_not_yet_added(self, infoset: TichuState, **additional_node_attrs)->None:
+        if infoset not in self.graph:
+            self.graph.add_node(infoset, attr_dict={'record': BaseRecord(), **additional_node_attrs})
+
+    def _add_new_edge(self, from_infoset: TichuState, to_infoset: TichuState, action: TichuAction)->None:
         # TODO if the edge is already in the graph, updates the attr_dict. Should not be a problem? -> check again later.
-        self.graph.add_edge(u=fsid, v=tsid, attr_dict={'action': action})
+        self.graph.add_edge(u=from_infoset, v=to_infoset, attr_dict={'action': action})
+
+    def _must_expand(self, state: TichuState):
+        if self._expanded:
+            return False
+        poss_acs = set(state.possible_actions())
+        existing_actions = {action for _, _, action in self.graph.out_edges_iter(nbunch=[state], data='action', default=None)}
+        if len(existing_actions) < len(poss_acs):
+            return True
+
+        # if all possible actions already exist -> must not expand
+        return not poss_acs.issubset(existing_actions)
 
     def _expand_tree(self, leaf_state: TichuState) -> None:
         """
         Expand all possible actions from the leaf_state
+        
+        :param history: The StateActionHistory up to the leaf_state. leaf_state not included. Following should hold: history.last_state.next_state(history.last_action) == leaf_state
         :param leaf_state: 
-        :return: 
+        :return: None
         """
+
+        # logging.debug('expanding tree')
+        leaf_infostate = TichuState.from_tichustate(leaf_state)
+
         for action in leaf_state.possible_actions_gen():
-            child = leaf_state.next_state(action)
-            self._add_new_node_if_not_yet_added(child)
-            self._add_new_edge(leaf_state, action, child)
+            to_infoset = TichuState.from_tichustate(leaf_state.next_state(action))
+            self._add_new_node_if_not_yet_added(infoset=to_infoset)
+            self._add_new_edge(from_infoset=leaf_infostate, to_infoset=to_infoset, action=action)
+
+    def _draw_graph(self, outfilename):
+        #from networkx.drawing.nx_agraph import graphviz_layout
+        plt.clf()
+        G = self.graph
+        graph_pos = nx.spectral_layout(G)
+        #graph_pos = graphviz_layout(G)
+        nx.draw_networkx_nodes(G, graph_pos, with_labels=False, node_size=50, node_color='red', alpha=0.3)
+        nx.draw_networkx_edges(G, graph_pos, width=1, alpha=0.3, edge_color='green')
+
+        edge_labels = nx.get_edge_attributes(self.graph, 'action')
+        nx.draw_networkx_edge_labels(G, graph_pos, edge_labels=edge_labels, font_size=6)
+
+        plt.savefig(outfilename)
+
+
 
