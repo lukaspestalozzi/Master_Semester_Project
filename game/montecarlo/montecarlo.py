@@ -1,7 +1,7 @@
 import uuid
+from collections import defaultdict
 from operator import itemgetter
 from typing import Optional
-from game.tichu.new_.tichu_states import TichuInfoSet
 import abc
 import random
 from math import sqrt, log
@@ -11,8 +11,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 from game.tichu.new_.tichu_states import TichuState
-from game.tichu.tichu_actions import TichuAction
-from game.utils import check_param
+from game.tichu.tichu_actions import TichuAction, PassAction
+from game.utils import check_param, NodeID, RewardVector
 
 
 class UCB1Record(object):
@@ -73,51 +73,56 @@ class UCB1Record(object):
         return "{self.__class__.__name__} uuid:{self._uuid} (available:{self.availability_count}, visits:{self.visit_count}, rewards: {self.total_reward})".format(self=self)
 
     def __str__(self):
-        return "{self.__class__.__name__}(av:{self.availability_count}, v:{self.visit_count}, rewards:{self.total_reward})".format(self=self)
-
-
-NodeID = str
+        return "{self.__class__.__name__}(av:{self.availability_count}, v:{self.visit_count}, rewards:{self.total_reward} -> {av_reward})".format(self=self, av_reward=[(r/self.visit_count if self.visit_count > 0 else 0) for r in self.total_reward])
 
 
 class InformationSetMCTS(object):
     """
+    **Type:** Information Set MCTS
     
+    **Selection:** UCB1
+    
+    **Simulation:** Uniform Random
+    
+    **Best Action:** Most Visited
     """
 
     def __init__(self):
 
-        self.graph = nx.DiGraph(name='BaseIcarus-GameGraph')
+        self.graph = nx.DiGraph(name='GameGraph')
         self.observer_id = None
         self._visited_records = set()
         self._available_records = set()
 
-    def search(self, start_infoset: TichuInfoSet, observer_id: int, iterations: int, cheat: bool=False) -> TichuAction:
-        logging.debug(f"started InformationSetMCTS with observer {observer_id}, for {iterations} iterations and cheat={cheat}")
+    def search(self, root_state: TichuState, observer_id: int, iterations: int, cheat: bool=False, clear_graph_on_new_root=True) -> TichuAction:
+        logging.debug(f"started {self.__class__.__name__} with observer {observer_id}, for {iterations} iterations and cheat={cheat}")
         check_param(observer_id in range(4))
         self.observer_id = observer_id
+        root_nid = self._graph_node_id(root_state)
 
-        if start_infoset not in self.graph:
+        if root_nid not in self.graph and clear_graph_on_new_root:
             _ = self.graph.clear()
-            self.add_root(start_infoset)
         else:
             logging.debug("Could keep the graph :)")
+        self.add_root(root_state)
 
         iteration = 0
         while iteration < iterations:
             iteration += 1
             self._init_iteration()
             # logging.debug("iteration "+str(iteration))
-            start_state = start_infoset.determinization(observer_id=self.observer_id, cheat=cheat)
+            state = root_state.determinization(observer_id=self.observer_id, cheat=cheat)
             # logging.debug("Tree policy")
-            leaf_state = self.tree_policy(start_state)
+            leaf_state = self.tree_policy(state)
             # logging.debug("rollout")
             rollout_result = self.rollout_policy(leaf_state)
             # logging.debug("backpropagation")
             assert len(rollout_result) == 4
             self.backpropagation(reward_vector=rollout_result)
 
-        action = self.best_action(start_infoset)
+        action = self.best_action(root_state)
         logging.debug(f"size of graph after search: {len(self.graph)}")
+        # self._draw_graph('./graphs/graph_{}.pdf'.format(time()))
         return action
 
     def _init_iteration(self)->None:
@@ -126,16 +131,13 @@ class InformationSetMCTS(object):
 
     def _graph_node_id(self, state: TichuState) -> NodeID:
         return state.unique_infoset_id(self.observer_id)
-        """
-        if isinstance(state, TichuInfoSet):
-            return state
-        else:
-            return TichuInfoSet.from_tichustate(state, self.observer_id)
-        """
 
-    def add_child_node(self, from_nid: Optional[NodeID], to_nid: Optional[NodeID], action: Optional[TichuAction]) -> None:
+    def add_child_node(self, from_nid: Optional[NodeID]=None, to_nid: Optional[NodeID]=None, action: Optional[TichuAction]=None) -> None:
         """
         Adds a node for each infoset (if not already in graph) and an edge from the from_infoset to the to_infoset
+        
+        Adds the node if the argument is not None (if from_nid is not None, adds a node with the nid=from_nid) etc.
+        Adds the edge if no argument is None
         
         :param from_nid: 
         :param to_nid: 
@@ -146,7 +148,7 @@ class InformationSetMCTS(object):
         # assert from_infoset is None or isinstance(from_infoset, TichuInfoSet)
         # assert to_infoset is None or isinstance(to_infoset, TichuInfoSet)
 
-        def add_node(nid: str):
+        def add_node(nid: NodeID):
             self.graph.add_node(nid, attr_dict={'record': UCB1Record()})
 
         if from_nid is not None and from_nid not in self.graph:
@@ -158,9 +160,8 @@ class InformationSetMCTS(object):
         if action is not None and from_nid is not None and to_nid is not None:  # if all 3 are not none
             self.graph.add_edge(u=from_nid, v=to_nid, attr_dict={'action': action})
 
-    def add_root(self, nid: NodeID)->None:
-        if not isinstance(nid, NodeID):
-            nid = self._graph_node_id(nid)
+    def add_root(self, state: TichuState)->None:
+        nid = self._graph_node_id(state)
         self.add_child_node(from_nid=nid, to_nid=None, action=None)
 
     def expand(self, leaf_state: TichuState)->None:
@@ -178,13 +179,12 @@ class InformationSetMCTS(object):
         """
         curr_state = state
         while not curr_state.is_terminal():
-            isid = self._graph_node_id(curr_state)
-            if not self.is_fully_expanded(isid):
-                self.expand(isid)
+            if not self.is_fully_expanded(curr_state):
+                self.expand(curr_state)
                 # logging.debug("tree_policy expand and return")
-                return self.tree_selection(isid)
+                return curr_state.next_state(self.tree_selection(curr_state))
             else:
-                curr_state = self.tree_selection(isid)
+                curr_state = curr_state.next_state(self.tree_selection(curr_state))
 
         # logging.debug("tree_policy return (state is terminal)")
         return curr_state
@@ -199,16 +199,16 @@ class InformationSetMCTS(object):
         # if all possible actions already exist -> is fully expanded
         return poss_acs.issubset(existing_actions)
 
-    def tree_selection(self, state: TichuState) -> TichuState:
+    def tree_selection(self, state: TichuState) -> TichuAction:
         """
         
         :param state:
         :return: 
         """
         # logging.debug("Tree selection")
-        isid = self._graph_node_id(state)
+        nid = self._graph_node_id(state)
         # store record for backpropagation
-        rec = self.graph.node[isid]['record']
+        rec = self.graph.node[nid]['record']
         self._visited_records.add(rec)
         self._available_records.add(rec)
 
@@ -216,7 +216,7 @@ class InformationSetMCTS(object):
         poss_actions = set(state.possible_actions())
         max_val = -float('inf')
         max_actions = list()
-        for _, to_nid, action in self.graph.out_edges_iter(nbunch=[isid], data='action', default=None):
+        for _, to_nid, action in self.graph.out_edges_iter(nbunch=[nid], data='action', default=None):
             # logging.debug("Tree selection looking at "+str(action))
             if action in poss_actions:
                 child_record = self.graph.node[to_nid]['record']
@@ -230,9 +230,9 @@ class InformationSetMCTS(object):
 
         next_action = random.choice(max_actions)
         # logging.debug(f"Tree selection -> {next_action}")
-        return state.next_state(next_action)
+        return next_action
 
-    def rollout_policy(self, state: TichuState)->tuple:
+    def rollout_policy(self, state: TichuState)->RewardVector:
         """
         Does a rollout from the given state and returns the reward vector
         
@@ -244,18 +244,17 @@ class InformationSetMCTS(object):
             rollout_state = rollout_state.next_state(rollout_state.random_action())
         return self.evaluate_state(rollout_state)
 
-    def evaluate_state(self, state: TichuState)->tuple:
+    def evaluate_state(self, state: TichuState)->RewardVector:
         """
         
         :param state: 
         :return: 
         """
         points = state.count_points()
-
-        assert points[0] == points[2] and points[1] == points[3], str(points)
+        assert points[0] == points[2] and points[1] == points[3]
         return points
 
-    def backpropagation(self, reward_vector: tuple)->None:
+    def backpropagation(self, reward_vector: RewardVector)->None:
         """
         Called at the end with the rollout result.
         
@@ -276,30 +275,146 @@ class InformationSetMCTS(object):
             record.increase_number_visits()
             record.add_reward(reward_vector)
 
-    def best_action(self, infoset: TichuInfoSet) -> TichuAction:
+    def best_action(self, state: TichuState) -> TichuAction:
         """
-        
-        :param infoset: 
-        :return: The best action to play from the given infoset
+
+        :param state: 
+        :return: The best action to play from the given state
         """
-        max_a = None
+        nid = self._graph_node_id(state)
+
+        assert nid in self.graph
+        assert self.graph.out_degree(nid) > 0
+
+        possactions= state.possible_actions()
+
+        max_a = next(iter(possactions))
         max_v = -float('inf')
-        for _, to_nid, action in self.graph.out_edges_iter(infoset, data='action', default=None):
-            rec = self.graph.node[to_nid]['record']
-            if rec.visit_count > max_v:
-                max_v = rec.visit_count
-                max_a = action
+        for _, to_nid, action in self.graph.out_edges_iter(nid, data='action', default=None):
+            if action in possactions:
+                rec = self.graph.node[to_nid]['record']
+                val = rec.total_reward[state.player_id] / rec.visit_count if rec.visit_count > 0 else 0
+                logging.debug(f"   {val}->{action}: {rec}")
+                if val > max_v:
+                    max_v = val
+                    max_a = action
 
-            # logging.debug(f"   {action}: {rec}")
-
-        # logging.debug(f"best action -> {max_a}")
         return max_a
 
+    def _draw_graph(self, outfilename):
+        #from networkx.drawing.nx_agraph import graphviz_layout
+        plt.clf()
+        G = self.graph
+        graph_pos = nx.spring_layout(G)
+        #graph_pos = graphviz_layout(G)
+        nx.draw_networkx_nodes(G, graph_pos, with_labels=False, node_size=30, node_color='red', alpha=0.3)
+        nx.draw_networkx_edges(G, graph_pos, width=1, alpha=0.3, edge_color='green')
 
-class MCTS(InformationSetMCTS):
+        edge_labels = nx.get_edge_attributes(self.graph, 'action')
+        nx.draw_networkx_edge_labels(G, graph_pos, edge_labels=edge_labels, font_size=3)
+
+        plt.savefig(outfilename)
+
+
+class EpicISMCTS(InformationSetMCTS):
+
+    def _graph_node_id(self, state: TichuState)->NodeID:
+        return state.position_in_episode()
+
+
+class ISMctsLGR(InformationSetMCTS):
     """
-    'Normal' MCTS. One searchtree for each determinization.
+    **Type:** Information Set MCTS
     
+    **Selection:** UCB1
+    
+    **Simulation:** LastGoodResponse (Moves of winning player gets stored and chosen in next rollout if applicable)
+    
+    **Best Action:** Most Visited
+    """
+    MOVE_BREAK = "MoveBreak"  # used to signalise the end of a trick in the made_moves attribute
+
+    def __init__(self, *args, forgetting: bool=True, **kwargs):
+        """
+        
+        :param args: 
+        :param forgetting: if True, looser moves will be forgotten
+        :param kwargs: 
+        """
+        super().__init__(*args, **kwargs)
+        self.forgetting = forgetting
+        self._lgr_map = defaultdict(lambda: [None, None, None, None])
+        self._made_moves = list()
+
+    def search(self, *args, **kwargs):
+        self._lgr_map.clear()
+        return super().search(*args, **kwargs)
+
+    def _init_iteration(self):
+        self._made_moves.clear()
+        super()._init_iteration()
+
+    def tree_selection(self, state: TichuState):
+        if state.trick_on_table.is_empty():
+            self._made_moves.append(self.MOVE_BREAK)
+        action = super().tree_selection(state)
+        if not isinstance(action, PassAction):  # exclude pass actions
+            self._made_moves.append(action)
+        return action
+
+    def rollout_policy(self, state: TichuState) -> RewardVector:
+        """
+        Does a rollout from the given state and returns the reward vector
+
+        :param state: 
+        :return: the reward vector of this rollout
+        """
+
+        rollout_state = state
+        last_action = None
+        next_action = None
+        while not rollout_state.is_terminal():
+            if rollout_state.trick_on_table.is_empty():
+                self._made_moves.append(self.MOVE_BREAK)
+
+            if (last_action in self._lgr_map
+                    and self._lgr_map[last_action] is not None
+                    and self._lgr_map[last_action][rollout_state.player_id] in rollout_state.possible_actions()):  # only take possible actions
+                next_action = self._lgr_map[last_action][rollout_state.player_id]
+                # logging.debug("LGR hit: {}->{}".format(last_action, next_action))
+            else:
+                next_action = rollout_state.random_action()
+
+            if not isinstance(next_action, PassAction):  # exclude pass actions
+                self._made_moves.append(next_action)
+            rollout_state = rollout_state.next_state(next_action)
+            last_action = next_action
+        return self.evaluate_state(rollout_state)
+
+    def backpropagation(self, reward_vector: RewardVector, *args, **kwargs):
+        super().backpropagation(reward_vector, *args, **kwargs)
+        winners = {0, 2} if reward_vector[0] > reward_vector[1] else {1, 3}
+        prev_action = self._made_moves.pop(0)
+        for action in self._made_moves:
+            if prev_action != self.MOVE_BREAK and action != self.MOVE_BREAK:
+                if action.player_pos in winners:
+                    self._lgr_map[prev_action][action.player_pos] = action
+                elif self.forgetting and prev_action in self._lgr_map:
+                    self._lgr_map[prev_action][action.player_pos] = None
+            prev_action = action
+
+        # logging.debug("Size of LGR cache: {}".format(len(self._lgr_map)))
+        self._made_moves.clear()
+
+
+class ISMctsEpigLGR(ISMctsLGR, EpicISMCTS):
+    """
+    **Type:** Information Set MCTS
+
+    **Selection:** EPIC-UCB1
+
+    **Simulation:** LastGoodResponse (Moves of winning player gets stored and chosen in next rollout if applicable)
+
+    **Best Action:** Most Visited
     """
     pass
-

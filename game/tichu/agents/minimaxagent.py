@@ -6,9 +6,10 @@ from multiprocessing.pool import ThreadPool, Pool
 
 import time
 
+from game.tichu.handcardsnapshot import HandCardSnapshot
 from .baseagent import DefaultAgent
 from ..cards import Card, Cards, ImmutableCards
-from ..tichu_actions import HandCardSnapshot, PassAction, CombinationAction
+from ..tichu_actions import PassAction, CombinationAction
 from game.utils import indent, check_param
 
 
@@ -32,7 +33,7 @@ class GameState(namedtuple("GameState", ["player_pos", "hand_cards", "tricks", "
 class MiniMaxPIAgent(DefaultAgent):  # MiniMaxPerfectInformationAgent
 
     def __init__(self):
-        super().__init__()
+        super().__init__(name="MiniMaxPIAgent")
         self._minimax = MiniMaxSearch(max_depth=2)
 
     def play_combination(self, wish, round_history):

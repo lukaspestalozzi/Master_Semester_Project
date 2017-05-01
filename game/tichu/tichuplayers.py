@@ -1,8 +1,7 @@
 import abc
 import logging
 import uuid
-
-from .agents import BaseAgent
+from .agents.baseagent import BaseAgent
 from .cards import Cards, ImmutableCards
 from .exceptions import IllegalActionException
 from .tichu_actions import SwapCardAction, PassAction, CombinationAction, GiveDragonAwayAction, WishAction
@@ -69,6 +68,9 @@ class TichuPlayer(metaclass=abc.ABCMeta):
     @property
     def tricks(self):
         return list(self._tricks)
+
+    def agent_info(self):
+        return self._agent.info()
 
     def has_cards(self, cards):
         return all(c in self._hand_cards for c in cards)

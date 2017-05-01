@@ -1,8 +1,14 @@
 import logging
 
 import abc
+from typing import Optional
 
+import time
 
+from game.tichu.cards import CardValue
+from game.tichu.new_.tichu_states import TichuState
+from game.tichu.tichu_actions import TichuAction, PlayerGameEvent, PassAction, CombinationAction, SimpleWinTrickEvent
+from game.tichu.trick import Trick
 from ..cards import Single
 # from game.tichu.tichu_actions import SwapCardAction  INFO: Imported later
 
@@ -14,7 +20,11 @@ class BaseAgent(metaclass=abc.ABCMeta):
         self._hand_cards = None
 
     @property
-    def position(self):
+    def name(self)->str:
+        return self.__class__.__name__
+
+    @property
+    def position(self)->int:
         return self._position
 
     @position.setter
@@ -24,6 +34,13 @@ class BaseAgent(metaclass=abc.ABCMeta):
     @property
     def hand_cards(self):
         return self._hand_cards
+
+    @abc.abstractmethod
+    def info(self)->str:
+        """
+        Info string about this agent
+        :return: 
+        """
 
     @hand_cards.setter
     def hand_cards(self, hcs):
@@ -61,7 +78,6 @@ class BaseAgent(metaclass=abc.ABCMeta):
 
         :param announced_tichu:
         :param announced_grand_tichu:
-        :param round_history:
         :return:
         """
         # TODO describe
@@ -103,7 +119,8 @@ class BaseAgent(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def play_combination(self, wish, round_history):
         """
-
+        
+        :param wish:
         :param round_history:
         :return:
         """
@@ -143,8 +160,8 @@ class DefaultAgent(BaseAgent):
     all other methods just 'pass'
     """
 
-    def __init__(self):
-        super().__init__()
+    def info(self):
+        return "{s.__class__.__name__}({s.name})".format(s=self)
 
     def swap_cards_received(self, swapped_cards_actions):
         pass
@@ -201,4 +218,61 @@ class DefaultAgent(BaseAgent):
     def announce_grand_tichu(self, announced_grand_tichu):
         return False
 
+
+class SearchAgent(BaseAgent):
+    """
+    Defines the methods 'play_combination' and 'play_first'
+    
+    Those methods create the start state and initialize the search
+    
+    method to overwrite: 
+    
+    :search: given a state returns the action to play
+    """
+
+    def play_combination(self, wish, round_history):
+        state = self._create_tichu_state(round_history=round_history,
+                                         wish=wish,
+                                         trick_on_table=round_history.tricks[-1])
+        action = self._start_search(state)
+        return action
+
+    def play_first(self, round_history, wish):
+        state = self._create_tichu_state(round_history=round_history,
+                                         wish=wish,
+                                         trick_on_table=Trick())
+        action = self._start_search(state)
+        return action
+
+    def _create_tichu_state(self, round_history, wish: Optional[CardValue], trick_on_table: Trick)->TichuState:
+        return TichuState(player_id=self.position,
+                          hand_cards=round_history.last_handcards,
+                          won_tricks=round_history.won_tricks,
+                          trick_on_table=trick_on_table,
+                          wish=wish,
+                          ranking=tuple(round_history.ranking),
+                          announced_tichu=frozenset(round_history.announced_tichus),
+                          announced_grand_tichu=frozenset(round_history.announced_grand_tichus),
+                          history=tuple([a for a in round_history.events if isinstance(a, (SimpleWinTrickEvent, CombinationAction, PassAction))]))
+
+    def _start_search(self, start_state: TichuState)->TichuAction:
+        logging.debug(f"agent {self.name} (pos {self._position}) starts search.")
+        start_t = time.time()
+        if len(start_state.possible_actions()) == 1:
+            logging.debug(f"agent {self.name} (pos {self._position}) there is only one action to play.")
+            action = next(iter(start_state.possible_actions()))
+        else:
+            action = self.search(start_state)
+
+        logging.debug(f"agent {self.name} (pos {self._position}) found action: {action} (time: {time.time()-start_t})")
+        return action
+
+    @abc.abstractmethod
+    def search(self, state: TichuState)->TichuAction:
+        """
+        
+        :param state: The state from which the search starts
+        :return: The Action to play
+        """
+        pass
 

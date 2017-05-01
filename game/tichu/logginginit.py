@@ -1,9 +1,29 @@
 import logging
-import os.path
+import os
+import errno
+
+
+def make_sure_path_exists(path):
+    try:
+        os.makedirs(path)
+    except OSError as exception:
+        if exception.errno != errno.EEXIST:
+            raise
 
 
 def initialize_logger(output_dir, console_log_level, info_log="info.log", warn_err_log="warn_error.log", all_log="all.log"):
+    """
+    
+    :param output_dir: 
+    :param console_log_level: 
+    :param logsname: The logs go into a folder with this name, if it is a string
+    :param info_log: 
+    :param warn_err_log: 
+    :param all_log: 
+    :return: 
+    """
     # datefmt='%Y.%m.%d %H:%M:%S'
+    make_sure_path_exists(output_dir)
 
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
@@ -39,3 +59,5 @@ def initialize_logger(output_dir, console_log_level, info_log="info.log", warn_e
         formatter = logging.Formatter('%(levelname)s [%(module)s]:%(message)s')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
+
+    logging.info("Logging to: "+output_dir)

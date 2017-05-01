@@ -25,7 +25,7 @@ class MonteCarloGameSimulation(DefaultMonteCarloTreeSearch):
 
 def continue_montecarlo_game_simulation(mcgs, start_state):
     start_t = time.time()
-    main_line = mcgs.search(start_state=start_state)
+    main_line = mcgs.search(state=start_state)
 
     print("Depth: ", len(main_line))
     print("Tree size: ", len(mcgs._nodes))

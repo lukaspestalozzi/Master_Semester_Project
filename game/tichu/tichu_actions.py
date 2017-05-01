@@ -1,7 +1,7 @@
 
 import abc
 
-from .handcardsnapshot import HandCardSnapshot
+# Imported later: from .handcardsnapshot import HandCardSnapshot
 from .trick import Trick
 from .cards import Combination, Card, CardValue, Bomb
 from .exceptions import IllegalActionException
@@ -74,25 +74,17 @@ class FinishEvent(PlayerGameEvent):
     __slots__ = ()
 
 
-class WinTrickEvent(PlayerGameEvent):
-    """ Win a trick """
+class SimpleWinTrickEvent(PlayerGameEvent):
+    __slots__ = ("_trick",)
 
-    __slots__ = ("_hand_cards")
-
-    def __init__(self, player_pos, trick, hand_cards):
+    def __init__(self, player_pos, trick):
         """
-        :param player_pos:
-        :param hand_cards: The HandCardSnapshot of the players when the trick finished
+        :param player_pos: the player winning the trick
+        :param trick: The won trick
         """
-        check_isinstance(hand_cards, HandCardSnapshot)
         check_isinstance(trick, Trick)
         super().__init__(player_pos=player_pos)
-        self._hand_cards = hand_cards
         self._trick = trick
-
-    @property
-    def hand_cards(self):
-        return self._hand_cards
 
     @property
     def trick(self):
@@ -100,6 +92,35 @@ class WinTrickEvent(PlayerGameEvent):
 
     def pretty_string(self, indent_=0):
         return f"{indent(indent_, s=' ')}{self.__class__.__name__}(winner:{self._player_pos})"
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self._player_pos}, trick:{self._trick})"
+
+    def __eq__(self, other):
+        return super().__eq__(other) and self.trick == other.trick
+
+    def __hash__(self):
+        return hash((self._player_pos, self._trick))
+
+
+class WinTrickEvent(SimpleWinTrickEvent):
+    """ Win a trick """
+
+    __slots__ = ("_hand_cards",)
+
+    def __init__(self, player_pos, trick, hand_cards):
+        """
+        :param player_pos:
+        :param hand_cards: The HandCardSnapshot of the players when the trick finished
+        """
+        from .handcardsnapshot import HandCardSnapshot
+        check_isinstance(hand_cards, HandCardSnapshot)
+        super().__init__(player_pos=player_pos, trick=trick)
+        self._hand_cards = hand_cards
+
+    @property
+    def hand_cards(self):
+        return self._hand_cards
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self._player_pos} handcards:{self._hand_cards}, trick:{self._trick})"

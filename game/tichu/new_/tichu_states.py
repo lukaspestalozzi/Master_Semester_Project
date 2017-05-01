@@ -3,11 +3,15 @@ from collections import Generator, namedtuple
 
 import logging
 
+import itertools
+from typing import Tuple
+
 from game.abstract import GameInfoSet, GameState
 from game.tichu.cards import Card, CardValue
 from game.tichu.exceptions import IllegalActionException
 from game.tichu.handcardsnapshot import HandCardSnapshot
-from game.tichu.tichu_actions import TichuAction, CombinationAction, PassAction
+from game.tichu.tichu_actions import TichuAction, CombinationAction, PassAction, PlayerAction, PlayerGameEvent, \
+    SimpleWinTrickEvent
 from game.tichu.trick import Trick
 from game.utils import flatten, check_param
 
@@ -20,9 +24,13 @@ class TichuState(GameState, namedtuple("S", [
             "wish",
             "ranking",
             "announced_tichu",
-            "announced_grand_tichu"
+            "announced_grand_tichu",
+            "history"
         ])):
-    def __init__(self, player_id: int, hand_cards: HandCardSnapshot, won_tricks: tuple, trick_on_table: Trick, wish: CardValue, ranking: tuple, announced_tichu: frozenset, announced_grand_tichu: frozenset):
+    def __init__(self, player_id: int, hand_cards: HandCardSnapshot, won_tricks: tuple,
+                 trick_on_table: Trick, wish: CardValue, ranking: tuple,
+                 announced_tichu: frozenset, announced_grand_tichu: frozenset,
+                 history: Tuple[PlayerGameEvent]):
         super().__init__()
 
         # some paranoid checks
@@ -44,6 +52,8 @@ class TichuState(GameState, namedtuple("S", [
         assert all(r in range(4) for r in announced_grand_tichu)
 
         assert isinstance(trick_on_table, Trick)
+        assert isinstance(history, tuple)
+        assert all(isinstance(a, PlayerGameEvent) for a in history)
 
         self._action_state_transitions = dict()
         self._possible_actions = None
@@ -216,12 +226,14 @@ class TichuState(GameState, namedtuple("S", [
                         wish=None if comb.fulfills_wish(self.wish) else self.wish,
                         ranking=tuple(new_ranking),
                         announced_tichu=self.announced_tichu,
-                        announced_grand_tichu=self.announced_grand_tichu)
+                        announced_grand_tichu=self.announced_grand_tichu,
+                        history=self.history + (combination_action,))
         return ts
 
     def _state_for_pass(self):
         new_won_tricks = self.won_tricks  # tricks is a tuple (of len 4) containing tuple of tricks
         new_trick_on_table = self.trick_on_table
+        new_history = self.history + (PassAction(self.player_id),)
 
         next_player_pos = self.next_player_turn()
         leading_player = self.trick_on_table.last_combination_action.player_pos
@@ -240,6 +252,7 @@ class TichuState(GameState, namedtuple("S", [
             new_won_tricks[trick_winner_pos] = tuple(winner_tricks)
             new_won_tricks = tuple(new_won_tricks)
             new_trick_on_table = Trick()  # There is a new trick on the table
+            new_history += (SimpleWinTrickEvent(leading_player, self.trick_on_table),)  # add a WinTrickEvent
 
         ts = TichuState(player_id=next_player_pos,
                         hand_cards=self.hand_cards,
@@ -248,11 +261,48 @@ class TichuState(GameState, namedtuple("S", [
                         wish=self.wish,
                         ranking=self.ranking,
                         announced_tichu=self.announced_tichu,
-                        announced_grand_tichu=self.announced_grand_tichu)
+                        announced_grand_tichu=self.announced_grand_tichu,
+                        history=new_history)
 
         return ts
 
-    def unique_infoset_id(self, observer_id: int):
+    def determinization(self, observer_id: int, cheat: bool=False):
+        """
+        :param observer_id:
+        :param cheat: if True, returns self (the real state).
+        :return: A uniform random determinization of this information set (as a TichuInfoSet class).
+        """
+        if cheat:
+            return self
+        else:
+            unknown_cards = list(flatten((hc for idx, hc in enumerate(self.hand_cards) if idx != observer_id)))
+            # logging.debug('unknown cards: '+str(unknown_cards))
+            random.shuffle(unknown_cards)
+            new_hc_list = [None]*4
+            for idx in range(4):
+                if idx == observer_id:
+                    new_hc_list[idx] = self.hand_cards[idx]
+                else:
+                    l = len(self.hand_cards[idx])
+                    det_cards = unknown_cards[:l]
+                    unknown_cards = unknown_cards[l:]
+                    new_hc_list[idx] = det_cards
+            new_handcards = HandCardSnapshot.from_cards_lists(*new_hc_list)
+            assert all(c is not None for c in new_hc_list)
+            assert sum(len(hc) for hc in new_handcards) == sum(len(hc) for hc in self.hand_cards)
+            ts = TichuState(player_id=self.player_id,
+                            hand_cards=new_handcards,  # The only hidden Information are the others handcards
+                            won_tricks=self.won_tricks,
+                            trick_on_table=self.trick_on_table,
+                            wish=self.wish,
+                            ranking=self.ranking,
+                            announced_tichu=self.announced_tichu,
+                            announced_grand_tichu=self.announced_grand_tichu,
+                            history=self.history)
+
+            return ts
+
+    def unique_infoset_id(self, observer_id: int)->str:
         """
         
         :param observer_id: 
@@ -267,13 +317,28 @@ class TichuState(GameState, namedtuple("S", [
                         sorted(self.announced_tichu),
                         sorted(self.announced_grand_tichu),
                         self.trick_on_table.unique_id(),
-                        *[t.unique_id() for t in (wt for wt in self.won_tricks)],  # TODO
+                        *[t.unique_id() for t in itertools.chain.from_iterable(self.won_tricks)],
                         *[len(hc) for hc in self.hand_cards],  # length of handcards.
                         self.hand_cards[observer_id].unique_id()
-            )])
+                        )
+                     ])
         return self._infosets_ids[observer_id]
 
+    def position_in_episode(self)->str:
+        """
+        Position in episode is the history since the last 'first play' action
+        :return: Unique identifier for the position in episode
+        """
+        # TODO try: - with/without passactions; - include/remove playerid; - use the trick and not history; use 'generic' actions (eg. pair(As) instead of Pair(As1, As2))
+        # TODO cache
 
+        # history is the current trick on the table
+        if self.trick_on_table.is_empty():
+            return "ROOT_"+str(self.player_id)
+        else:
+            return '->'.join(str(a) for a in self.trick_on_table)
+
+"""
 class TichuInfoSet(TichuState, GameInfoSet):
 
     def __new__(cls, observer_id, *args, **kwargs):
@@ -298,11 +363,11 @@ class TichuInfoSet(TichuState, GameInfoSet):
         return infoset
 
     def determinization(self, observer_id: int, cheat: bool=False):
-        """
+        
         :param observer_id:
         :param cheat: if True, returns self (the real state).
         :return: A uniform random determinization of this information set (as a TichuInfoSet class).
-        """
+        
         if cheat:
             return self
         else:
@@ -338,7 +403,7 @@ class TichuInfoSet(TichuState, GameInfoSet):
         return self.hand_cards[self._observer_id]
 
     __hash__ = None
-    """
+    
     def __hash__(self):
         if self.__hash_cache is None:
             self.__hash_cache = hash((self.player_id,
@@ -351,7 +416,7 @@ class TichuInfoSet(TichuState, GameInfoSet):
                                      *self.won_tricks,
                                      self.trick_on_table))
         return self.__hash_cache
-    """
+    
     def __eq__(self, other):
 
         return (self.player_id == other.player_id
@@ -363,3 +428,4 @@ class TichuInfoSet(TichuState, GameInfoSet):
                 and all(len(shc) == len(ohc) for shc, ohc in zip(self.hand_cards, other.hand_cards))
                 and self.won_tricks == other.won_tricks
                 and self.trick_on_table == other.trick_on_table)
+"""
