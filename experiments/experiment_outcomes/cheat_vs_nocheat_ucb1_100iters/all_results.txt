@@ -1,0 +1,166 @@
+Absolute_result:
+8:0
+
+Total_points:
+8655: 4945
+
+Single_results:
+1000, 700
+1195, 505
+1050, 450
+1180, 720
+1095, 705
+1015, 885
+1110, 490
+1010, 490
+
+
+################################## CHEATVSNONCHEATUCB1 ##################################
+start-time: 2017-05-02_18:23:49
+
+end-time: 2017-05-02_21:31
+
+duration: 11270.62478351593 seconds (187.0 minutes and 50.624783515930176 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: True]
+2: ISMctsUCB1Agent[iterations: 100, cheat: True] 
+VS.
+1: ISMctsUCB1Agent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent[iterations: 100, cheat: False]
+
+Outcome: (1000, 700)
+Game Result: (1000, 700)
+Number of Rounds: 14
+
+
+
+
+################################## CHEATVSNONCHEATUCB1 ##################################
+start-time: 2017-05-02_19:22:23
+
+end-time: 2017-05-02_22:35
+
+duration: 11588.142573833466 seconds (193.0 minutes and 8.142573833465576 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: True]
+2: ISMctsUCB1Agent[iterations: 100, cheat: True] 
+VS.
+1: ISMctsUCB1Agent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent[iterations: 100, cheat: False]
+
+Outcome: (1195, 505)
+Game Result: (1195, 505)
+Number of Rounds: 14
+
+################################## CHEATVSNONCHEATUCB1 ##################################
+start-time: 2017-05-02_19:24:31
+
+end-time: 2017-05-02_22:07
+
+duration: 9776.211333036423 seconds (162.0 minutes and 56.21133303642273 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: True]
+2: ISMctsUCB1Agent[iterations: 100, cheat: True] 
+VS.
+1: ISMctsUCB1Agent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent[iterations: 100, cheat: False]
+
+Outcome: (1050, 450)
+Game Result: (1050, 450)
+Number of Rounds: 15
+
+
+
+################################## CHEATVSNONCHEATUCB1 ##################################
+start-time: 2017-05-02_21-58-51
+
+end-time: 2017-05-03_01:02
+
+duration: 11042.376153945923 seconds (184.0 minutes and 2.3761539459228516 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: True]
+2: ISMctsUCB1Agent[iterations: 100, cheat: True] 
+VS.
+1: ISMctsUCB1Agent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent[iterations: 100, cheat: False]
+
+Outcome: (1180, 720)
+Game Result: (1180, 720)
+Number of Rounds: 16
+
+
+
+################################## CHEATVSNONCHEATUCB1 ##################################
+start-time: 2017-05-03_01-02-54
+
+end-time: 2017-05-03_03:38
+
+duration: 9350.19340634346 seconds (155.0 minutes and 50.19340634346008 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: True]
+2: ISMctsUCB1Agent[iterations: 100, cheat: True] 
+VS.
+1: ISMctsUCB1Agent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent[iterations: 100, cheat: False]
+
+Outcome: (1095, 705)
+Game Result: (1095, 705)
+Number of Rounds: 15
+
+
+
+################################## CHEATVSNONCHEATUCB1 ##################################
+start-time: 2017-05-03_03-38-44
+
+end-time: 2017-05-03_06:05
+
+duration: 8813.316264867783 seconds (146.0 minutes and 53.31626486778259 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: True]
+2: ISMctsUCB1Agent[iterations: 100, cheat: True] 
+VS.
+1: ISMctsUCB1Agent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent[iterations: 100, cheat: False]
+
+Outcome: (1015, 885)
+Game Result: (1015, 885)
+Number of Rounds: 15
+
+
+
+################################## CHEATVSNONCHEATUCB1 ##################################
+start-time: 2017-05-03_06-05-37
+
+end-time: 2017-05-03_07:40
+
+duration: 5705.398421049118 seconds (95.0 minutes and 5.398421049118042 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: True]
+2: ISMctsUCB1Agent[iterations: 100, cheat: True] 
+VS.
+1: ISMctsUCB1Agent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent[iterations: 100, cheat: False]
+
+Outcome: (1110, 490)
+Game Result: (1110, 490)
+Number of Rounds: 13
+
+
+
+################################## CHEATVSNONCHEATUCB1 ##################################
+start-time: 2017-05-03_07-40-43
+
+end-time: 2017-05-03_09:18
+
+duration: 5880.080159664154 seconds (98.0 minutes and 0.08015966415405273 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: True]
+2: ISMctsUCB1Agent[iterations: 100, cheat: True] 
+VS.
+1: ISMctsUCB1Agent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent[iterations: 100, cheat: False]
+
+Outcome: (1010, 490)
+Game Result: (1010, 490)
+Number of Rounds: 13
+
