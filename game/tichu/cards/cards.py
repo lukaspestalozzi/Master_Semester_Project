@@ -135,7 +135,7 @@ class ImmutableCards(collectionsabc.Collection):
 
     def value_dict(self, include_special=True):
         """
-        :type include_special: bool: if False, the special cards are not in the dict
+        :param include_special: bool: if False, the special cards are not in the dict
         :return: a dict mapping the card_values appearing in self._cards to the list of corresponding cards.
         """
         # TODO precompute, -> must be overridden by mutable subclasses
@@ -212,7 +212,7 @@ class ImmutableCards(collectionsabc.Collection):
                 if len(l) >= 2:
                     yield Trio(l[0], l[1], Card.PHOENIX)
 
-        # normal pairs
+        # normal trios
         for l in valdict.values():
             if len(l) >= 3:
                 # 3 or more same valued cards -> take 2 of them

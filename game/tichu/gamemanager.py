@@ -37,6 +37,11 @@ class TichuGame(object):
         self._target_points = target_points
         self._history = GameHistoryBuilder(team1, team2, target_points=target_points)
 
+    @property
+    def players(self):
+        return [self._teams[0].first_player, self._teams[1].first_player,
+                self._teams[0].second_player, self._teams[1].second_player]
+
     def start_game(self):
         """
         Starts the tichu

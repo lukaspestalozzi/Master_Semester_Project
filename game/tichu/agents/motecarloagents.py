@@ -1,12 +1,43 @@
+import abc
 import logging
 import time
 
 from game.montecarlo.old_montecarlo import MctsState, DefaultMonteCarloTreeSearch
-from game.montecarlo.montecarlo import InformationSetMCTS, EpicISMCTS, ISMctsLGR, ISMctsEpigLGR
+from game.montecarlo.montecarlo import InformationSetMCTS, EpicISMCTS, ISMctsLGR, ISMctsEpigLGR, \
+    InformationSetMCTS_old_evaluation
 from game.tichu.agents.baseagent import SearchAgent
 from game.tichu.agents.partialagents import SimplePartialAgent
 from game.tichu.new_.tichu_states import TichuState
 from game.tichu.tichu_actions import TichuAction
+
+
+class MonteCarloAgent(SearchAgent, SimplePartialAgent, metaclass=abc.ABCMeta):
+
+    def __init__(self, iterations: int = 100, cheat: bool = False):
+        super().__init__()
+        self._mcts = None
+        self.cheat = cheat
+        self.iterations = iterations
+
+    def start_game(self):
+        self._mcts = self.init_montecarlo_search()
+
+    def info(self):
+        return "{s.name}[iterations: {s.iterations}, cheat: {s.cheat}]".format(s=self)
+
+    def search(self, start_state):
+        return self._mcts.search(root_state=start_state,
+                                 observer_id=self.position,
+                                 iterations=self.iterations,
+                                 cheat=self.cheat)
+
+    @abc.abstractmethod
+    def init_montecarlo_search(self):
+        """
+        
+        :return: The instance of the search class to be used.
+        """
+        pass
 
 
 class SimpleMonteCarloPerfectInformationAgent(SearchAgent, SimplePartialAgent):
@@ -39,7 +70,7 @@ class SimpleMonteCarloPerfectInformationAgent(SearchAgent, SimplePartialAgent):
         return self._mcts.search(start_state=start_state)
 
 
-class ISMctsUCB1Agent(SearchAgent, SimplePartialAgent):
+class ISMctsUCB1Agent(MonteCarloAgent):
     """
     **Type:** Information Set MCTS
 
@@ -50,25 +81,20 @@ class ISMctsUCB1Agent(SearchAgent, SimplePartialAgent):
     **Best Action:** Most Visited
     """
 
-    def __init__(self, iterations: int = 100, cheat: bool = False):
-        super().__init__()
-        self._ismcts = None
-        self.cheat = cheat
-        self.iterations = iterations
-
-    def info(self):
-        return "{s.name}[iterations: {s.iterations}, cheat: {s.cheat}]".format(s=self)
-
-    def start_game(self):
-        self._ismcts = InformationSetMCTS()
-
-    def search(self, start_state: TichuState) -> TichuAction:
-        action = self._ismcts.search(start_state, observer_id=self.position, iterations=self.iterations,
-                                     cheat=self.cheat)
-        return action
+    def init_montecarlo_search(self):
+        return InformationSetMCTS()
 
 
-class ISMctsEpicAgent(SearchAgent, SimplePartialAgent):
+class ISMctsUCB1Agent_old_evalAgent(MonteCarloAgent):
+    """
+    Same as ISMctsUCB1Agent but uses the absolute points as the reward of states.
+    """
+
+    def init_montecarlo_search(self):
+        return InformationSetMCTS_old_evaluation()
+
+
+class ISMctsEpicAgent(MonteCarloAgent):
     """
     **Type:** Episodic MCTS
 
@@ -79,25 +105,11 @@ class ISMctsEpicAgent(SearchAgent, SimplePartialAgent):
     **Best Action:** Most Visited
     """
 
-    def __init__(self, iterations: int = 100, cheat: bool = False):
-        super().__init__()
-        self._epicmcts = None
-        self.cheat = cheat
-        self.iterations = iterations
-
-    def info(self):
-        return "{s.name}[iterations: {s.iterations}, cheat: {s.cheat}]".format(s=self)
-
-    def start_game(self):
-        self._epicmcts = EpicISMCTS()
-
-    def search(self, start_state: TichuState) -> TichuAction:
-        action = self._epicmcts.search(start_state, observer_id=self.position, iterations=self.iterations,
-                                       cheat=self.cheat)
-        return action
+    def init_montecarlo_search(self):
+        return EpicISMCTS()
 
 
-class ISMctsLGRAgent(SearchAgent, SimplePartialAgent):
+class ISMctsLGRAgent(MonteCarloAgent):
     """
     **Type:** Information Set MCTS
     
@@ -109,24 +121,27 @@ class ISMctsLGRAgent(SearchAgent, SimplePartialAgent):
     """
 
     def __init__(self, iterations: int = 100, cheat: bool = False, forgetting: bool=True):
-        super().__init__()
-        self._mc_search = None
-        self.cheat = cheat
-        self.iterations = iterations
+        super().__init__(iterations=iterations, cheat=cheat)
         self.forgetting = forgetting
 
     def info(self):
         return "{s.name}[iterations: {s.iterations}, cheat: {s.cheat}, forgetting: {s.forgetting}]".format(s=self)
 
-    def start_game(self):
-        self._mc_search = ISMctsLGR(forgetting=self.forgetting)
-
-    def search(self, start_state: TichuState) -> TichuAction:
-        action = self._mc_search.search(start_state, observer_id=self.position, iterations=self.iterations, cheat=self.cheat)
-        return action
+    def init_montecarlo_search(self):
+        return ISMctsLGR(forgetting=self.forgetting)
 
 
 class ISMctsEpicLGRAgent(ISMctsLGRAgent):
+    """
+    **Type:** Information Set MCTS
+    
+    **Selection:** Epic
+    
+    **Simulation:** LastGoodResponse (Moves of winning player gets stored and chosen in next rollout if applicable)
+    
+    **Best Action:** Most Visited
+    """
 
-    def start_game(self):
-        self._mc_search = ISMctsEpigLGR(forgetting=self.forgetting)
+    def init_montecarlo_search(self):
+        return ISMctsEpigLGR(forgetting=self.forgetting)
+

@@ -214,7 +214,6 @@ class TichuState(GameState, namedtuple("S", [
         next_player_pos = self.next_player_turn()
         if Card.DOG in comb:
             next_player_pos = next((ppos % 4 for ppos in range(self.player_id+2, self.player_id+3+2) if len(self.hand_cards[ppos % 4]) > 0))
-            assert next_player_pos is not None
             assert self.trick_on_table.is_empty()
             new_trick_on_table = Trick()  # dog is removed instantly
 

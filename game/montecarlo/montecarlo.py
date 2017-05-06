@@ -210,7 +210,6 @@ class InformationSetMCTS(object):
         # store record for backpropagation
         rec = self.graph.node[nid]['record']
         self._visited_records.add(rec)
-        self._available_records.add(rec)
 
         # find max (return uniformly at random from max UCB1 value)
         poss_actions = set(state.possible_actions())
@@ -252,7 +251,10 @@ class InformationSetMCTS(object):
         """
         points = state.count_points()
         assert points[0] == points[2] and points[1] == points[3]
-        return points
+        # reward is the difference to the enemy team
+        r0 = points[0] - points[1]
+        r1 = r0 * -1
+        return (r0, r1, r0, r1)
 
     def backpropagation(self, reward_vector: RewardVector)->None:
         """
@@ -293,7 +295,7 @@ class InformationSetMCTS(object):
         for _, to_nid, action in self.graph.out_edges_iter(nid, data='action', default=None):
             if action in possactions:
                 rec = self.graph.node[to_nid]['record']
-                val = rec.total_reward[state.player_id] / rec.visit_count if rec.visit_count > 0 else 0
+                val = rec.ucb[state.player_id]
                 logging.debug(f"   {val}->{action}: {rec}")
                 if val > max_v:
                     max_v = val
@@ -314,6 +316,17 @@ class InformationSetMCTS(object):
         nx.draw_networkx_edge_labels(G, graph_pos, edge_labels=edge_labels, font_size=3)
 
         plt.savefig(outfilename)
+
+
+class InformationSetMCTS_old_evaluation(InformationSetMCTS):
+    """
+    Same as InformationSetMCTS, but the evaluation uses the absolute points instead of the difference.
+    """
+
+    def evaluate_state(self, state: TichuState) -> RewardVector:
+        points = state.count_points()
+        assert points[0] == points[2] and points[1] == points[3]
+        return points
 
 
 class EpicISMCTS(InformationSetMCTS):
