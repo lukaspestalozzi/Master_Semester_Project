@@ -2,7 +2,7 @@
 import abc
 from collections import namedtuple, Generator
 
-from .cards import Combination, DOG, Trick, CardRank
+from .cards import Combination, DOG_COMBINATION, Trick, CardRank
 
 CardTrade = namedtuple('CardTrade', ['from_', 'to', 'card'])
 
@@ -36,7 +36,7 @@ class PlayFirst(PlayCombination):
 class PlayDog(PlayFirst):
 
     def __init__(self, player_pos: int):
-        super().__init__(player_pos=player_pos, combination=DOG)
+        super().__init__(player_pos=player_pos, combination=DOG_COMBINATION)
 
 
 class PlayBomb(PlayCombination):
@@ -118,6 +118,7 @@ def all_wish_actions_gen(player_pos: int)->Generator:
     :param player_pos: 
     :return: Generator yielding all wish actions with the given player id
     """
+    from .cards import CardRank
     yield WishAction(player_pos=player_pos, wish=None)
     for rank in (CardRank.TWO, CardRank.THREE, CardRank.FOUR, CardRank.FIVE, CardRank.SIX,
                  CardRank.SEVEN, CardRank.EIGHT, CardRank.NINE, CardRank.TEN, CardRank.J,

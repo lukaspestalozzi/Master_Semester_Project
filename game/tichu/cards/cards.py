@@ -106,7 +106,7 @@ class ImmutableCards(collectionsabc.Collection):
         """
         :return: a set of partitions of the cards
         """
-        from tichu.cards.partition import Partition
+        from .partition import Partition
         # TODO test
         # remove PHOENIX
         no_phoenix_cards = [c for c in self._cards if c is not Card.PHOENIX]

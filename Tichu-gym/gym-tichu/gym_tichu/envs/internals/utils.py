@@ -189,7 +189,7 @@ class TypedFrozenCollection(collectionsabc.Collection, metaclass=abc.ABCMeta):
 
     def __init__(self, sequence=()):
         super().__init__()
-        if len(sequence) > 0:
+        with ignored(StopIteration):
             dtype = type(next(iter(sequence)))
             if not all((isinstance(e, dtype) for e in sequence)):
                 raise TypeError("All elements must be of the same type, but were not: {}".format(

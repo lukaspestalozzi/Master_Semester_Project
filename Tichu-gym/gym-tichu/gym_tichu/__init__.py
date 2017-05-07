@@ -6,10 +6,3 @@ register(
     reward_threshold=200.0,
     nondeterministic=True,
 )
-
-"""
-register(
-    id='foo-extrahard-v0',
-    entry_point='gym_foo.envs:FooExtraHardEnv',
-)
-"""

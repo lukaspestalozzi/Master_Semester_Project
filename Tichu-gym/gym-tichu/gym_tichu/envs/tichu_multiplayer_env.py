@@ -43,11 +43,11 @@ def default_give_dragon_away_strategy(state: TichuState, player: int) -> int:
 class TichuMultiplayerEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, trading_strategies: Collection[Callable[[TichuState, int], Tuple[Card, Card, Card]]],
-                 wish_strategies: Collection[Callable[[TichuState, int], CardRank]],
-                 announce_tichu_strategies: Collection[Callable[[TichuState, Set[int], int], bool]],
-                 announce_grand_tichu_strategies: Collection[Callable[[TichuState, Set[int], int], bool]],
-                 give_dragon_away_strategies: Collection[Callable[[TichuState, int], int]],
+    def __init__(self, trading_strategies: Collection[Callable[[TichuState, int], Tuple[Card, Card, Card]]]=(None, None, None, None),
+                 wish_strategies: Collection[Callable[[TichuState, int], CardRank]]=(None, None, None, None),
+                 announce_tichu_strategies: Collection[Callable[[TichuState, Set[int], int], bool]]=(None, None, None, None),
+                 announce_grand_tichu_strategies: Collection[Callable[[TichuState, Set[int], int], bool]]=(None, None, None, None),
+                 give_dragon_away_strategies: Collection[Callable[[TichuState, int], int]]=(None, None, None, None),
                  illegal_move_mode: str='raise'):
         """
         :param trading_strategies: 
@@ -57,7 +57,8 @@ class TichuMultiplayerEnv(gym.Env):
         :param illegal_move_mode: 'raise' or 'loose'. If 'raise' an exception is raised, 'loose' and the team looses 200:0
         """
         assert illegal_move_mode in ['raise'], 'loose is not yet implemented'  # ['raise', 'loose']
-        assert all((len(s) == 4 for s in [trading_strategies, wish_strategies, announce_tichu_strategies, announce_grand_tichu_strategies]))
+
+        super().__init__()
 
         # Strategies
         self._trading_strategies = tuple([(ts if ts else default_trading_strategy) for ts in trading_strategies])
@@ -66,7 +67,13 @@ class TichuMultiplayerEnv(gym.Env):
         self._announce_grand_tichu_strategies = tuple([(agts if agts else default_announce_grand_tichu_strategy) for agts in announce_grand_tichu_strategies])
         self._give_dragon_away_strategies = tuple([drs if drs else default_give_dragon_away_strategy for drs in give_dragon_away_strategies])
 
-        self._current_state: TichuState = None
+        assert len(self._trading_strategies) == 4
+        assert len(self._wish_strategies) == 4
+        assert len(self._announce_tichu_strategies) == 4
+        assert len(self._announce_grand_tichu_strategies) == 4
+        assert len(self._give_dragon_away_strategies) == 4
+
+        self._current_state = None
         self._reset()
 
     def _setup_initial_state(self)->Tuple[TichuState, TichuState, TichuState, TichuState, TichuState, TichuState]:
@@ -104,7 +111,7 @@ class TichuMultiplayerEnv(gym.Env):
             tc = strategy(state=s_before_trading, player=ppos)
             # some checks
             assert len(set(tc)) == len(tc)  # cant trade the same card twice
-            assert all(s_14cards.has_cards(player=ppos, card=c) for c in tc)  # player must have the card
+            assert s_14cards.has_cards(player=ppos, cards=tc)  # player must have the card
 
             traded_cards.append(CardTrade(from_=ppos, to=(ppos-1)%4, card=tc[0]))
             traded_cards.append(CardTrade(from_=ppos, to=(ppos + 2) % 4, card=tc[1]))
@@ -144,10 +151,11 @@ class TichuMultiplayerEnv(gym.Env):
 
         return state, reward, state.is_terminal(), {'state': state, 'next_player': state.player}
 
-    def _reset(self):
+    def _reset(self)->TichuState:
         # Initialise initial state (includes distributing cards, grand tichus and trading cards)
         states = self._setup_initial_state()
         self._current_state = states[-1]
+        return self._current_state
 
     def _render(self, mode='human', close=False):
-        self._current_state.render()
+        print("RENDER: ", self._current_state)

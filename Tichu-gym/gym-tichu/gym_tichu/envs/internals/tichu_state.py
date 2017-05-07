@@ -135,7 +135,7 @@ class History(object):
         """
         return self._wished
 
-    def new_state_action(self, state: TichuState, action: PlayerAction)->'History':
+    def new_state_action(self, state: 'TichuState', action: PlayerAction)->'History':
         assert isinstance(state, TichuState)
         assert isinstance(action, PlayerAction)
         assert state not in self._state_to_action
@@ -156,6 +156,9 @@ class TichuState(namedtuple("TichuState", [
             "announced_grand_tichu",
             "history"
         ])):
+
+    def __new__(cls, *args, allow_tichu=True, **kwargs):
+        return super().__new__(cls, *args, **kwargs)
 
     def __init__(self, player_pos: int, handcards: HandCards, won_tricks: WonTricks,
                  trick_on_table: Trick, wish: Optional[CardRank], ranking: tuple,
@@ -228,6 +231,19 @@ class TichuState(namedtuple("TichuState", [
                 allow_tichu=allow_tichu
         )
 
+    def distribute_14_cards(self)->'TichuState':
+        """
+        Distributes the remaining cards. 
+        :return: 
+        :raises: ValueError when not all players have exactly 8 cards. And won_tricks is not empty.
+        """
+        remaining_cards = set(Deck(full=True)) - set(self.handcards.iter_all_cards())
+        piles = Deck(full=False, cards=remaining_cards).split(nbr_piles=4, random_=True)
+        assert len(piles) == 4
+        assert all(len(p) == 6 for p in piles), str(piles)
+        new_handcards = HandCards(*[itertools.chain(crds, piles[k]) for k, crds in enumerate(self.handcards)])
+        return self.change(handcards=new_handcards)
+
     @property
     def _current_player_handcards(self) -> CardSet:
         return self.handcards[self.player_pos]
@@ -238,7 +254,7 @@ class TichuState(namedtuple("TichuState", [
             self._possible_actions_set = frozenset(self.possible_actions())
         return self._possible_actions_set
 
-    def possible_actions(self)->Generator[PlayerAction]:
+    def possible_actions(self)->Generator[PlayerAction, None, None]:
         """
         :return: Generator yielding all possible actions in this state
         """
@@ -252,7 +268,7 @@ class TichuState(namedtuple("TichuState", [
                 return  # player has to decide whether to announce a tichu or not
 
         # wish?
-        if (not self.history.wished()) and Card.MAHJONG in self.trick_on_table.last_combination:
+        if (not self.history.wished()) and (not self.trick_on_table.is_empty()) and Card.MAHJONG in self.trick_on_table.last_combination:
             # Note that self.player_pos is not equal to the wishing player pos.
             yield all_wish_actions_gen(self.trick_on_table.last_combination_action.player_pos)
             return  # Player must wish something, no other actions allowed
@@ -454,19 +470,6 @@ class TichuState(namedtuple("TichuState", [
         else:
             return self.change(announced_tichu=self.announced_tichu.union(player_positions))
 
-    def distribute_14_cards(self)->'TichuState':
-        """
-        Distributes the remaining cards. 
-        :return: 
-        :raises: ValueError when not all players have exactly 8 cards. And won_tricks is not empty.
-        """
-        remaining_cards = set(Deck(full=True)) - set(self.handcards.iter_all_cards())
-        piles = Deck(cards=remaining_cards).split(nbr_piles=4, random_=True)
-        assert len(piles) == 4
-        assert all(len(p) == 5 for p in piles)
-        new_handcards = HandCards(*[itertools.chain(crds, piles[k]) for k, crds in enumerate(self.handcards)])
-        return self.change(handcards=new_handcards)
-
     def trade_cards(self, trades: Collection[CardTrade])->'TichuState':
         """
         
@@ -555,5 +558,16 @@ class TichuState(namedtuple("TichuState", [
         return tuple(points)
 
     def __str__(self):
-        # TODO
-        raise NotImplementedError()
+        return (
+        """
+        player: {me.player_pos}
+        handcards: {me.handcards}
+        won tricks: {me.won_tricks}
+        trick on table: {me.trick_on_table}
+        wish: {me.wish}
+        ranking: {me.ranking}
+        tichus: {me.announced_tichu}
+        grand tichus: {me.announced_grand_tichu}
+        history: {me.history}
+        """).format(me=self)
+

@@ -7,15 +7,16 @@ import random as rnd
 import logging
 
 from .utils import check_true, check_param, check_isinstance, check_all_isinstance, ignored, TypedFrozenSet, TypedTuple, indent
-from .actions import PlayerAction, PlayCombination
+
 
 __author__ = 'Lukas Pestalozzi'
 
 __all__ = ('CardRank', 'CardSuit', 'Card',
            'CardSet', 'Deck',
-           'Combination', 'Single', 'DOG', 'DRAGON',
+           'Combination', 'Single', 'DOG_COMBINATION', 'DRAGON_COMBINATION',
            'Pair', 'Trio', 'FullHouse', 'PairSteps', 'Straight',
            'SquareBomb', 'StraightBomb', 'Trick')
+
 
 # ######################### CARD #########################
 
@@ -283,8 +284,7 @@ class Card(ComparableEnum):
     K_PAGODA = (CardRank.K, CardSuit.PAGODA, 54)
     A_PAGODA = (CardRank.A, CardSuit.PAGODA, 55)
 
-    def __init__(self, val_tuple: tuple):
-        cardrank, cardsuit, number = val_tuple
+    def __init__(self, cardrank: CardRank, cardsuit: CardSuit, number: int):
         self._suit = cardsuit
         self._cardrank = cardrank
         self._nbr = number
@@ -361,7 +361,7 @@ class CardSet(TypedFrozenSet):
         if self._rank_dict is None:
             temp_dict = defaultdict(lambda: [])
             for c in self:
-                temp_dict[c.card_value].append(c)
+                temp_dict[c.card_rank].append(c)
                 self._rank_dict = {k: tuple(v) for k, v in temp_dict.items()}
 
         return dict(self._rank_dict)
@@ -384,7 +384,7 @@ class CardSet(TypedFrozenSet):
         :param n: int > 0
         :return: n random cards.
         """
-        cds = list(self._cards)
+        cds = list(self)
         rnd.shuffle(cds)
         return cds[:n]
 
@@ -392,7 +392,7 @@ class CardSet(TypedFrozenSet):
         return rank in self.rank_dict()
 
     # Combinations methods
-    def possible_combinations(self, played_on: Optional[Combination]=None, contains_rank: Optional[CardRank]=None):
+    def possible_combinations(self, played_on: Optional['Combination']=None, contains_rank: Optional[CardRank]=None):
         assert played_on is None or isinstance(played_on, Combination)
         assert contains_rank is None or isinstance(contains_rank, CardRank)
 
@@ -442,7 +442,7 @@ class CardSet(TypedFrozenSet):
                 # all higher straights
                 yield from self.straights(played_on=played_on, contains_rank=contains_rank)
 
-    def singles(self, played_on: Optional[Single]=None, contains_rank: Optional[CardRank]=None):
+    def singles(self, played_on: Optional['Single']=None, contains_rank: Optional[CardRank]=None):
         # TODO handle presence of streetbomb
         # TODO cache
         if not isinstance(played_on, Single):
@@ -467,7 +467,7 @@ class CardSet(TypedFrozenSet):
             # All singles
             yield from (Single(crds[0]) for crds in rank_dict.values())
 
-    def pairs(self, played_on: Optional[Pair]=None, contains_rank: Optional[CardRank]=None):
+    def pairs(self, played_on: Optional['Pair']=None, contains_rank: Optional[CardRank]=None):
         # TODO handle presence of streetbomb
         # TODO cache
         if not isinstance(played_on, Pair):
@@ -488,7 +488,7 @@ class CardSet(TypedFrozenSet):
                 if pair.can_be_played_on(played_on):
                     yield pair
 
-    def trios(self, played_on: Optional[Trio]=None, contains_rank: Optional[CardRank]=None):
+    def trios(self, played_on: Optional['Trio']=None, contains_rank: Optional[CardRank]=None):
         # TODO handle presence of streetbomb
         # TODO cache
         if not isinstance(played_on, Trio):
@@ -511,7 +511,7 @@ class CardSet(TypedFrozenSet):
                 if trio.can_be_played_on(played_on):
                     yield trio
 
-    def squarebombs(self, played_on: Optional[Combination]=None, contains_rank: Optional[CardRank]=None):
+    def squarebombs(self, played_on: Optional['Combination']=None, contains_rank: Optional[CardRank]=None):
         # TODO cache
         if isinstance(played_on, StraightBomb):
             return  # Nothing to do here
@@ -526,7 +526,7 @@ class CardSet(TypedFrozenSet):
                 if sq.can_be_played_on(played_on):
                     yield sq
 
-    def straightbombs(self, played_on: Optional[Combination]=None, contains_rank: Optional[CardRank]=None):
+    def straightbombs(self, played_on: Optional['Combination']=None, contains_rank: Optional[CardRank]=None):
         # TODO cache suitdict
         # TODO cache
         # group by card suit
@@ -542,11 +542,11 @@ class CardSet(TypedFrozenSet):
                     if sbomb.can_be_played_on(played_on):
                         yield sbomb
 
-    def all_bombs(self, played_on: Optional[Combination]=None, contains_rank: Optional[CardRank]=None):
+    def all_bombs(self, played_on: Optional['Combination']=None, contains_rank: Optional[CardRank]=None):
         return itertools.chain(self.squarebombs(played_on=played_on, contains_rank=contains_rank),
                                self.straightbombs(played_on=played_on, contains_rank=contains_rank))
 
-    def straights(self, played_on: Optional[Straight] = None, contains_rank: Optional[CardRank] = None):
+    def straights(self, played_on: Optional['Straight'] = None, contains_rank: Optional[CardRank] = None):
         # TODO handle presence of streetbomb
         # TODO cache
         # TODO exploit played_on and contains_rank more
@@ -615,7 +615,7 @@ class CardSet(TypedFrozenSet):
             # neither played_on nor contains rank
             yield from streets_gen
 
-    def fullhouses(self, played_on: Optional[FullHouse] = None, contains_rank: Optional[CardRank] = None):
+    def fullhouses(self, played_on: Optional['FullHouse'] = None, contains_rank: Optional[CardRank] = None):
         if not isinstance(played_on, FullHouse):
             return  # Nothing to do here
 
@@ -636,7 +636,7 @@ class CardSet(TypedFrozenSet):
                         fh = FullHouse(pair=p, trio=t)
                         yield fh
 
-    def pairsteps(self, played_on: Optional[PairSteps] = None, contains_rank: Optional[CardRank] = None):
+    def pairsteps(self, played_on: Optional['PairSteps'] = None, contains_rank: Optional[CardRank] = None):
         if not isinstance(played_on, PairSteps) or len(self) < 4:
             return  # Nothing to do here
 
@@ -737,7 +737,7 @@ class _ConsecutiveCards(object):
         fill_card = self._card_rank_to_sword_card[lower.max + 1]
         return _ConsecutiveCards(itertools.chain(lower, [Card.PHOENIX], upper), phoenix_as=fill_card)
 
-    def make_straights(self, phoenix: bool)->Generator[Straight]:
+    def make_straights(self, phoenix: bool)->Generator['Straight', None, None]:
         """
         
         :param phoenix: if the phoenix should be used or not
@@ -821,7 +821,7 @@ class Deck(list):
             cards_to_add = set(cards)
 
         super().__init__(cards_to_add)
-        assert len(self) == set(cards_to_add)
+        assert len(self) == len(cards_to_add)
 
     def split(self, nbr_piles=4, random_=True)->List[List[Card]]:
         """
@@ -1305,20 +1305,20 @@ class StraightBomb(Bomb):
 
 class Trick(TypedTuple):
 
-    def __init__(self, actions: Sequence[PlayerAction]=()):
-        check_all_isinstance(actions, PlayerAction)
+    def __init__(self, actions: Sequence['PlayerAction']=()):
+        check_all_isinstance(actions, 'PlayerAction')
         super().__init__(actions)
         self._last_combination_action = 'NotInitialized'  # cache
 
     @property
-    def last_combination(self)->Optional[Combination]:
+    def last_combination(self)->Optional['Combination']:
         try:
             return self.last_combination_action.combination
         except AttributeError:
             return None
 
     @property
-    def last_combination_action(self)->Optional[PlayCombination]:
+    def last_combination_action(self)->Optional['PlayCombination']:
         if self._last_combination_action == 'NotInitialized':
             try:
                 self._last_combination_action = next((a for a in reversed(self) if isinstance(a, PlayCombination)))
@@ -1350,7 +1350,7 @@ class Trick(TypedTuple):
     def is_finished(self)->bool:
         return False
 
-    def finish(self, last_action: Optional[PlayerAction]=None)->'FinishedTrick':
+    def finish(self, last_action: Optional['PlayerAction']=None)->'FinishedTrick':
         """
         A Finished trick raises an Error when trying to add another action to it.
         :param last_action: if not None, then this action is appended to the finished trick and therefore is the last action of this trick
@@ -1368,7 +1368,7 @@ class Trick(TypedTuple):
         else:
             return f"{ind_str}{self.__class__.__name__}[{self[-1].player_pos}]: {' -> '.join([comb.pretty_string() for comb in self])}"
 
-    def __add__(self, action: PlayerAction)->'Trick':
+    def __add__(self, action: 'PlayerAction')->'Trick':
         return Trick(itertools.chain(self, (action,)))
 
     def __str__(self):
