@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Collection, Tuple
+from typing import Callable, Optional, Collection, Tuple, Set
 
 import random
 import gym
@@ -24,7 +24,7 @@ def default_trading_strategy(state: TichuState, player: int) -> Tuple[Card, Card
 
 
 def default_wish_strategy(state: TichuState, player: int) -> CardRank:
-    wish = random.choice(list(all_wish_actions_gen()))
+    wish = random.choice(list(all_wish_actions_gen(player_pos=player)))
     return wish
 
 
@@ -36,13 +36,18 @@ def default_announce_grand_tichu_strategy(*args, **kwargs) -> bool:
     return False
 
 
+def default_give_dragon_away_strategy(state: TichuState, player: int) -> int:
+    return (player + 1) % 4  # give dtagon to player right
+
+
 class TichuMultiplayerEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, trading_strategies: Collection[Callable[[TichuState, int], Tuple[Card, Card, Card]]],
                  wish_strategies: Collection[Callable[[TichuState, int], CardRank]],
-                 announce_tichu_strategies: Collection[Callable[[TichuState, Collection[int], int], bool]],
-                 announce_grand_tichu_strategies: Collection[Callable[[TichuState, Collection[int], int], bool]],
+                 announce_tichu_strategies: Collection[Callable[[TichuState, Set[int], int], bool]],
+                 announce_grand_tichu_strategies: Collection[Callable[[TichuState, Set[int], int], bool]],
+                 give_dragon_away_strategies: Collection[Callable[[TichuState, int], int]],
                  illegal_move_mode: str='raise'):
         """
         :param trading_strategies: 
@@ -59,6 +64,7 @@ class TichuMultiplayerEnv(gym.Env):
         self._wish_strategies = tuple([(ws if ws else default_wish_strategy) for ws in wish_strategies])
         self._announce_tichu_strategies = tuple([(ats if ats else default_announce_tichu_strategy) for ats in announce_tichu_strategies])
         self._announce_grand_tichu_strategies = tuple([(agts if agts else default_announce_grand_tichu_strategy) for agts in announce_grand_tichu_strategies])
+        self._give_dragon_away_strategies = tuple([drs if drs else default_give_dragon_away_strategy for drs in give_dragon_away_strategies])
 
         self._current_state: TichuState = None
         self._reset()
@@ -110,18 +116,30 @@ class TichuMultiplayerEnv(gym.Env):
 
     def _step(self, action: PlayerAction)-> Tuple[TichuState, int, bool, dict]:
         state = self._current_state.next_state(action=action)
-        self._current_state = state
         # handle tichu and wish actions:
-        # TODO if wish action in state.possible_actions then apply wish_strategy
-        # TODO if tichu action in state.possible_actions apply tichu strategy
-        # -> in both cases, don't return but make next state
         # Note: for both tichu and wish action, player_pos is not the same as action.player_pos, it is the pos of the next player
-        #
-        # TODO handle dragon away strategy
-        # TODO also handle when finish action is the only action
+        # TODO assert that all actions are of the same type
 
+        possible_actions_gen = state.possible_actions()
+        action = next(possible_actions_gen)
+        if isinstance(action, TichuAction):
+            if self._announce_tichu_strategies[action.player_pos](state=state, player=action.player_pos):
+                state = state.next_state(TichuAction(player_pos=action.player_pos, announce_tichu=True))
+
+        elif isinstance(action, WishAction):
+            wish = self._wish_strategies[action.player_pos](state=state, player=action.player_pos)
+            state = state.next_state(WishAction(player_pos=action.player_pos, wish=wish))
+
+        elif isinstance(action, GiveDragonAwayAction):
+            to_player = self._give_dragon_away_strategies[action.player_pos](state=state, player=action.player_pos)
+            state = state.next_state(GiveDragonAwayAction(player_from=action.player_pos, player_to=to_player, trick=action.trick))
+
+        elif isinstance(action, WinTrickAction):
+            state = state.next_state(action)
+            # TODO assert that there is no more action in possible_actions_gen
 
         self._current_state = state
+
         reward = state.reward_vector() if state.is_terminal() else (0, 0, 0, 0)
 
         return state, reward, state.is_terminal(), {'state': state, 'next_player': state.player}
@@ -133,5 +151,3 @@ class TichuMultiplayerEnv(gym.Env):
 
     def _render(self, mode='human', close=False):
         self._current_state.render()
-
-

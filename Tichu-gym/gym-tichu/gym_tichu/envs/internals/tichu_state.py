@@ -183,6 +183,8 @@ class TichuState(namedtuple("TichuState", [
         assert isinstance(history, History)
 
         self._allow_tichu = allow_tichu
+        self._possible_actions_set = None
+        self._possible_actions_tuple = None
 
     @classmethod
     def initial(cls):
@@ -230,7 +232,13 @@ class TichuState(namedtuple("TichuState", [
     def _current_player_handcards(self) -> CardSet:
         return self.handcards[self.player_pos]
 
-    def possible_actions(self)->Generator:
+    @property
+    def possible_actions_set(self):
+        if self._possible_actions_set is None:
+            self._possible_actions_set = frozenset(self.possible_actions())
+        return self._possible_actions_set
+
+    def possible_actions(self)->Generator[PlayerAction]:
         """
         :return: Generator yielding all possible actions in this state
         """

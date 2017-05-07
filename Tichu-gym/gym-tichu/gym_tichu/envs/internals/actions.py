@@ -77,10 +77,15 @@ class GiveDragonAwayAction(WinTrickAction):
         assert player_to in range(4)
         super().__init__(player_pos=player_from, trick=trick)
         self._to = player_to
+        self._trick = trick
 
     @property
     def to(self):
         return self._to
+
+    @property
+    def trick(self):
+        return self._trick
 
 
 class WishAction(PlayerAction):

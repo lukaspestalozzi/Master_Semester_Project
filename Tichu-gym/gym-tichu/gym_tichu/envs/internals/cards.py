@@ -1,9 +1,10 @@
 import abc
 from enum import Enum
 from collections import defaultdict
-from typing import Union, Optional, Sequence, Set, Collection, Iterable, List, Tuple, Dict
+from typing import Union, Optional, Sequence, Set, Collection, Iterable, List, Tuple, Dict, Generator
 import itertools
 import random as rnd
+import logging
 
 from .utils import check_true, check_param, check_isinstance, check_all_isinstance, ignored, TypedFrozenSet, TypedTuple, indent
 from .actions import PlayerAction, PlayCombination
@@ -102,15 +103,15 @@ class CardRank(ComparableEnum):
             self._str = str(self.value)
 
     @property
-    def height(self):
+    def height(self)->int:
         return self.value
 
     @property
-    def points(self):
+    def points(self)->int:
         return self._points
 
     @staticmethod
-    def from_name(name):
+    def from_name(name)->'CardRank':
         """
         >>> CardRank.from_name('TWO').name
         'TWO'
@@ -301,6 +302,10 @@ class Card(ComparableEnum):
 
     @property
     def card_rank(self)->CardRank:
+        return self._cardrank
+
+    @property
+    def rank(self) -> CardRank:
         return self._cardrank
 
     @property
@@ -506,7 +511,8 @@ class CardSet(TypedFrozenSet):
                 if trio.can_be_played_on(played_on):
                     yield trio
 
-    def squarebombs(self, played_on: Optional[Trio]=None, contains_rank: Optional[CardRank]=None):
+    def squarebombs(self, played_on: Optional[Combination]=None, contains_rank: Optional[CardRank]=None):
+        # TODO cache
         if isinstance(played_on, StraightBomb):
             return  # Nothing to do here
 
@@ -519,6 +525,269 @@ class CardSet(TypedFrozenSet):
                 sq = SquareBomb(*cards)
                 if sq.can_be_played_on(played_on):
                     yield sq
+
+    def straightbombs(self, played_on: Optional[Combination]=None, contains_rank: Optional[CardRank]=None):
+        # TODO cache suitdict
+        # TODO cache
+        # group by card suit
+        suitdict = defaultdict(lambda: [])
+        for c in self:
+            suitdict[c.suit].append(c)
+
+        # look only at cards of same suit
+        for suit, cards in suitdict.items():
+            if len(cards) >= 5:  # must be at least 5 to be a straight (also excludes special cards)
+                sbombs = (StraightBomb(st) for st in CardSet(cards).straights(contains_rank=contains_rank))
+                for sbomb in sbombs:
+                    if sbomb.can_be_played_on(played_on):
+                        yield sbomb
+
+    def all_bombs(self, played_on: Optional[Combination]=None, contains_rank: Optional[CardRank]=None):
+        return itertools.chain(self.squarebombs(played_on=played_on, contains_rank=contains_rank),
+                               self.straightbombs(played_on=played_on, contains_rank=contains_rank))
+
+    def straights(self, played_on: Optional[Straight] = None, contains_rank: Optional[CardRank] = None):
+        # TODO handle presence of streetbomb
+        # TODO cache
+        # TODO exploit played_on and contains_rank more
+        if not isinstance(played_on, Straight) or len(self) < 5:
+            return  # Nothing to do here
+
+        def make_consecutive_cards(cards: Tuple[Card,...], min_len: int=5, max_len: int=float('inf'))->Generator[_ConsecutiveCards]:
+            last = cards[0]
+            cons_cards = [last]
+            for c in cards[1:]:
+                if c.rank.value -1 == last.rank.value:
+                    # the cards are consecutive
+                    cons_cards.append(c)
+                else:
+                    # cards are NOT consecutive
+                    if min_len <= len(cons_cards) <= max_len:
+                        yield _ConsecutiveCards(cards=cons_cards)
+                    cons_cards = [c]
+                last = c
+            return
+
+        def merge_consecutive_cards_with_phoenix(consecutive_cards: Tuple[_ConsecutiveCards,...], min_len: int=5, max_len: int=float('inf'))->Generator[_ConsecutiveCards]:
+            # yield first consecutive_cards if possible
+            if min_len <= len(consecutive_cards[0]) <= max_len:
+                yield consecutive_cards[0]
+
+            for lower, upper in zip(consecutive_cards, consecutive_cards[1:]):
+                # yield the upper if possible.
+                if min_len <= len(upper) <= max_len:
+                    yield upper
+
+                # merge the two if possible
+                if upper.min - lower.max == 1 and min_len <= len(lower) + len(upper) + 1 <= max_len:
+                    yield lower.merge(upper)
+
+        def make_streets(consecutive_cards: Tuple[_ConsecutiveCards,...], phoenix: bool, min_len: int=5, max_len: int=float('inf'))->Generator[Straight]:
+            for cc in consecutive_cards:
+                if min_len <= len(cc) <= max_len:
+                    yield from cc.make_straights(phoenix=phoenix)
+
+        # sorted and removed duplicated ranks and special cards
+        cleaned_cards = sorted((crds[0] for crds in self.rank_dict().values()))
+        cards_to_remove = {Card.PHOENIX, Card.DRAGON, Card.DOG}
+        cleaned_cards = tuple(c for c in cleaned_cards if c not in cards_to_remove)
+        if played_on:
+            min_length = len(played_on)
+            max_length = len(played_on)
+        else:
+            min_length = 5
+            max_length = float('inf')
+        has_phoenix = Card.PHOENIX in self
+        all_consecutive_cards = tuple(make_consecutive_cards(cleaned_cards, min_len=min_length, max_len=max_length))
+        merged_cc = (tuple(merge_consecutive_cards_with_phoenix(all_consecutive_cards, min_len=min_length, max_len=max_length))
+                     if has_phoenix else all_consecutive_cards)
+        streets_gen = make_streets(merged_cc, phoenix=has_phoenix, min_len=min_length, max_len=max_length)
+
+        # yield the streets
+        if contains_rank and played_on:
+            yield from (street for street in streets_gen if street.contains_cardrank(contains_rank) and street.can_be_played_on(played_on))  # just to be sure
+        elif contains_rank or played_on:
+            if contains_rank:
+                yield from (street for street in streets_gen if street.contains_cardrank(contains_rank))
+            else:
+                yield from (street for street in streets_gen if street.can_be_played_on(played_on))  # just to be sure
+        else:
+            # neither played_on nor contains rank
+            yield from streets_gen
+
+    def fullhouses(self, played_on: Optional[FullHouse] = None, contains_rank: Optional[CardRank] = None):
+        if not isinstance(played_on, FullHouse):
+            return  # Nothing to do here
+
+        trios = list(self.trios(played_on=played_on.trio if played_on else None))
+        pairs = list(self.pairs())
+        if contains_rank:
+            for t in trios:
+                t_contains = t.contains_cardrank(contains_rank)
+                for p in pairs:
+                    if t_contains or p.contains_cardrank(contains_rank):
+                        with ignored(TypeError, ValueError):
+                            fh = FullHouse(pair=p, trio=t)
+                            yield fh
+        else:
+            for t in trios:
+                for p in pairs:
+                    with ignored(TypeError, ValueError):
+                        fh = FullHouse(pair=p, trio=t)
+                        yield fh
+
+    def pairsteps(self, played_on: Optional[PairSteps] = None, contains_rank: Optional[CardRank] = None):
+        if not isinstance(played_on, PairSteps) or len(self) < 4:
+            return  # Nothing to do here
+
+        sorted_pairs = sorted(self.pairs())
+        next_pair_no_ph = defaultdict(lambda: [])
+        next_pair_with_ph = defaultdict(lambda: [])
+        for p in sorted_pairs:
+            if p.contains_phoenix():
+                next_pair_with_ph[p.height-1].append(p)
+            else:
+                next_pair_no_ph[p.height - 1].append(p)
+
+        def gen_from(pair, remlength, ph_used)->Generator[List[Pair]]:
+            if remlength <= 1:
+                yield [pair]
+
+            # continue without phoenix:
+            with ignored(StopIteration, IndexError):
+                for ps in gen_from(next_pair_no_ph[pair.height][0], remlength - 1, ph_used=ph_used):
+                    yield [pair] + ps
+
+            # continue with phoenix:
+            if not ph_used:
+                with ignored(StopIteration, IndexError):
+                    for ps in gen_from(next_pair_with_ph[pair.height][0], remlength - 1, ph_used=True):
+                        yield [pair] + ps
+
+        def gen_all_pairsteps()->Generator[Collection[Pair]]:
+            """ Take all possible starting pairs and generate pairsteps from them """
+            max_height = CardRank.A.value  # there is no possible pairstep starting from As (must have length 2)
+            if contains_rank:
+                max_height = min(max_height, contains_rank.value)  # straight starting from a higher value than contains_val, can not contain that val
+
+            for pair in sorted_pairs:
+                if pair.height <= max_height:
+                    yield from gen_from(pair, 2, ph_used=pair.contains_phoenix())  # all steps starting with the pair
+
+        # make and yield the pairsteps:
+        gen = (PairSteps(pairs) for pairs in gen_all_pairsteps())
+        if contains_rank:
+            yield from (ps for ps in gen if ps.contains_cardrank(contains_rank) and ps.can_be_played_on(played_on))
+        else:
+            yield from (ps for ps in gen if ps.can_be_played_on(played_on))
+
+
+class _ConsecutiveCards(object):
+    _card_rank_to_sword_card = {
+        2: Card.TWO_SWORD,
+        3: Card.THREE_SWORD,
+        4: Card.FOUR_SWORD,
+        5: Card.FIVE_SWORD,
+        6: Card.SIX_SWORD,
+        7: Card.SEVEN_SWORD,
+        8: Card.EIGHT_SWORD,
+        9: Card.NINE_SWORD,
+        10: Card.TEN_SWORD,
+        11: Card.J_SWORD,
+        12: Card.Q_SWORD,
+        13: Card.K_SWORD,
+        14: Card.A_SWORD,
+    }
+
+    def __init__(self, cards: Iterable[Card]=tuple(), phoenix_as: Optional[Card]=None):
+        self._cards: Tuple[Card, ...] = tuple(cards)
+        self._len = len(self._cards)
+        self._max_rank: CardRank = max(c.rank for c in self._cards)
+        self._min_rank: CardRank = min(c.rank for c in self._cards)
+        self._phoenix_as = phoenix_as
+        if phoenix_as:
+            assert self.min < phoenix_as.rank.height < self.max
+            assert Card.PHOENIX in self._cards
+        # TODO assert consecutiveness?
+
+    @property
+    def max(self)->int:
+        return self._max_rank.height
+
+    @property
+    def min(self)->int:
+        return self._min_rank.height
+
+    @property
+    def max_rank(self) -> CardRank:
+        return self._max_rank
+
+    @property
+    def min_rank(self) -> CardRank:
+        return self._min_rank
+
+    def merge(self, other: '_ConsecutiveCards')->'_ConsecutiveCards':
+        """
+        :param other: must have a gap of exactly 1 card to this consecutive cards
+        :return: the two consecutivecards merged with the phoenix in between of them
+        """
+        # TODO assert mergableness?
+        lower, upper = (self, other) if self.max < other.min else (other, self)
+        assert upper.min - lower.max == 1
+        fill_card = self._card_rank_to_sword_card[lower.max + 1]
+        return _ConsecutiveCards(itertools.chain(lower, [Card.PHOENIX], upper), phoenix_as=fill_card)
+
+    def make_straights(self, phoenix: bool)->Generator[Straight]:
+        """
+        
+        :param phoenix: if the phoenix should be used or not
+        :return: generator yielding all different straight that can be made from this ConsecutiveCards
+        """
+        if len(self) < 5:
+            return
+
+        # TODO shortcut if self._len == 5 ant dot phoenix?
+
+        # all without phoenix
+        streets = list()
+        for length in range(5, self._len+1):
+            for start in range(0, self._len - length + 1):
+                st = Straight(self._cards[start:start + length], phoenix_as=self._phoenix_as)
+                assert len(st) == length
+                streets.append(st)
+                yield st
+
+        if phoenix:
+            for street in streets:
+                if not street.contains_phoenix():
+                    cards = list(street.cards)
+                    # replace each card with the Phoenix
+                    before = []
+                    card = cards[0]
+                    after = list(reversed(cards[1:]))
+                    ph_tuple = (Card.PHOENIX,)
+                    logging.debug("{} should be the same as:".format(cards))
+                    while len(before) != len(cards):
+                        yield Straight(itertools.chain(before, ph_tuple, after), phoenix_as=card)
+                        before.append(card)
+                        card = after.pop()
+                        logging.debug("{}".format(card))
+
+                    # add phoenix to the beginning
+                    if not street.cards.contains_cardrank(CardRank.TWO):
+                        yield Straight(itertools.chain(ph_tuple, cards), phoenix_as=Card.TWO_SWORD)
+                    # add phoenix to the end
+                    if not street.cards.contains_cardrank(CardRank.A):
+                        yield Straight(itertools.chain(cards, ph_tuple), phoenix_as=Card.TWO_SWORD)
+
+    def __len__(self):
+        return self._len
+
+    def __contains__(self, item: Card):
+        return self._cards.__contains__(item)
+
+    def __iter__(self):
+        return self._cards.__iter__()
 
 
 # ######################### DECK #########################
@@ -579,7 +848,7 @@ class Deck(list):
 
 class Combination(metaclass=abc.ABCMeta):
 
-    def __init__(self, cards: Iterable):
+    def __init__(self, cards: Iterable[Card]):
         try:
             next(iter(cards))
         except StopIteration:
@@ -588,6 +857,7 @@ class Combination(metaclass=abc.ABCMeta):
         check_all_isinstance(cards, Card)
         self._cards = CardSet(cards)
         check_true(len(self._cards) == len(list(cards)))
+        self._ranks = {c.card_rank for c in self._cards}
 
     @property
     def cards(self)->CardSet:
@@ -682,7 +952,7 @@ class Combination(metaclass=abc.ABCMeta):
         return self.contains_cardrank(wish)
 
     def contains_cardrank(self, cardrank: CardRank)->bool:
-        return cardrank in (c.card_rank for c in self._cards)
+        return cardrank in self._ranks
 
     def is_bomb(self)->bool:
         return False
@@ -928,12 +1198,14 @@ class Straight(Combination):
 
     __slots__ = ("_height", "_ph_as")
 
-    def __init__(self, cards: Collection[Card], phoenix_as: Optional[Card]=None):
+    def __init__(self, cards: Union[Collection[Card], Tuple[Card, ...]], phoenix_as: Optional[Card]=None):
         check_param(len(cards) >= 5)
         if Card.PHOENIX in cards:
             check_isinstance(phoenix_as, Card)
             check_param(phoenix_as not in cards, param=(phoenix_as, cards))
             check_param(phoenix_as.suit is not CardSuit.SPECIAL, param=phoenix_as)
+        else:
+            phoenix_as = None
 
         cards_phoenix_replaced = [c for c in cards if c is not Card.PHOENIX] + [phoenix_as] if phoenix_as else cards
         check_param(len({c.card_value for c in cards_phoenix_replaced}) == len(cards_phoenix_replaced))  # different card values
