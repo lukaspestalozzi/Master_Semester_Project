@@ -1,161 +1,239 @@
-from typing import Callable, Optional, Collection, Tuple, Set
+from typing import Callable, Optional, Collection, Tuple, Set, Any, Iterable, Union
 
 import random
 import gym
-from gym import error, spaces, utils
-from gym.utils import seeding
+import logging
+import itertools
+import numpy as np
+
+from gym import spaces
+from profilehooks import timecall
 
 from .internals import *
+from .internals.error import IllegalActionError, LogicError
 
-
-try:
-   pass
-except ImportError as e:
-    raise error.DependencyNotInstalled("{}. (HINT: you can install the dependencies with 'pip install gym[tichu].)'".format(e))
+logger = logging.getLogger(__name__)
 
 __all__ = ('TichuMultiplayerEnv',)
-
-Tuple4OptionalCallables = Tuple[Optional[Callable], Optional[Callable], Optional[Callable], Optional[Callable]]
-
-
-def default_trading_strategy(state: TichuState, player: int) -> Tuple[Card, Card, Card]:
-    sc = state.handcards[player].random_cards(3)
-    return tuple(sc)
-
-
-def default_wish_strategy(state: TichuState, player: int) -> CardRank:
-    wish = random.choice(list(all_wish_actions_gen(player_pos=player)))
-    return wish
-
-
-def default_announce_tichu_strategy(*args, **kwargs) -> bool:
-    return False
-
-
-def default_announce_grand_tichu_strategy(*args, **kwargs) -> bool:
-    return False
-
-
-def default_give_dragon_away_strategy(state: TichuState, player: int) -> int:
-    return (player + 1) % 4  # give dtagon to player right
 
 
 class TichuMultiplayerEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, trading_strategies: Collection[Callable[[TichuState, int], Tuple[Card, Card, Card]]]=(None, None, None, None),
-                 wish_strategies: Collection[Callable[[TichuState, int], CardRank]]=(None, None, None, None),
-                 announce_tichu_strategies: Collection[Callable[[TichuState, Set[int], int], bool]]=(None, None, None, None),
-                 announce_grand_tichu_strategies: Collection[Callable[[TichuState, Set[int], int], bool]]=(None, None, None, None),
-                 give_dragon_away_strategies: Collection[Callable[[TichuState, int], int]]=(None, None, None, None),
-                 illegal_move_mode: str='raise'):
+    def __init__(self, illegal_move_mode: str='raise', verbose: bool=True):
         """
-        :param trading_strategies: 
-        :param wish_strategies: 
-        :param announce_tichu_strategies: 
-        :param announce_grand_tichu_strategies: 
         :param illegal_move_mode: 'raise' or 'loose'. If 'raise' an exception is raised, 'loose' and the team looses 200:0
+        :param verbose: if True, logs to the info log, if false, logs to the debug log
         """
-        assert illegal_move_mode in ['raise'], 'loose is not yet implemented'  # ['raise', 'loose']
+        assert illegal_move_mode in ['raise'], "'loose' is not yet implemented"  # ['raise', 'loose']
 
         super().__init__()
 
-        # Strategies
-        self._trading_strategies = tuple([(ts if ts else default_trading_strategy) for ts in trading_strategies])
-        self._wish_strategies = tuple([(ws if ws else default_wish_strategy) for ws in wish_strategies])
-        self._announce_tichu_strategies = tuple([(ats if ats else default_announce_tichu_strategy) for ats in announce_tichu_strategies])
-        self._announce_grand_tichu_strategies = tuple([(agts if agts else default_announce_grand_tichu_strategy) for agts in announce_grand_tichu_strategies])
-        self._give_dragon_away_strategies = tuple([drs if drs else default_give_dragon_away_strategy for drs in give_dragon_away_strategies])
-
-        assert len(self._trading_strategies) == 4
-        assert len(self._wish_strategies) == 4
-        assert len(self._announce_tichu_strategies) == 4
-        assert len(self._announce_grand_tichu_strategies) == 4
-        assert len(self._give_dragon_away_strategies) == 4
-
         self._current_state = None
+        self.verbose = verbose
         self._reset()
 
-    def _setup_initial_state(self)->Tuple[TichuState, TichuState, TichuState, TichuState, TichuState, TichuState]:
-        """
-        
-        :return: tuple of the following states (in this order): 
-        - initial (without any cards)
-        - when all players got 8 cards
-        - after all players decided to announce grand tichu (or not)
-        - after all players got 14 cards
-        - after all players decided to announce tichu (or not)
-        - after all players traded their 3 cards. This is then the initial state and the player with the mahjong can play next.
-        """
-        s_initial = TichuState.initial()
-        s_8cards = TichuState.distributed_8_cards()
-        # grand tichu
-        announced_gt = set()
-        for ppos, strategy in enumerate(self._announce_grand_tichu_strategies):
-            if strategy(state=s_8cards, already_announced=set(announced_gt), player=ppos):
-                announced_gt.add(ppos)
-        s_after_gt = s_8cards.announce_grand_tichus(player_positions=announced_gt)
-        # distribute remaining cards
-        s_14cards = s_after_gt.distribute_14_cards()
+    def _step(self, action: Any)-> Tuple[TichuState, int, bool, dict]:
+        logger.debug("_step with action {}".format(action))
 
-        # players may announce tichu now
-        announced_t = set()
-        for ppos, strategy in enumerate(self._announce_tichu_strategies):
-            if ppos not in announced_gt and strategy(state=s_14cards, already_announced=set(announced_t), player=ppos):
-                announced_t.add(ppos)
-        s_before_trading = s_14cards.announce_tichus(player_positions=announced_t)
-
-        # trade cards
-        traded_cards = list()
-        for ppos, strategy in enumerate(self._trading_strategies):
-            tc = strategy(state=s_before_trading, player=ppos)
-            # some checks
-            assert len(set(tc)) == len(tc)  # cant trade the same card twice
-            assert s_14cards.has_cards(player=ppos, cards=tc)  # player must have the card
-
-            traded_cards.append(CardTrade(from_=ppos, to=(ppos-1)%4, card=tc[0]))
-            traded_cards.append(CardTrade(from_=ppos, to=(ppos + 2) % 4, card=tc[1]))
-            traded_cards.append(CardTrade(from_=ppos, to=(ppos + 1) % 4, card=tc[2]))
-
-        s_traded = s_before_trading.trade_cards(trades=traded_cards)
-
-        return (s_initial, s_8cards, s_after_gt, s_14cards, s_before_trading, s_traded)
-
-    def _step(self, action: PlayerAction)-> Tuple[TichuState, int, bool, dict]:
-        state = self._current_state.next_state(action=action)
-        # handle tichu and wish actions:
-        # Note: for both tichu and wish action, player_pos is not the same as action.player_pos, it is the pos of the next player
-        # TODO assert that all actions are of the same type
-
-        possible_actions_gen = state.possible_actions()
-        action = next(possible_actions_gen)
-        if isinstance(action, TichuAction):
-            if self._announce_tichu_strategies[action.player_pos](state=state, player=action.player_pos):
-                state = state.next_state(TichuAction(player_pos=action.player_pos, announce_tichu=True))
-
-        elif isinstance(action, WishAction):
-            wish = self._wish_strategies[action.player_pos](state=state, player=action.player_pos)
-            state = state.next_state(WishAction(player_pos=action.player_pos, wish=wish))
-
-        elif isinstance(action, GiveDragonAwayAction):
-            to_player = self._give_dragon_away_strategies[action.player_pos](state=state, player=action.player_pos)
-            state = state.next_state(GiveDragonAwayAction(player_from=action.player_pos, player_to=to_player, trick=action.trick))
-
-        elif isinstance(action, WinTrickAction):
-            state = state.next_state(action)
-            # TODO assert that there is no more action in possible_actions_gen
-
+        state = self._current_state.next_state(action)
         self._current_state = state
 
-        reward = state.reward_vector() if state.is_terminal() else (0, 0, 0, 0)
+        done = state.is_terminal()
+        points = state.count_points() if done else (0, 0, 0, 0)
+        if done:
+            state = state.change(history=state.history.add_last_state(state))
+        return state, points, done, dict()  # state, reward, done, info
 
-        return state, reward, state.is_terminal(), {'state': state, 'next_player': state.player}
-
-    def _reset(self)->TichuState:
-        # Initialise initial state (includes distributing cards, grand tichus and trading cards)
-        states = self._setup_initial_state()
-        self._current_state = states[-1]
+    def _reset(self)->InitialState:
+        self._current_state = InitialState()
         return self._current_state
 
     def _render(self, mode='human', close=False):
-        print("RENDER: ", self._current_state)
+        # print("RENDER: ", self._current_state)
+        pass
+
+    def _log(self, message, *args, **kwargs):
+        if self.verbose:
+            logger.info(message, *args, **kwargs)
+        else:
+            logger.debug(message, *args, **kwargs)
+
+
+class TichuSinglePlayerAgainstRandomEnv(gym.Env):
+    metadata = {'render.modes': ['human']}
+
+    def __init__(self, illegal_move_mode: str='loose', verbose: bool=True):
+        """
+        :param illegal_move_mode: 'raise' or 'loose'. If 'raise' an exception is raised, 'loose' and the team looses 200:0
+        :param verbose: if True, logs to the info log, if false, logs to the debug log
+        """
+        assert illegal_move_mode in ['loose'], "'raise' is not yet implemented"  # ['raise', 'loose']
+
+        super().__init__()
+
+        self._general_combinations = list(all_general_combinations_gen())
+        self.action_space = spaces.Discrete(len(self._general_combinations)+1)  # +1 because there is also the Pass action
+        self.nbr_to_gcomb = {idx: gcomb for idx, gcomb in enumerate(self._general_combinations)}
+        self.gcomb_to_nbr = {v: k for k, v in self.nbr_to_gcomb.items()}
+        self.pass_action = PassAction(0)
+        self.pass_action_nbr = len(self._general_combinations)
+        logging.debug("self.pass_action_nbr: {}".format(self.pass_action_nbr))
+
+        self.observation_space = spaces.MultiBinary(56*5+258)
+
+        self.nbr_action = {self.pass_action_nbr: self.pass_action}  # dictionary used to keep directly track of nbrs -> actual actions. This dict changes during the game
+
+        self._current_state = None
+        self.verbose = verbose
+        self._reset()
+
+    @timecall(immediate=False)
+    def _step(self, action: Union[int, PlayerAction])-> Tuple[Any, int, bool, dict]:
+        try:
+            # logger.debug("State: {}".format(self._current_state))
+            # logger.debug(" Action {} ({})".format(action, action.__class__))
+            # logger.debug("nbr->action dict: {}".format(self.nbr_action))
+            #
+            # poss_actions_encoding = list(self.encode_state(self._current_state)[1])
+            # legal_int_actions = [idx for idx, a in enumerate(poss_actions_encoding) if a]
+            # logger.debug("Legal actions: {}".format(legal_int_actions))
+
+            action = self.nbr_action[int(action)]
+            # logger.debug(" -> {}".format(action))
+        except ValueError:
+            logger.debug("Action is not an int: {}".format(action))
+            pass  # action is not an int, so it must be a PlayerAction
+        except KeyError:
+            logger.debug("Action was not in the nbr_action dict (probably illegal action): {}".format(action))
+            pass  # Action was not in the nbr_action dict (probably illegal action), lets see what happens...
+
+        try:
+            self._current_state = self._current_state.next_state(action)
+            # logger.debug("Legal Action! {}".format(action))
+        except IllegalActionError:
+            logger.debug("Illegal Action! {}, legal are: {}".format(action, [idx for idx, a in enumerate(list(self.encode_state(self._current_state)[1])) if a]))
+            return self.encode_state(self._current_state), -500, True, {'illegalAction': action}
+
+        state = self._forward_to_player()
+        self._current_state = state
+
+        done = state.is_terminal()
+        assert done or state.player_pos == 0
+        if done:
+            logger.debug("TichuSinglePlayerAgainstRandomEnv, Final State: {}".format(state))
+
+        reward = state.count_points()[0] if done else 0
+        return self.encode_state(state), reward, done, {'state': state}  # state, reward, done, info
+
+    def _reset(self)->TichuState:
+        self._current_state = InitialState().announce_grand_tichus([]).announce_tichus([]).trade_cards(trades=list())
+        self._current_state = self._forward_to_player()
+        # logger.debug("Done Resetting")
+        return self.encode_state(self._current_state)
+
+    def _forward_to_player(self)->TichuState:
+        """
+        
+        :return: The next state in which the player 0 can play a Combiantion.
+        """
+        # logger.debug("Forwarding to player 0")
+        state = self._current_state
+
+        if state.is_terminal():
+            logger.debug("State is already terminal, Nothing to forward.")
+            return state
+
+        first_action = state.possible_actions_list[0]
+        # Note: for both tichu and wish action, state.player_pos is not the same as action.player_pos, it is the pos of the next player to play a combination
+
+        while not isinstance(first_action, (PassAction, PlayCombination)) or first_action.player_pos != 0:
+            # logger.debug("state: {}".format(state))
+            # TICHU
+            if isinstance(first_action, TichuAction):
+                no_tichu_action = next(filter(lambda act: act.announce is False, state.possible_actions_list))
+                state = state.next_state(no_tichu_action)
+
+            # WISH
+            elif isinstance(first_action, WishAction):
+                no_wish_action = WishAction(player_pos=first_action.player_pos, wish=None)
+                state = state.next_state(no_wish_action)
+
+            # TRICK ENDS
+            elif isinstance(first_action, WinTrickAction):
+                state = state.next_state(first_action)
+
+            # Play Combination
+            elif isinstance(first_action, (PassAction, PlayCombination)):
+                assert state.player_pos != 0
+                # choose random action
+                action = random.choice(state.possible_actions_list)
+                state = state.next_state(action)
+
+            else:
+                raise LogicError()
+
+            if state.is_terminal():
+                # logger.debug("State is terminal -> break out of forward to player")
+                # logger.debug("Final State: {}".format(state))
+                break
+
+            first_action = state.possible_actions_list[0]
+
+        return state
+
+    def _render(self, mode='human', close=False):
+        pass
+        # if mode == 'human':
+        #     logger.info("Render: {}".format(self._current_state))
+
+    def _log(self, message, *args, **kwargs):
+        if self.verbose:
+            logger.info(message, *args, **kwargs)
+        else:
+            logger.debug(message, *args, **kwargs)
+
+    @timecall(immediate=False)
+    def encode_state(self, state: TichuState)->Any:
+        """
+        Return a 1D binary numpy.array of length 56*4+258:
+        
+        The first 5*56 positions represent the handcards of the 4 players + trick on table ( each length 56)
+        the rest the indexes of the possible general-combinations (length 258)
+        
+        """
+        def encode_cards(cards: Iterable[Card]):
+            l = [False]*56
+            for c in state.handcards.iter_all_cards(player=0):
+                l[c.number] = True
+            return l
+
+        encoded = []
+        for cards in state.handcards:
+            encoded.extend(encode_cards(cards))
+
+        encoded.extend(encode_cards(state.trick_on_table.last_combination))
+
+        # clear the nbr->action dict
+        self.nbr_action = {self.pass_action_nbr: self.pass_action}
+
+        encoded_gen_actions = [-500]*(len(self.gcomb_to_nbr)+1)
+        for action in state.possible_actions_list:
+            if isinstance(action, PassAction):
+                nbr = self.pass_action_nbr
+            else:
+                gcomb = GeneralCombination.from_combination(action.combination)
+                try:
+                    nbr = self.gcomb_to_nbr[gcomb]
+                except KeyError:
+                    logging.debug("comb: {}".format(action.combination))
+                    logging.debug("gcomb: {}".format(gcomb))
+                    raise
+            encoded_gen_actions[nbr] = 0
+            self.nbr_action[nbr] = action
+
+        assert len(encoded) == 56*5
+        assert len(encoded_gen_actions) == 258
+        enc = (np.array(encoded, dtype=bool), np.array(encoded_gen_actions))
+        # logger.warning("enc: {}".format(enc))
+        return enc

@@ -1,6 +1,8 @@
 import abc
 from collections import abc as collectionsabc
 from decorator import contextmanager
+from time import time
+from datetime import timedelta
 
 # constants
 # all primes smaller than 200
@@ -27,6 +29,8 @@ def flatten(iterable):
     [None]
     >>> list(flatten("abc"))
     ['abc']
+    >>> list(flatten(['abc', 12, ['a', ['c', ['i']], ('xyz','tu')]]))
+    ['abc', 12, 'a', 'c', 'i', 'xyz', 'tu']
     >>> list(flatten([1]))
     [1]
     >>> list(flatten([1, "abc", [["de", 3]], "fg", 9]))
@@ -41,13 +45,17 @@ def flatten(iterable):
     :param iterable: any iterable
     :return: a generator yielding all non iterable elements in the iterable.
     """
+    # handle strings
     if isinstance(iterable, (str, bytes)):
         yield iterable
         return
+
     try:
+        # try to iterate over the input
         for item in iterable:
             yield from flatten(item)
     except TypeError:
+        # 'iterable' is not iterable and therefore a 'terminal' item
         yield iterable
 
 
@@ -115,7 +123,13 @@ def check_isinstance(item, clazzes, msg=None):
     :raises: TypeError when isinstance(item, clazzes) is False
     """
     if not isinstance(item, clazzes):
-        message = msg if msg is not None else "Item must be instance of at least one of: [{}], but was {}".format(clazzes, item.__class__)
+        import inspect
+        message = (msg if msg is not None
+                   else
+                   "Item must be instance of at least one of: {}, but was: {} (from {})"
+                        .format(', '.join("{} from {}".format(c, inspect.getfile(c)) for c in clazzes),
+                                item.__class__,
+                                inspect.getfile(item.__class__)))
         raise TypeError(message)
     else:
         return True
@@ -176,12 +190,29 @@ def crange(start, stop, modulo):
         k = (k + 1) % modulo
 
 
+def time_since(since: int)->timedelta:
+    """
+    
+    :param since: time since epoche (in seconds)
+    :return: a datetime.timedelta element: timedelta(seconds=time() - since)
+    """
+    return timedelta(seconds=time() - since)
+
 @contextmanager
 def ignored(*exceptions):
     try:
         yield
     except exceptions:
         pass
+
+
+@contextmanager
+def error_logged(logger):
+    try:
+        yield
+    except Exception as ex:
+        logger.exception(ex)
+        raise
 
 
 # Classes

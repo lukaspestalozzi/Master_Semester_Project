@@ -6,3 +6,10 @@ register(
     reward_threshold=200.0,
     nondeterministic=True,
 )
+
+register(
+    id='tichu_singleplayer-v0',
+    entry_point='gym_tichu.envs:TichuSinglePlayerAgainstRandomEnv',
+    reward_threshold=200.0,
+    nondeterministic=True,
+)

@@ -15,7 +15,7 @@ class LogicError(TichuError):
     pass
 
 
-class IllegalActionException(TichuError):
+class IllegalActionError(TichuError):
     """
     Exception raised when a Player makes an illegal Move
     """
@@ -32,5 +32,12 @@ class TichuEnvValueError(TichuError, ValueError):
 class TichuEnvTypeError(TichuError, TypeError):
     """
     A Type Error
+    """
+    pass
+
+
+class NotSupportedError(TichuError):
+    """
+    Raised when calling a method that is not supported
     """
     pass
