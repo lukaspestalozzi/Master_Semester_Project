@@ -1,2 +1,2 @@
 
-from .gymbaseagent import BaseGymAgent
+from .agents import *
