@@ -33,10 +33,10 @@ if __name__ == "__main__":
         ]
         """
         players = [
-            TichuPlayer(name="player0", agent=ISMctsUCB1Agent(iterations=30, cheat=False)),
-            TichuPlayer(name="player1", agent=ISMctsEpicLGRAgent(iterations=30, cheat=False)),
-            TichuPlayer(name="player2", agent=ISMctsUCB1Agent(iterations=30, cheat=False)),
-            TichuPlayer(name="player3", agent=ISMctsEpicLGRAgent(iterations=30, cheat=False)),
+            TichuPlayer(name="player0", agent=RandomAgent()),
+            TichuPlayer(name="player1", agent=RandomAgent()),
+            TichuPlayer(name="player2", agent=RandomAgent()),
+            TichuPlayer(name="player3", agent=RandomAgent()),
         ]
 
         players_vs_string = "0: {0}\n2: {2} \nVS.\n1: {1}\n3: {3}\n\n".format(*[p.agent_info() for p in players])
