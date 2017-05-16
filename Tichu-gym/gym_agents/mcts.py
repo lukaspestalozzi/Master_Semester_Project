@@ -1,6 +1,7 @@
 import uuid
 import abc
-import itertools
+import os
+from itertools import islice
 import logging
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -10,18 +11,21 @@ import atexit
 from collections import defaultdict
 from functools import lru_cache
 from operator import itemgetter
-from typing import Optional, Union, Hashable, NewType, TypeVar, Tuple, List
+from typing import Optional, Union, Hashable, NewType, TypeVar, Tuple, List, Dict, Iterable, Generator, Set, FrozenSet
 from math import sqrt, log
 from time import time
+from scraper.tichumania_game_scraper import GenCombWeights
 
 from profilehooks import timecall, profile
 
-from gym_tichu.envs.internals import TichuState, PlayerAction, PassAction, Trick, CardSet, HandCards
+from gym_tichu.envs.internals import (TichuState, PlayerAction, PassAction, Trick, CardSet, HandCards, Card, CardRank,
+                                      GeneralCombination, Combination, all_general_combinations_gen, InitialState)
 from gym_tichu.envs.internals.utils import check_param, flatten
 
 logger = logging.getLogger(__name__)
 
-__all__ = ('InformationSetMCTS', 'InformationSetMCTS_absolute_evaluation', 'EpicISMCTS', 'ISMctsLGR', 'ISMctsEpicLGR')
+__all__ = ('InformationSetMCTS', 'InformationSetMCTS_absolute_evaluation', 'EpicISMCTS', 'ISMctsLGR', 'ISMctsEpicLGR',
+           'InformationSetMCTSWeightedDeterminization')
 
 NodeID = NewType('NodeID', Hashable)
 RewardVector = NewType('RewardVector', Tuple[int, int, int, int])
@@ -76,6 +80,10 @@ def _atexit_caches_info():
     print()
 
 atexit.register(_atexit_caches_info)
+
+
+PPos = int  # playerPositionType
+Len = int  # lengthType
 
 
 class UCB1Record(object):
@@ -151,7 +159,7 @@ class InformationSetMCTS(MCTS):
     """
     **Type:** Information Set MCTS
     
-    **determinisation:** Uniformely Random
+    **determinization:** Uniformly Random
 
     **Selection:** UCB1
 
@@ -165,15 +173,17 @@ class InformationSetMCTS(MCTS):
         self.observer_id = None
         self._visited_records = set()
         self._available_records = set()
+        self._determinization_generator = None
 
     @timecall(immediate=False)
     def search(self, root_state: TichuState, observer_id: int, iterations: int, cheat: bool = False, clear_graph_on_new_root=True) -> PlayerAction:
         logger.debug(f"Started {self.__class__.__name__} with observer {observer_id}, for {iterations} iterations and cheat={cheat}")
         check_param(observer_id in range(4))
 
-        root_state = TichuState(*root_state, allow_tichu=False, allow_wish=False)  # Don't allow tichus or wishes in the simulation
+        root_state: TichuState = TichuState(*root_state, allow_tichu=False, allow_wish=False)  # Don't allow tichus or wishes in the simulation
 
         self.observer_id = observer_id
+        self._determinization_generator = self._make__determinization_generator(root_state, observer_id)
         root_nid = self._graph_node_id(root_state)
 
         if root_nid not in self.graph and clear_graph_on_new_root:
@@ -187,9 +197,9 @@ class InformationSetMCTS(MCTS):
             iteration += 1
             self._init_iteration()
             # logger.debug("iteration "+str(iteration))
-            state = self.determinization(state=root_state, cheat=cheat)
+            state_det = root_state if cheat else next(self._determinization_generator)
             # logger.debug("Tree policy")
-            leaf_state = self.tree_policy(state)
+            leaf_state = self.tree_policy(state_det)
             # logger.debug("rollout")
             rollout_result = self.rollout_policy(leaf_state)
             # logger.debug("backpropagation")
@@ -212,30 +222,15 @@ class InformationSetMCTS(MCTS):
     def _graph_node_id(self, state: TichuState) -> NodeID:
         return unique_infoset_id(state=state, observer_id=self.observer_id)
 
-    def determinization(self, state: TichuState, cheat: bool)->TichuState:
-        if cheat:
-            return state
-        else:
-            unknown_cards = list(flatten((hc for idx, hc in enumerate(state.handcards) if idx != self.observer_id)))
-            # logging.debug('unknown cards: '+str(unknown_cards))
-            random.shuffle(unknown_cards)
-            new_hc_list = [None]*4
-            for idx in range(4):
-                if idx == self.observer_id:
-                    new_hc_list[idx] = list(state.handcards[idx])
-                else:
-                    l = len(state.handcards[idx])
-                    det_cards = unknown_cards[:l]
-                    unknown_cards = unknown_cards[l:]
-                    new_hc_list[idx] = det_cards
-
-            # print(*map(str, flatten(new_hc_list)))
-            new_handcards = HandCards(*new_hc_list)
-            assert all(c is not None for c in new_hc_list)  # all players have handcards
-            assert sum(len(hc) for hc in new_handcards) == sum(len(hc) for hc in state.handcards)  # no card is lost
-            assert new_handcards[self.observer_id] == state.handcards[self.observer_id]  # observers handcards have not been changed
-            ts = state.change(handcards=new_handcards)
-            return ts
+    def _make__determinization_generator(self, state: TichuState, observer_id: int):
+        """
+        Overwrite to change determinization strategy
+        
+        :param state: 
+        :param observer_id:
+        :return: A Generator generating determinizations for the given state and observer
+        """
+        return Determiner(state=state, observer=observer_id).uniform_random_determinization_gen()
 
     def add_child_node(self, from_nid: Optional[NodeID] = None, to_nid: Optional[NodeID] = None, action: Optional[PlayerAction] = None) -> None:
         """
@@ -436,6 +431,12 @@ class InformationSetMCTS_absolute_evaluation(InformationSetMCTS):
         return points
 
 
+class InformationSetMCTSWeightedDeterminization(InformationSetMCTS):
+
+    def _make__determinization_generator(self, state: TichuState, observer_id: int):
+        return Determiner(state=state, observer=observer_id).weighted_determinization_gen()
+
+
 class EpicISMCTS(InformationSetMCTS):
     def _graph_node_id(self, state: TichuState) -> NodeID:
         return position_in_episode(state)
@@ -538,3 +539,190 @@ class ISMctsEpicLGR(ISMctsLGR, EpicISMCTS):
     **Best Action:** Most Visited
     """
     pass
+
+
+PlayerPos = NewType('PlayerPos', int)  # a playerposition (in range(4))
+Length = NewType('Length', int)  # denotes a length. ie the length of a cards set.
+
+
+def _make_random_weights_dict()->Dict[GeneralCombination, Dict[Len, float]]:
+    d = dict()
+    for gcomb in all_general_combinations_gen():
+        weights = [random.random() for _ in range(1, 15)]
+        s = sum(weights)
+        weights = [w / s for w in weights]
+        for l0, w in enumerate(weights):
+            d[(gcomb, l0+1)] = w
+    return d
+
+# Probability that given some handcards of the length, the GeneralCombination is in it.
+WEIGHTS_DICT: Dict[Tuple[Length, GeneralCombination], float] = GenCombWeights.weights_from_file("{}/gcombweights.pkl".format(os.path.dirname(os.path.realpath(__file__))))
+
+
+class Determiner(object):
+    """
+    Class generating determinizations from a given state
+    """
+
+    def __init__(self, state: TichuState, observer: PlayerPos):
+        self._state = state
+        self._observer = observer
+        self._cards = self._unknown_cards()
+        self._observer_handcards = state.handcards[observer]
+
+        self._right, self._teammate, self._left = (observer + 1) % 4, (observer + 2) % 4, (observer + 3) % 4
+        self._other_players = (self._right, self._teammate, self._left)
+        self._pos_to_goallength: Dict[PlayerPos, Length] = {ppos: len(state.handcards[ppos]) for ppos in self._other_players}
+
+    def uniform_random_determinization_gen(self)->TichuState:
+        """
+        Does a uniform random determinization of the given state with the observer keeping the original cards
+        :return: TichuState with the determinization applied
+        """
+        full_unknown_cards = list(self._unknown_cards())
+        while True:
+            unknown_cards = list(full_unknown_cards)
+            random.shuffle(unknown_cards)
+            # logging.debug('unknown cards: '+str(unknown_cards))
+            new_hc_list = [list()]*4
+            for idx in range(4):
+                if idx == self._observer:
+                    new_hc_list[idx] = list(self._state.handcards[idx])
+                else:
+                    l = len(self._state.handcards[idx])
+                    det_cards = unknown_cards[:l]
+                    unknown_cards = unknown_cards[l:]
+                    new_hc_list[idx] = det_cards
+
+            # print(*map(str, flatten(new_hc_list)))
+            yield self._apply_the_determinization_to_state(new_hc_list)
+
+    def weighted_determinization_gen(self)->Generator[TichuState, None, None]:
+        while True:
+            yield self._pool_strategy()
+
+    def _pool_strategy(self)->TichuState:
+        # Setup stuff
+        handcards = {ppos: list() for ppos in self._other_players}
+        remaining_cards: CardSet = self._cards
+
+        assert len(self._cards) == sum(self._pos_to_goallength.values())  # cards to distribute match the goal lengths
+
+        while any(len(handcards[ppos]) != self._pos_to_goallength[ppos] for ppos in self._other_players):  # while not all players have their cards
+            # Find all possible generalcombinations
+            gencombs, possible_for_dict = self.possible_gencombs(remaining_cards, remaining_lengths={ppos: self._pos_to_goallength[ppos] - len(hc) for ppos, hc in handcards.items()})
+            # Find probability that the gencomb is in any of the 3 handcards
+            gcomb_weight = list()
+            for gcomb in gencombs:
+                # only taking the probas into account where the gcomb is acctually possible.
+                probas = [WEIGHTS_DICT[(l, gcomb)] for l in (self._pos_to_goallength[ppos] for ppos in possible_for_dict[gcomb])]
+                weight = sum(probas) / len(probas) if len(probas) else 0  # weight is the average of those probas
+                assert 0.0 <= weight <= 1.0
+                if len(possible_for_dict[gcomb]) == 0:
+                    logger.warning("Determiner::_pool_strategy: General Comb can't be added to any player -> {}".format(weight))
+                else:
+                    gcomb_weight.append((gcomb, weight))
+
+            # Sample from all gcombs with their respective weights
+            chosen_gcomb = random.choices(population=list(map(itemgetter(0), gcomb_weight)), weights=list(map(itemgetter(1), gcomb_weight)))[0]
+            # print("chosen: ", chosen_gcomb, "gcomb-weight: ", gcomb_weight[list(map(itemgetter(0), gcomb_weight)).index(chosen_gcomb)])
+
+            # Give to most probable player (take current handcards into account)
+            best_ppos = None
+            p = -float('inf')
+            for ppos in possible_for_dict[chosen_gcomb]:
+                w = WEIGHTS_DICT[(self._pos_to_goallength[ppos], chosen_gcomb)]
+                if w > p:
+                    p = w
+                    best_ppos = ppos
+
+            # convert gcomb to actual cards.
+            chosen_comb = chosen_gcomb.find_in_cards(remaining_cards)
+            handcards[best_ppos].extend(chosen_comb)
+            remaining_cards = CardSet(c for c in remaining_cards if c not in chosen_comb)
+
+        assert len(remaining_cards) == 0
+        handcards[self._observer] = list(self._observer_handcards)
+        return self._apply_the_determinization_to_state([handcards[ppos] for ppos in range(4)])
+
+    def _apply_the_determinization_to_state(self, new_handcards_list: List[List[Card]]) -> TichuState:
+        """
+        Applies the determinization and does some sanity checks
+
+        :param new_handcards_list: 
+        :param observer: 
+        :return: The TichuState where the handcards are replaced by the HandCards instance created by the new_handcards_list.
+        """
+        new_handcards = HandCards(*new_handcards_list)
+        assert all(c is not None for c in new_handcards_list)  # all players have handcards
+        assert sum(len(hc) for hc in new_handcards) == sum(
+                len(hc) for hc in self._state.handcards), "\nnew: {} \nold: {}".format(new_handcards, self._state.handcards)  # no card is lost
+        assert all(len(old_hc) == len(new_hc) for old_hc, new_hc in zip(self._state.handcards, new_handcards))  # each player has the same amount of cards as before
+        assert new_handcards[self._observer] == self._state.handcards[self._observer]  # observers handcards have not been changed
+        ts = self._state.change(handcards=new_handcards)
+        return ts
+
+    def _unknown_cards(self) -> CardSet:
+        """
+        :return: The shuffeled cards of the 3 players (that are not the observer) 
+        """
+        return CardSet(flatten((hc for idx, hc in enumerate(self._state.handcards) if idx != self._observer)))
+
+    def possible_gencombs(self, cards: CardSet, remaining_lengths: Dict[PlayerPos, Length])->Tuple[FrozenSet[GeneralCombination], Dict[GeneralCombination, List[PlayerPos]]]:
+        """
+        
+        :param cards: 
+        :return: A Tuple containing: 
+        - A set of possible GeneralCombinations in the given cards (taking the goal_lengths into account). 
+        - a dict mapping each gcomb to the playerpos where it can be added
+        """
+        max_length = max(remaining_lengths.values())
+        gen_combs_set = frozenset(gcomb for gcomb in cards.all_general_combinations() if gcomb.nbr_cards() <= max_length)
+        gcomb_ppos_dict = {gcomb: [ppos for ppos, l in remaining_lengths.items() if gcomb.nbr_cards() <= l] for gcomb in gen_combs_set}
+
+        return gen_combs_set, gcomb_ppos_dict
+
+
+if __name__ == '__main__':
+    def count_different_cardranks(hc1: HandCards, hc2: HandCards):
+        count = 0
+
+        for k in range(4):
+            cards1: CardSet = hc1[k]
+            cards2: CardSet = hc2[k]
+            rank_dict1 = cards1.rank_dict()
+            rank_dict2 = cards2.rank_dict()
+            for rank in CardRank:
+                count += abs(len(rank_dict1.get(rank, [])) - len(rank_dict2.get(rank, [])))
+        return count
+
+
+    initstate = InitialState().announce_grand_tichus([]).announce_tichus([]).trade_cards(trades=list())
+    next_handcards = initstate.handcards
+    # remove some cards
+    next_handcards = next_handcards.remove_cards(player=1, cards=islice(next_handcards.iter_all_cards(player=1), 7))
+    next_handcards = next_handcards.remove_cards(player=2, cards=islice(next_handcards.iter_all_cards(player=2), 9))
+    next_handcards = next_handcards.remove_cards(player=3, cards=islice(next_handcards.iter_all_cards(player=3), 10))
+
+    state = initstate.change(handcards=next_handcards)
+    D: Determiner = Determiner(state, observer=0)
+    rand_gen = D.uniform_random_determinization_gen()
+    weighted_gen = D.weighted_determinization_gen()
+    count_diff_proba_vs_rand = 0
+    for _ in range(100):
+        det = next(weighted_gen)
+        rand_det = next(rand_gen)
+        diff_rand = count_different_cardranks(D._state.handcards, rand_det.handcards)
+        diff_proba = count_different_cardranks(D._state.handcards, det.handcards)
+        count_diff_proba_vs_rand += (diff_rand - diff_proba)  # if positive, proba was better, if negative, random was better
+
+        print("{} - {}".format(diff_rand, diff_proba))
+        # for k in range(4):
+        #     print("Orig:       ", D.state.handcards[k])
+        #     print("Det:        ", det.handcards[k])
+        #     print("random Det: ", rand_det.handcards[k])
+        #     print()
+        # print("different cards to probabilistic: ", diff_proba)
+        # print("different cards to random: ", diff_rand)
+
+    print(count_diff_proba_vs_rand)

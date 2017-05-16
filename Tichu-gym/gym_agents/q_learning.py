@@ -17,19 +17,19 @@ def all_general_combinations_gen():
     non_special_ranks = {r for r in CardRank if r not in special_ranks}
     # singles
     for rank in CardRank:
-        yield GeneralCombination(type=Single, height=rank.value)
+        yield GeneralCombination(type=Single, height=(1, rank.value))
     # pairs
     for rank in non_special_ranks:
-        yield GeneralCombination(type=Pair, height=rank.value)
+        yield GeneralCombination(type=Pair, height=(2, rank.value))
     # trios
     for rank in non_special_ranks:
-        yield GeneralCombination(type=Trio, height=rank.value)
+        yield GeneralCombination(type=Trio, height=(3, rank.value))
     # squarebombs
     for rank in non_special_ranks:
-        yield GeneralCombination(type=SquareBomb, height=rank.value)
+        yield GeneralCombination(type=SquareBomb, height=(4, rank.value))
     # fullhouse
     for rank_trio in non_special_ranks:
-        yield GeneralCombination(type=FullHouse, height=rank_trio.value)
+        yield GeneralCombination(type=FullHouse, height=(5, rank_trio.value))
         # for rank_duo in non_special_ranks:
         #     # Note trio == duo may happen with a squarebomb and the phoenix
         #     yield GeneralCombination(type=FullHouse, height=(rank_trio.value, rank_duo.value))

@@ -9,8 +9,10 @@ import numpy as np
 from gym import spaces
 from profilehooks import timecall
 
+
 from .internals import *
 from .internals.error import IllegalActionError, LogicError
+
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,8 @@ class TichuSinglePlayerAgainstRandomEnv(gym.Env):
         assert illegal_move_mode in ['loose'], "'raise' is not yet implemented"  # ['raise', 'loose']
 
         super().__init__()
+        from gym_agents import dqn_agent_4layers
+        self.agents = [None, dqn_agent_4layers, dqn_agent_4layers, dqn_agent_4layers]
 
         self._general_combinations = list(all_general_combinations_gen())
         self.action_space = spaces.Discrete(len(self._general_combinations)+1)  # +1 because there is also the Pass action
@@ -166,8 +170,9 @@ class TichuSinglePlayerAgainstRandomEnv(gym.Env):
             # Play Combination
             elif isinstance(first_action, (PassAction, PlayCombination)):
                 assert state.player_pos != 0
-                # choose random action
-                action = random.choice(state.possible_actions_list)
+                # predefined agents choose action
+
+                action = self.agents[state.player_pos].action(state=state)
                 state = state.next_state(action)
 
             else:

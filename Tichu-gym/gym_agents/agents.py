@@ -2,7 +2,9 @@ import abc
 import os
 import logging
 
+import datetime
 import rl
+
 
 import logginginit
 import random
@@ -12,6 +14,7 @@ from collections import defaultdict, OrderedDict
 import gym
 from gym_tichu.envs.internals import (TichuState, PlayerAction, CardRank, Card, wishable_card_ranks,
                                       PassAction, CardTrade, HandCards)
+from gym_tichu.envs.internals.utils import check_param
 import numpy as np
 
 import keras
@@ -26,12 +29,13 @@ from rl.memory import SequentialMemory
 
 
 from .q_learning import DQNProcessor
-from .mcts import MCTS, InformationSetMCTS, InformationSetMCTS_absolute_evaluation, EpicISMCTS
+from .mcts import MCTS, InformationSetMCTS, InformationSetMCTS_absolute_evaluation, EpicISMCTS, InformationSetMCTSWeightedDeterminization
 from . import strategies
 
 __all__ = ('DefaultGymAgent', 'RandomAgent', 'BalancedRandomAgent', 'BaseMonteCarloAgent', 'HumanInputAgent',
-           'information_set_mcts_agent', 'information_set_mcts_absolute_evaluation_agent', 'epic_ismcts_agent',
-           'DQNTichuAgent', 'dqn_agent_2layers', 'dqn_agent_4layers')
+           'make_information_set_mcts_agent', 'make_information_set_mcts_absolute_evaluation_agent', 'make_epic_ismcts_agent',
+           'DQNTichuAgent', 'make_dqn_agent_2layers', 'make_dqn_agent_4layers', 'make_dqn_trainagent_4layers', 'DQN4LayerAgent',
+           'make_first_ismcts_then_random_agent', 'make_information_set_mcts_agent_weighted_determinization')
 
 logger = logging.getLogger(__name__)
 human_logger = logginginit.CONSOLE_LOGGER
@@ -63,6 +67,7 @@ class DefaultGymAgent(object):
         return next(state.possible_actions())
 
 
+# ################## RANDOM ####################
 class RandomAgent(DefaultGymAgent):
     """
     Returns one of the possible actions at random
@@ -90,6 +95,7 @@ class BalancedRandomAgent(RandomAgent):
         return random.choice(d[random.choice(list(d.keys()))])
 
 
+# ################## MCTS ####################
 class BaseMonteCarloAgent(DefaultGymAgent):
 
     def __init__(self, search_algorithm: MCTS, iterations: int=100, cheat: bool=False):
@@ -116,11 +122,13 @@ class BaseMonteCarloAgent(DefaultGymAgent):
         return "{me.__class__.__name__}({me.search.__class__.__name__}, {me.iterations}, {me.cheat})".format(me=self)
 
 
-information_set_mcts_agent = BaseMonteCarloAgent(InformationSetMCTS())
-information_set_mcts_absolute_evaluation_agent = BaseMonteCarloAgent(InformationSetMCTS_absolute_evaluation())
-epic_ismcts_agent = BaseMonteCarloAgent(EpicISMCTS())
+make_information_set_mcts_agent = lambda: BaseMonteCarloAgent(InformationSetMCTS())
+make_information_set_mcts_agent_weighted_determinization = lambda: BaseMonteCarloAgent(InformationSetMCTSWeightedDeterminization())
+make_information_set_mcts_absolute_evaluation_agent = lambda: BaseMonteCarloAgent(InformationSetMCTS_absolute_evaluation())
+make_epic_ismcts_agent = lambda: BaseMonteCarloAgent(EpicISMCTS())
 
 
+# ################## HUMAN ####################
 class HumanInputAgent(DefaultGymAgent):
 
     def __init__(self, position: int):
@@ -309,6 +317,7 @@ class HumanInputAgent(DefaultGymAgent):
         return input()
 
 
+# ################## LEARNING / DQN ####################
 class LearningAgent(DefaultGymAgent):
 
     def __init__(self, agent: rl.core.Agent, weights_file: Optional[str]):
@@ -332,7 +341,7 @@ class LearningAgent(DefaultGymAgent):
         logger.debug("Q-agent chooses action {} -> {}".format(chosen_nbr, action))
         return action
 
-    def train(self, weights_out_file: str, nbr_steps: int=1000):
+    def train(self, weights_out_file: str, nbr_steps: int, verbose: int):
         """
         Trains the agent
         :param weights_out_file: saves the weights to that file after training.
@@ -380,11 +389,8 @@ def _make_4Layer_model()->Model:
     return model
 
 
-def _make_dqn_agent(model)->DQNAgent:
+def _make_dqn_agent(model, policy: rl.policy.Policy=BoltzmannQPolicy(clip=(-500, 300)), processor: rl.core.Processor=DQNProcessor())->DQNAgent:
     memory = SequentialMemory(limit=50000, window_length=1)
-    # TODO maybe parametrizise the nb_steps for annealingPolicy
-    policy = LinearAnnealedPolicy(BoltzmannQPolicy(clip=(-500, 300)), attr='tau', value_max=1., value_min=.1, value_test=.01, nb_steps=100000)
-    processor = DQNProcessor()
     dqn = DQNAgent(model=model, nb_actions=NBR_TICHU_ACTIONS, memory=memory, nb_steps_warmup=100,
                    target_model_update=1e-2, policy=policy, processor=processor)
     dqn.compile(Adam(lr=1e-3), metrics=['mae'])
@@ -400,15 +406,8 @@ class DQNTichuAgent(LearningAgent):
         agent = self._make_agent()
         super().__init__(agent=agent, weights_file=weights_file)
 
-    def train(self, weights_out_file: str, nbr_steps: int=1000):
-        """
-        Trains on the 'tichu_singleplayer-v0' environment.
-        :param weights_out_file: saves the weights to that file after training.
-        :param nbr_steps: 
-        """
-        self.agent.fit(gym.make('tichu_singleplayer-v0'), nb_steps=nbr_steps, visualize=False, verbose=1, nb_max_start_steps=0)
-        logger.info("saving the weights to {}".format(weights_out_file))
-        self.agent.save_weights(weights_out_file, overwrite=True)
+    def train(self, weights_out_file: str, nbr_steps: int=1000, verbose: int=1):
+        raise NotImplementedError("Use class DQNTrainableAgent to train the agent")
 
     def _process_tichu_state(self, state: TichuState)->Any:
         return self.processor.encode_tichu_state(state)
@@ -427,5 +426,61 @@ class DQNTichuAgent(LearningAgent):
         return DQNProcessor()
 
 
-dqn_agent_2layers = DQNTichuAgent(model=_make_2Layer_model(), weights_file='{}/agent_weights/dqn_2layers_weights.h5f'.format(os.path.dirname(os.path.realpath(__file__))))
-dqn_agent_4layers = DQNTichuAgent(model=_make_4Layer_model(), weights_file='{}/agent_weights/dqn_4layers_weights.h5f'.format(os.path.dirname(os.path.realpath(__file__))))
+class DQNTrainableAgent(DQNTichuAgent):
+    def train(self, weights_out_file: str, nbr_steps: int=1000, verbose: int=1):
+        """
+        Trains on the 'tichu_singleplayer-v0' environment.
+        After training saves the weights to the given file as well as a timestamped file.
+        :param weights_out_file: saves the weights to that file after training.
+        :param nbr_steps: 
+        """
+        self.agent.fit(gym.make('tichu_singleplayer-v0'), nb_steps=nbr_steps, visualize=False, verbose=verbose, nb_max_start_steps=0)
+        logger.info("saving the weights to {}".format(weights_out_file))
+        self.agent.save_weights(weights_out_file, overwrite=True)
+        unique_out_file = "{orig_f}_steps{steps}_{time_stamp}.{file_ending}".format(time_stamp=datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+                                                                                    orig_f=''.join(weights_out_file.split('.')[:-1]),
+                                                                                    steps=nbr_steps,
+                                                                                    file_ending=weights_out_file.split('.')[-1])
+        logger.info("saving the weights to unique file {}".format(unique_out_file))
+        self.agent.save_weights(unique_out_file, overwrite=True)
+
+    def _make_agent(self):
+        return _make_dqn_agent(self.model, policy=LinearAnnealedPolicy(BoltzmannQPolicy(clip=(-500, 300)), attr='tau', value_max=1., value_min=.1, value_test=.01, nb_steps=50000))
+
+
+class DQN4LayerAgent(DQNTichuAgent):
+
+    def __init__(self, weights_file: Optional[str]):
+        super().__init__(model=_make_4Layer_model(), weights_file=weights_file)
+
+make_dqn_agent_2layers = lambda: DQNTichuAgent(model=_make_2Layer_model(), weights_file='{}/agent_weights/dqn_2layers_weights.h5f'.format(os.path.dirname(os.path.realpath(__file__))))
+make_dqn_agent_4layers = lambda: DQN4LayerAgent(weights_file='{}/agent_weights/dqn_4layers_weights.h5f'.format(os.path.dirname(os.path.realpath(__file__))))
+make_dqn_trainagent_4layers = lambda: DQNTrainableAgent(model=_make_4Layer_model(), weights_file='{}/agent_weights/dqn_4layers_weights.h5f'.format(os.path.dirname(os.path.realpath(__file__))))
+
+
+# ################## Composite ####################
+
+class DoubleAgent(DefaultGymAgent):
+    """
+    Agent that is composed of 2 agents.
+    
+    The first agent chooses the action if the player has more handcards than the switch_length, the second otherwise.
+    """
+
+    def __init__(self, agent1: DefaultGymAgent, agent2: DefaultGymAgent, switch_length: int=5):
+        check_param(switch_length in range(1, 15))
+        super().__init__()
+        self.first_agent = agent1
+        self.second_agent = agent2
+        self.switch_len = switch_length
+
+    def action(self, state: TichuState)->PlayerAction:
+        my_handcards = state.handcards[state.player_pos]
+        if len(my_handcards) > self.switch_len:
+            return self.first_agent.action(state)
+        else:
+            return self.second_agent.action(state)
+
+
+def make_first_ismcts_then_random_agent(switch_length: int)->DoubleAgent:
+    return DoubleAgent(make_information_set_mcts_agent(), BalancedRandomAgent(), switch_length=switch_length)

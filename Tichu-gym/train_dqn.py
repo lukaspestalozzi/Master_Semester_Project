@@ -19,7 +19,7 @@ from rl.policy import BoltzmannQPolicy, GreedyQPolicy, LinearAnnealedPolicy
 from rl.memory import SequentialMemory
 
 import logginginit
-from gym_agents import BalancedRandomAgent, dqn_agent_2layers, dqn_agent_4layers
+from gym_agents import BalancedRandomAgent, dqn_agent_2layers, dqn_agent_4layers, dqn_trainagent_4layers
 
 logger = logging.getLogger(__name__)
 ENV_NAME = 'tichu_singleplayer-v0'
@@ -93,7 +93,7 @@ def generate_random_state_batch(batchsize=32):
             np.array([[random.random() < 0.2 for _ in range(258)] for _ in range(batchsize)])]
 
 
-def train_dqn_test():
+def train_dqn_experimenting():
     env = gym.make(ENV_NAME)
     nb_actions = env.action_space.n
     NB_TRAIN_STEPS = 50000
@@ -149,9 +149,9 @@ def train_dqn_test():
 
 
 def train_dqn_agent(nbr_steps: int):
-    print("Training for {} steps...".format(nbr_steps))
-    agent = dqn_agent_4layers
-    agent.train(nbr_steps=nbr_steps, weights_out_file=agent.weights_file)
+    print("Training DQN Agent for {} steps ...".format(nbr_steps))
+    agent = dqn_trainagent_4layers
+    agent.train(nbr_steps=nbr_steps, weights_out_file=agent.weights_file, verbose=1)
 
 
 if __name__ == '__main__':
@@ -160,8 +160,8 @@ if __name__ == '__main__':
 
     start_ftime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     log_folder_name = "/mnt/Data/Dropbox/Studium/EPFL/MA4/sem_project/logs/train_dqn_" + start_ftime
-    logging_mode = logginginit.ExperimentMode
+    logging_mode = logginginit.TrainMode
     logginginit.initialize_loggers(output_dir=log_folder_name, logging_mode=logging_mode, min_loglevel=logging.INFO)
 
     # run_singleplayer_with_random_agent(1000)
-    train_dqn_agent(nbr_steps=50000)
+    train_dqn_agent(nbr_steps=60000)

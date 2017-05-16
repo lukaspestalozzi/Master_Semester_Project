@@ -14,7 +14,7 @@ import random
 from typing import Callable, Optional, Collection, Tuple, Set
 
 import logging
-from envs.internals import Card
+from gym_tichu.envs.internals import Card
 from gym_tichu.envs.internals import TichuState, CardRank
 
 TradingStrategyType     = Callable[[TichuState, int], Tuple[Card, Card, Card]]

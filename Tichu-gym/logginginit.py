@@ -26,13 +26,17 @@ TogetherMode = DefaultMode._replace(debug_file=None, info_file=None, warn_file=N
 SeparateMode = DefaultMode._replace(all_file=None, info_and_above_file=None, warn_and_above_file=None)
 
 ExperimentMode = SeparateMode._replace(redirect_stdout=True, console_logger_level=None, stderr_level=None)  # Only seperate files and no console output
-
+TrainMode = ExperimentMode._replace(redirect_stdout=False)
 HumanplayMode = DefaultMode._replace(redirect_stdout=True, stderr_level=logging.INFO)
 HumanplayCheatMode = HumanplayMode._replace(console_logger_level=logging.DEBUG)
 
 DebugMode = DefaultMode._replace(console_logger_level=logging.DEBUG, stderr_level=logging.DEBUG)  # Logs everything
 
 RunGameMode = ExperimentMode._replace(redirect_stdout=False, stderr_level=logging.WARNING)  # only stdout and seperate files.
+
+logging_modes = {"DefaultMode": DefaultMode, "TogetherMode": TogetherMode, "SeparateMode": SeparateMode,
+                 "ExperimentMode": ExperimentMode, "TrainMode": TrainMode, "HumanplayMode": HumanplayMode,
+                 "HumanplayCheatMode": HumanplayCheatMode, "DebugMode": DebugMode, "RunGameMode": RunGameMode}
 
 
 class LevelFilter(logging.Filter):
@@ -198,78 +202,3 @@ def initialize_loggers(output_dir: str, logging_mode: LoggingMode=DefaultMode, m
     if logging_mode.warn_and_above_file is not None:
         register_root_file_handler(logging_mode.warn_and_above_file, level=logging.WARNING)
 
-
-#
-# def initialize_logger(output_dir: str, console_log_level, logger_name: Optional[str],
-#                       info_log: str="info.log", warn_err_log: str="warn_error.log", all_log: str="all.log",
-#                       verbose: bool=True, redirect_stdout: bool=False):
-#     """
-#
-#     :param output_dir:
-#     :param console_log_level:
-#     :param logger_name:
-#     :param info_log:
-#     :param warn_err_log:
-#     :param all_log:
-#     :param verbose: if True, prints to stdout which handlers have been set.
-#     :param redirect_stdout: If True,
-#     :return:
-#     """
-#
-#
-#
-#     # TODO Create logging modes and make a human logger.
-#
-#     # datefmt='%Y.%m.%d %H:%M:%S'
-#     make_sure_path_exists(output_dir)
-#
-#     logger = logging.getLogger(logger_name)
-#     logger.setLevel(logging.DEBUG)
-#
-#     format_string = '%(process)d: (%(module)s) [%(levelname)s]: %(message)s'
-#
-#     if redirect_stdout:
-#         sys.stdout = logger.info
-#
-#     # create console handler and set level to info
-#     if console_log_level:
-#         handler = logging.StreamHandler()
-#         handler.setLevel(console_log_level)
-#         formatter = logging.Formatter(format_string)
-#         handler.setFormatter(formatter)
-#         logger.addHandler(handler)
-#         if verbose:
-#             print("console_log_level is", str(console_log_level))
-#
-#     # create INFO file handler and set level to error
-#     if info_log:
-#         handler = logging.FileHandler(os.path.join(output_dir, info_log), "w", encoding=None)
-#         handler.setLevel(logging.INFO)
-#         formatter = logging.Formatter(format_string)
-#         handler.setFormatter(formatter)
-#         logger.addHandler(handler)
-#         if verbose:
-#             print("info_log is", info_log)
-#
-#     # create error file handler and set level to WARNING
-#     if warn_err_log:
-#         handler = logging.FileHandler(os.path.join(output_dir, warn_err_log), "w", encoding=None, delay="true")
-#         handler.setLevel(logging.WARNING)
-#         formatter = logging.Formatter(format_string)
-#         handler.setFormatter(formatter)
-#         logger.addHandler(handler)
-#         if verbose:
-#             print("warn_err_log is", warn_err_log)
-#
-#     # create debug file handler and set level to debug
-#     if all_log:
-#         handler = logging.FileHandler(os.path.join(output_dir, all_log), "w")
-#         handler.setLevel(logging.DEBUG)
-#         formatter = logging.Formatter(format_string)
-#         handler.setFormatter(formatter)
-#         logger.addHandler(handler)
-#         if verbose:
-#             print("all_log is", all_log)
-#
-#     if verbose:
-#         print("Logging to:", output_dir)

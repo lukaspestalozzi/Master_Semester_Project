@@ -219,16 +219,22 @@ class History(object):
         except AttributeError:
             points = "No points"
 
+        actions = list(self.actions())
+        actions_str = "    " if len(actions) else "EMPTY"
+        for action in actions:
+            actions_str += " -> "+str(action)
+            if isinstance(action, WinTrickAction):
+                actions_str += "\n    "
         return (
-        """
-        {me.__class__.__name__}
-        length: {length}
-        last ranking: {ranking}
-        last points: {points}
-        actions: 
-        {actions}        
-        """.format(me=self, length=len(self._state_action_tuple), ranking=ranking, points=points,
-                   actions=' -> '.join(map(str, self.actions())) if len(self._state_action_tuple) else 'EMPTY')
+"""
+{me.__class__.__name__}
+length: {length}
+last ranking: {ranking}
+last points: {points}
+actions: 
+{actions}        
+""".format(me=self, length=len(self._state_action_tuple), ranking=ranking, points=points,
+           actions=actions_str)
         )
 
 
@@ -431,7 +437,7 @@ class TichuState(BaseTichuState, namedtuple("TichuState", [
 
         # ######### DOG? #########
         if DOG_COMBINATION == last_combination:  # Dog was played
-            logger.debug("Dog was played -> Win trick action")
+            # logger.debug("Dog was played -> Win trick action")
             yield WinTrickAction(player_pos=(last_combination_action.player_pos + 2) % 4, trick=self.trick_on_table)
             return  # No more actions allowed
 

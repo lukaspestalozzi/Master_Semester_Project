@@ -1,3 +1,4 @@
+from collections import namedtuple
 from time import time
 import logging
 from typing import Tuple, List
@@ -17,6 +18,8 @@ from gym_agents.agents import HumanInputAgent
 
 logger = logging.getLogger(__name__)
 console_logger = logginginit.CONSOLE_LOGGER
+
+GameOutcome = namedtuple("GameOutcome", ["points", "history"])
 
 
 class TichuGame(object):
@@ -60,7 +63,7 @@ class TichuGame(object):
 
             console_logger.info("[GAME END] Game ended: {p} [Time: {time_passed}]".format(p=points, time_passed=time_since(since=start_t)))
 
-        return points, round_histories
+        return GameOutcome(points, round_histories)
 
     @timecall(immediate=False)
     def _start_round(self)->Tuple[Tuple[int, int], History]:
@@ -135,8 +138,8 @@ class TichuGame(object):
 
         console_logger.debug("Final State: {}".format(curr_state))
         points = (reward[0], reward[1])
-        console_logger.info("[ROUND END] Round ended: ranking: {}, outcome: {} [Time: {}]".format(curr_state.ranking, points, time_since(since=start_t)))
-        return points, curr_state.history
+        console_logger.warning("[ROUND END] Round ended: ranking: {}, outcome: {} [Time: {}]".format(curr_state.ranking, points, time_since(since=start_t)))
+        return GameOutcome(points, curr_state.history)
 
     @timecall(immediate=False)
     def _setup_round(self)->Tuple[TichuState, Tuple[int, int, int, int], bool, dict]:

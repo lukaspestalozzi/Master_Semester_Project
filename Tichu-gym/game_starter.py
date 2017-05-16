@@ -48,8 +48,18 @@ def dqn_against_random(target_points: int):
     return res
 
 
+def dqn_against_ismcts(target_points: int):
+    game = create_agent_against_agent(lambda: dqn_agent_4layers, lambda: BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))
+
+    res = game.start_game(target_points=target_points)
+    return res
+
+
 def dqn_against_dqn(target_points: int):
-    game = create_agent_against_agent(lambda: dqn_agent_4layers, lambda: dqn_agent_2layers)
+    weights_file1 = './gym_agents/agent_weights/dqn_4layers_weights.h5f'  # latest weights
+    weights_file2 = './gym_agents/agent_weights/dqn_4layers_weights_steps60000_2017-05-14_12-39-47.h5f'  # previous weights
+    game = create_agent_against_agent(lambda: DQN4LayerAgent(weights_file=weights_file1),
+                                      lambda: DQN4LayerAgent(weights_file=weights_file2))
 
     res = game.start_game(target_points=target_points)
     return res
@@ -89,5 +99,5 @@ if __name__ == "__main__":
     logging_mode = logginginit.RunGameMode
     logginginit.initialize_loggers(output_dir=log_folder_name, logging_mode=logging_mode, min_loglevel=logging.INFO)
 
-    res = dqn_against_random(target_points=1000)
+    res = dqn_against_random(target_points=10000)
     print_game_outcome(res)
