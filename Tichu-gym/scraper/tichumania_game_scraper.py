@@ -1,9 +1,14 @@
 import traceback
-from collections import defaultdict
+from collections import defaultdict, Counter
 import datetime
+import logging
 
 import json
 import functools
+import pickle
+import csv
+from operator import itemgetter
+
 import requests
 import grequests as greq
 import sys
@@ -14,13 +19,13 @@ from bs4 import BeautifulSoup
 import os
 import errno
 from collections import namedtuple
+import typing
 
 from itertools import islice
 
-from Tichu.tichu.game.gameutils import *
-from Tichu.tichu.cards.card import Card as C
-from tichu.cards.cards import ImmutableCards
-from tichu.players.tichuplayers import TichuPlayer
+from gym_tichu.envs.internals.cards import Card as C, CardSet, GeneralCombination, all_general_combinations_gen
+
+logger = logging.getLogger(__name__)
 
 
 class Player(namedtuple('Player', ['rank', 'name', 'nbr_games', 'nbr_won_games', 'elo'])):
@@ -49,25 +54,6 @@ class GameOverview(namedtuple('GameOverview', ['date', 'p0', 'p1', 'p2', 'p3', '
 class Game(namedtuple('Game', ['game_overview', 'p0', 'p1', 'p2', 'p3', 'result', 'rounds'])):
     def __init__(self, *args, **kwargs):
         super().__init__()
-    """
-    def to_tichu_game_history(self):
-        player0 = TichuPlayer(name=self.p0, agent=None)
-        player1 = TichuPlayer(name=self.p1, agent=None)
-        player2 = TichuPlayer(name=self.p2, agent=None)
-        player3 = TichuPlayer(name=self.p3, agent=None)
-        team1 = Team(player0, player2)
-        team2 = Team(player1, player3)
-
-        points_t1 = int(self.result.split(':')[0])  # TODO make self.result a tuple
-        points_t2 = int(self.result.split(':')[1])
-        winner_team = team1 if points_t1 > points_t2 else team2
-
-        rounds = tuple([round_.to_round_history() for round_ in self.rounds])
-
-        gh = GameHistory(team1=team1, team2=team2, winner_team=winner_team,
-                         points=(points_t1, points_t2), target_points=1000, rounds=rounds)
-        return gh
-    """
 
     def __hash__(self):
         return hash((self.game_overview, self.result))
@@ -80,57 +66,6 @@ class Round(namedtuple('Round', ['initial_points', 'result', 'gt_hands', 'grand_
                                  'complete_hands', 'moves'])):
     def __init__(self, *args, **kwargs):
         super().__init__()
-
-    """
-    def to_round_history(self, player_0_name, player_1_name, player_2_name, player_3_name):
-        player_names = [player_0_name, player_1_name, player_2_name, player_3_name]
-        def to_cards_list(hands_dict):
-            return [hands_dict[player_0_name], hands_dict[player_1_name],
-                    hands_dict[player_2_name], hands_dict[player_3_name]]
-
-        def player_name_to_pos(name):
-            return player_names.index(name)
-
-        rhb = RoundHistoryBuilder(self.initial_points)
-        # hands
-        rhb.grand_tichu_hands = cards_class_lists_to_snapshot(*to_cards_list(self.gt_hands))
-        rhb.before_swap_hands = cards_class_lists_to_snapshot(*to_cards_list(self.trading_hands))
-        rhb.complete_hands = cards_class_lists_to_snapshot(*to_cards_list(self.complete_hands))
-
-        # grand_tichus
-        for player_name in self.grand_tichus:
-            rhb.append_event(GrandTichuAction(player_name_to_pos(player_name)))
-
-        # normal tichus  TODO add at actual position in the game (take care of tichus announced before swaping)
-        for player_name in self.tichus:
-            rhb.append_event(TichuAction(player_name_to_pos(player_name)))
-
-        # swap cards
-        for player_name, traded_cards in self.traded_cards.items():  # traded cards: plname -> tuple(c to right, c to teammate, c to left)
-            player_pos = player_name_to_pos(player_name)
-            to_cards = [((player_pos+idx+1) % 4, card_class_to_tichu_card(cc)) for idx, cc in enumerate(traded_cards)]
-            rhb.append_event(SwapCardAction(player_pos, to_cards[0], to_cards[1]))
-
-        trick = UnfinishedTrick()
-        for move in self.moves:
-            player_pos = player_name_to_pos(move.player_name)
-            if move.is_pass:
-                rhb.append_event(PassAction(player_pos))
-
-            if move.is_clear:
-                rhb.append_event(WinTrickEvent(player_pos, trick.finish(), ))
-
-            if move.dragon_to:
-                rhb.append_event(GiveDragonAwayAction(player_pos, player_name_to_pos(move.dragon_to), trick.finish()))
-
-            if move.tichu:
-                rhb.append_event(TichuAction(player_pos))
-
-            if len(move.cards_played):
-                comb = Combination.make(cards_class_list_to_immutable_cards(move.cards_played))
-                rhb.append_event(CombinationAction(player_pos, comb))
-                trick.append(comb)
-    """
 
     def __hash__(self):
         return hash(tuple(self.moves))
@@ -187,7 +122,7 @@ class_to_card_dict = {
         'c_74': C.SEVEN_HOUSE,
         'c_81': C.EIGHT_SWORD,
         'c_92': C.NINE_PAGODA,
-        'c_103': C.TENJADE,
+        'c_103': C.TEN_JADE,
         'c_114': C.J_HOUSE,
         'c_121': C.Q_SWORD,
         'c_132': C.K_PAGODA,
@@ -214,13 +149,8 @@ def card_class_to_tichu_card(cclass: str):
     return class_to_card_dict[cclass]
 
 
-def cards_class_list_to_immutable_cards(clist):
-    return ImmutableCards([card_class_to_tichu_card(cc) for cc in clist])
-
-
-def cards_class_lists_to_snapshot(clist0, clist1, clist2, clist3):
-    imm_cards = [cards_class_list_to_immutable_cards(cl) for cl in [clist0, clist1, clist2, clist3]]
-    return HandCardSnapshot(*imm_cards)
+def cards_class_list_to_cardsset(clist):
+    return CardSet(map(card_class_to_tichu_card, clist))
 
 
 def pretty_print_game(game: Game):
@@ -339,33 +269,33 @@ class TichumaniaScraper(object):
     def save_scraped_games_to_file(self, filename='scraper_out.json'):
         return self._write_to_file(self._newly_scraped_games, filename=filename)
 
-    """
-    def find_games_of_best_players(self, nbr_players=10, nbr_games_per_player=10, return_dict=False, save_periodicaly=100):
 
+    # def find_games_of_best_players(self, nbr_players=10, nbr_games_per_player=10, return_dict=False, save_periodicaly=100):
+    #
+    #     """
+    #     :param nbr_players: how many players (length of returned dict) (None means to fetch all players)
+    #     :param nbr_games_per_player: how many games to fetch for each player (length of each set for each player); (None means to fetch all games)
+    #     :param return_dict: If True, returns a dict player -> tuple of games for that player. if False, returns None, this is preferred if the result is not used directly as the games are already stored in the 'scraped_games' attribute.
+    #     :param save_periodicaly: integer. calls 'save_scraped_games_to_file' after scraping the given amount of games. set negative to disable
+    #     :return: If return_dict is True, returns a dict player -> tuple of games for that player. if False, returns None.
+    #     """
+    #     start_t = time.time()
+    #     d = dict()
+    #     for player in islice(self.find_best_players(), nbr_players):
+    #         if player is None:
+    #             continue
+    #         print(f"fetching {nbr_games_per_player} games for the player '{player.name}'")
+    #         games_gen = islice(self.games_for_playername(player.name, save_periodicaly=save_periodicaly),
+    #                            nbr_games_per_player)
+    #         if return_dict:
+    #             d[player] = tuple(game for game in games_gen)
+    #         else:
+    #             for _ in games_gen:  # don't store the result.
+    #                 pass
+    #     seconds_taken = time.time() - start_t
+    #     print(f"done find_games_of_best_players, time: {int(seconds_taken // 60)}mins and {seconds_taken % 60 :.2f}s")
+    #     return d if return_dict else None
 
-        :param nbr_players: how many players (length of returned dict) (None means to fetch all players)
-        :param nbr_games_per_player: how many games to fetch for each player (length of each set for each player); (None means to fetch all games)
-        :param return_dict: If True, returns a dict player -> tuple of games for that player. if False, returns None, this is preferred if the result is not used directly as the games are already stored in the 'scraped_games' attribute.
-        :param save_periodicaly: integer. calls 'save_scraped_games_to_file' after scraping the given amount of games. set negative to disable
-        :return: If return_dict is True, returns a dict player -> tuple of games for that player. if False, returns None.
-
-        start_t = time.time()
-        d = dict()
-        for player in islice(self.find_best_players(), nbr_players):
-            if player is None:
-                continue
-            print(f"fetching {nbr_games_per_player} games for the player '{player.name}'")
-            games_gen = islice(self.games_for_playername(player.name, save_periodicaly=save_periodicaly),
-                               nbr_games_per_player)
-            if return_dict:
-                d[player] = tuple(game for game in games_gen)
-            else:
-                for _ in games_gen:  # don't store the result.
-                    pass
-        seconds_taken = time.time() - start_t
-        print(f"done find_games_of_best_players, time: {int(seconds_taken // 60)}mins and {seconds_taken % 60 :.2f}s")
-        return d if return_dict else None
-    """
     def scrape_games(self, max_nbr_games: int = None, max_time: int = None):
         """
         Scrapes games until either interrupted (by CTRL-C) or max_nbr_games is reached or max_time (in minutes) is reached.
@@ -416,7 +346,7 @@ class TichumaniaScraper(object):
         self._write_to_file(players, filename=out_file)
         return players
 
-    def scrape_gameoverviews(self, out_file: str = 'game_overviews.json', max_nbr_overviews: int = None, max_time: int = None):
+    def scrape_gameoverviews(self, out_file: str = 'game_overviews.json', max_nbr_overviews: int = None, max_time: int = 1.0):
         """
         Scrapes gameoverviews (most recent first) until either interrupted (by CTRL-C) or max_nbr_games is reached or max_time (in minutes) is reached.
         And stores them to the out_file (in the folder determined by the 'scraper_out_folder' attribute.)
@@ -445,6 +375,50 @@ class TichumaniaScraper(object):
         finally:
             self._write_to_file(scraped_gos, filename=out_file)
 
+    def scrape_normal_handcards(self, max_time: float = 1.0):
+        def store_handcards(hcrds):
+            make_sure_path_exists(self._out_folder_f.format('handcards/'))
+            self._write_to_file(list(hcrds), filename=f'handcards/{now().strftime("%Y-%m-%d_%H:%M:%S")}_scraped_handcards.json')
+
+        def store_gos(gosses):
+            make_sure_path_exists(self._out_folder_f.format('handcards/'))
+            self._write_to_file(list(gosses), filename=f'handcards/{now().strftime("%Y-%m-%d_%H:%M:%S")}_scraped_gameoverviews.json')
+
+        handcards = set()
+        already_scraped_gos = set(gos_nbr for gos_nbr in self.all_stored_gos_nbrs_gen())
+        print("already_scraped_gos length: {}".format(len(already_scraped_gos)))
+        start_t = time.time()
+        end_t = start_t + max_time * 60
+        logger.info("scraping handcards for {} minutes... ".format(max_time))
+        gos_batch_gen = grouper(n=8, iterable=self.game_overviews_gen())
+        while time.time() < end_t:
+            gos_batch = [gos for gos in next(gos_batch_gen)if gos.game_number not in already_scraped_gos]
+            for handcard_tuple in self._scrape_normal_handcards_from_batch(gos_batch=gos_batch):
+                handcards.add(handcard_tuple)
+            already_scraped_gos.update(gos.game_number for gos in gos_batch)
+            print("scraped {} handcards, time remaining: {:.2f}seconds".format(len(handcards), end_t - time.time()), flush=True)
+            if len(handcards) > 10000:
+                print("Store handcards & gosses in between.", flush=True)
+                store_handcards(handcards)
+                store_gos(already_scraped_gos)
+                handcards = set()
+        # end while
+
+        if len(handcards) > 0:
+            print("Store handcards & gosses at the end.", flush=True)
+            store_handcards(handcards)
+            store_gos(already_scraped_gos)
+
+    def scrape_normal_handcards_batch_gen(self)->typing.Generator[CardSet, None, None]:
+        """
+        :return: Generator yielding the handcards from 8 games at a time
+        """
+        gos_batch_gen = grouper(n=8, iterable=self.game_overviews_gen())
+        while 1 != 0:  # while True
+            gos_batch = next(gos_batch_gen)
+            for hc in self._scrape_normal_handcards_from_batch(gos_batch=gos_batch):
+                yield cards_class_list_to_cardsset(hc)
+
     # ==================== Public File Handling Methods ====================
 
     def all_stored_games_gen(self):
@@ -458,7 +432,15 @@ class TichumaniaScraper(object):
             for game in games:
                 yield game
 
+    def all_stored_handcards_gen(self):
+        handcard_files = glob.glob(self._out_folder_f.format('handcards/*handcards*'))
+        for filename in handcard_files:
+            yield from self._load_from_file(filename, default=[])
 
+    def all_stored_gos_nbrs_gen(self):
+        gos_files = glob.glob(self._out_folder_f.format('handcards/*gameoverviews*'))
+        for filename in gos_files:
+            yield from map(int, self._load_from_file(filename, default=[]))
 
     # ==================== Private Scrape Methods ====================
 
@@ -483,7 +465,7 @@ class TichumaniaScraper(object):
         :param default: The value returned if the file does not exist
         :return: the object in the file or none if the file does not exist
         """
-        file_path = self._out_folder_f.format(filename)
+        file_path = self._out_folder_f.format(filename) if self._out_folder_f.format("") not in filename else filename
         try:
             with open(file_path, 'r') as f:
                 print("Loading file ", file_path, '... ', end='', flush=True)
@@ -491,7 +473,7 @@ class TichumaniaScraper(object):
                 print("loaded data of type ", type(data), " and of length: ", len(data) if data.__len__ else 'Has no length.')
                 return data
         except FileNotFoundError as fnfe:
-            print("file did not exist, returning default: ", default)
+            print("file '{}' did not exist, returning default: {}".format(file_path, default))
             return default
 
     def _store_scraped_gamenumbers(self):
@@ -651,6 +633,20 @@ class TichumaniaScraper(object):
             if game is not None:
                 yield game
 
+    @exceptions_to_warning
+    def _scrape_normal_handcards_from_batch(self, gos_batch):
+        urls = [self.game_url(go.game_number) for go in gos_batch]
+        if len(urls) == 0:
+            return  # nothing to do here
+
+        rqsts = (greq.get(url) for url in urls)
+        responses = greq.map(rqsts)
+        failed_resp = [r for r in responses if not r.ok]
+        if len(failed_resp) > 0:
+            print("Following requests failed: ", failed_resp)
+        for handcards_in_game_gen in (self.scrape_normal_hands_from_soup(BeautifulSoup(r.text, 'lxml'), go) for r, go in zip(responses, gos_batch) if r is not None):
+            if handcards_in_game_gen is not None:
+                yield from handcards_in_game_gen
 
     @exceptions_to_warning
     def scrape_game(self, game_overview):
@@ -701,6 +697,15 @@ class TichumaniaScraper(object):
         print('done. time:', time.time() - start_t)
 
         return Game(**game_data)
+
+    @exceptions_to_warning
+    def scrape_normal_hands_from_soup(self, game_soup, game_overview):
+        all_handcards_tag = game_soup.find_all('div', {'class': 'cards'})
+        hands = set()
+        for cards_tag in all_handcards_tag:
+            handcards_list = [c_span['class'][-1] for c_span in cards_tag.find_all('span', {'class': 'card'})]
+            hands.add(tuple(sorted(handcards_list)))
+        yield from hands
 
     def _scrape_round(self, round_soup):
         """
@@ -853,16 +858,164 @@ class TichumaniaScraper(object):
             subline_tag = move_tag.find('div', {'class': 'subline'})
             move_data['is_pass'] = 'Pass' in subline_tag.text
             move_data['is_clear'] = 'final' in subline_tag['class']
-            move_data['dragon_to'] = subline_tag.text.strip().split(' ')[-1] if move_data[
-                                                                                    'is_clear'] and 'Dragon' in subline_tag.text else None
+            move_data['dragon_to'] = subline_tag.text.strip().split(' ')[-1] if move_data['is_clear'] and 'Dragon' in subline_tag.text else None
             moves.append(Move(**move_data))
 
         return tuple(moves)
 
 
+class GenCombWeights(object):
+
+    def __init__(self, load: bool=True):
+        self.filename = "./gcombweights.pkl"
+        self._gcomb_counter: typing.Dict[typing.Tuple[int, GeneralCombination], int] = defaultdict(int)  # (length, gencomb) -> how many time the gcomb was seen for the length
+        self._total_counter: typing.Dict[int, int] = defaultdict(int) # how many gcombs have been seen for the given length
+        if load:
+            try:
+                self.load_from_file()
+            except FileNotFoundError:
+                print("Loading GenCombWeights: File not Found {}, continuing empy.".format(self.filename))
+
+    @property
+    def weights(self):
+        return self._calc_weights_dict()
+
+    @staticmethod
+    def weights_from_file(filename: str=None)->typing.Dict[typing.Tuple[int, GeneralCombination], float]:
+        gcw = GenCombWeights(load=False)
+        gcw.load_from_file(filename=filename)
+        return gcw.weights
+
+    def _calc_weights_dict(self)->typing.Dict[typing.Tuple[int, GeneralCombination], float]:
+        weight_dict = defaultdict(float)
+        for len_gcomb, nbr in self._gcomb_counter.items():
+            try:
+                weight_dict[len_gcomb] = nbr / self._total_counter[len_gcomb[0]]
+            except ZeroDivisionError:
+                pass
+        return weight_dict
+
+    def add_gcombs_for_length(self, length, gcombs):
+        self._total_counter[length] += len(gcombs)
+        for gcomb in gcombs:
+            tup = (length, gcomb)
+            self._gcomb_counter[tup] += 1
+
+    def proba_for_gcomb_and_length(self, length, gcomb):
+        try:
+            return self._gcomb_counter[(length, gcomb)] / self._total_counter[length]
+        except ZeroDivisionError:
+            return 0
+
+    def load_from_file(self, filename: str=None):
+        if filename is None:
+            filename = self.filename
+        with open(filename, 'rb') as file:
+            obj = pickle.load(file)
+            self._gcomb_counter, self._total_counter = obj
+
+    def save_to_file(self, filename: str=None):
+        if filename is None:
+            filename = self.filename
+        obj = [self._gcomb_counter, self._total_counter]
+        with open(filename, 'wb') as file:
+            pickle.dump(obj, file)
+
+    def save_to_csv(self, filename: str=None):
+        if filename is None:
+            filename = "./weights_{}.csv".format(sum(self._total_counter.values()))
+        print("writing to csv file: {} ...".format(filename), end="", flush=True)
+        with open(filename, 'w', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile, delimiter=',', quoting=csv.QUOTE_NONNUMERIC)
+            csvwriter.writerow(['length', 'type', 'comblength', 'height', 'probability'])
+            for len_gcomb, proba in self.weights.items():
+                length, gcomb = len_gcomb
+                csvwriter.writerow([length, gcomb.type.__name__, gcomb.height[0], gcomb.height[1], proba])
+        print("...done", flush=True)
+
+    def scrape_weights(self, max_nbr=500000, save: bool=True):
+        print("scraping {} handcards...".format(max_nbr))
+        start_t = time.time()
+        scraper = TichumaniaScraper()
+        for n, cards in enumerate(islice(scraper.scrape_normal_handcards_batch_gen(), max_nbr)):
+            self.add_gcombs_for_length(length=len(cards), gcombs=cards.all_general_combinations())
+            if n % 1000 == 0:
+                print(" ... {} ".format(n), end="", flush=True)
+            if n % 10000 == 0:
+                print()
+        if save:
+            self.save_to_file()
+        print("... done scraping. it took {} seconds".format(time.time() - start_t))
+
 if __name__ == '__main__':
+    weights: GenCombWeights = GenCombWeights(load=False)
+    weights.scrape_weights(max_nbr=1000000)
+    weights.save_to_csv()
+    w = weights.weights
+
+    for l in range(1, 15):
+        for gcomb in all_general_combinations_gen():
+            tup = (l, gcomb)
+            proba = w[tup]
+            if proba > 0:
+                print("{a}: {b} -> {prob}".format(a=l, b=gcomb, prob=proba))
+
     # n_games, output_file = int(sys.argv[1]), sys.argv[2]
     # run_scraper(n_games, output_file)
-    scraper = TichumaniaScraper()
-    nbr_scraped = scraper.scrape_games(max_nbr_games=2)
-    print("nbr scraped: ", nbr_scraped)
+    # scraper = TichumaniaScraper()
+    # # scraper.scrape_normal_handcards(max_time=3.0)
+    # cardsets = [cards_class_list_to_cardsset(clist) for clist in scraper.all_stored_handcards_gen()]
+    # print("nbr handcards: ", len(cardsets))
+    #
+    # # ### group by length
+    # len_dict = defaultdict(list)
+    # for cset in cardsets:
+    #     len_dict[len(cset)].append(cset)
+    #
+    # # print how many for each length
+    # print("len -> how many handcards:")
+    # how_many_for_each_length = {k: len(l) for k, l in len_dict.items()}
+    # print('\n'.join("{}: {}".format(k, v) for k, v in sorted(how_many_for_each_length.items(), key=itemgetter(1), reverse=True)))
+    #
+    # #  ### map to all possible combinations and their general combinations
+    # len_gcombs_dict = defaultdict(list)
+    # for cset in cardsets:
+    #     diff_combs = cset.possible_combinations()
+    #     gen_combs = set(map(GeneralCombination.from_combination, diff_combs))
+    #     len_gcombs_dict[len(cset)].extend(gen_combs)
+    #
+    # #  print how many gcombs for each length
+    # print("len -> how many gcombs:")
+    # how_many_for_each_length = {k: len(l) for k, l in len_gcombs_dict.items()}
+    # print('\n'.join("{}: {}".format(k, v) for k, v in sorted(how_many_for_each_length.items(), key=itemgetter(1), reverse=True)))
+    #
+    # #  ### count how many identical gcombs in for each length
+    # len_gcombs_counter = dict()
+    # for length, gcombs in len_gcombs_dict.items():
+    #     len_gcombs_counter[length] = Counter(gcombs)
+    #
+    # #  print how many same gcombs for each length and gcomb
+    # print("len -> for each different gcomb how many:")
+    # for length, counter in len_gcombs_counter.items():
+    #     print(length, "(total ", how_many_for_each_length[length], "): ")
+    #     for line in str(counter).split('GeneralCombination'):
+    #         print(line)
+    #     print("===========================================")
+    #
+    # # dict for each gencomb the probas of each length
+    # gencomb_len_proba_dict = {gcomb: {l: 0.0 for l in range(1, 15)} for gcomb in all_general_combinations_gen()}
+    # for gcomb in all_general_combinations_gen():
+    #     for l in range(1, 15):
+    #         total_gcombs = how_many_for_each_length[l]
+    #         nbr_of_the_comb = len_gcombs_counter[l].get(gcomb, 0)
+    #         proba = nbr_of_the_comb / total_gcombs
+    #         gencomb_len_proba_dict[gcomb][l] = proba
+    #
+    # # print gencomb_len_proba_dict
+    # for gcomb, l_dict in gencomb_len_proba_dict.items():
+    #     print(gcomb, ":")
+    #     for l, proba in l_dict.items():
+    #         print("{indent} {l}: {proba}".format(indent="     ", l=l, proba=proba))
+
+
+
