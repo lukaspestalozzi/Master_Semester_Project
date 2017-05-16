@@ -12,8 +12,6 @@ import sys, os
 
 import gym
 
-from gym_agents.strategies import make_random_tichu_strategy, never_announce_tichu_strategy
-
 this_folder = '/'.join(os.getcwd().split('/')[:])
 parent_folder = '/'.join(os.getcwd().split('/')[:-1])
 Tichu_gym_folder = parent_folder+"/Tichu-gym"
@@ -22,11 +20,11 @@ for p in [this_folder, parent_folder, Tichu_gym_folder]:  # Adds the parent fold
     if p not in sys.path:
         sys.path.append(p)
 
-
 from gamemanager import TichuGame
 from gym_agents.strategies import make_random_tichu_strategy, never_announce_tichu_strategy, always_announce_tichu_strategy
-from gym_agents import BaseMonteCarloAgent, BalancedRandomAgent
-from gym_agents.mcts import InformationSetMCTS, InformationSetMCTS_absolute_evaluation
+from gym_agents import BaseMonteCarloAgent, BalancedRandomAgent, make_first_ismcts_then_random_agent, DQN4LayerAgent
+from gym_agents.mcts import InformationSetMCTS, InformationSetMCTS_absolute_evaluation, \
+    InformationSetMCTSWeightedDeterminization
 from gym_tichu.envs.internals.utils import time_since
 import logginginit
 
@@ -37,7 +35,6 @@ logger = logging.getLogger(__name__)
 # print('PATH:', sys.path)
 # print('this_folder:', this_folder)
 # print('parent_folder:', parent_folder)
-
 
 
 class Experiment(object):
@@ -86,7 +83,7 @@ Final Points: {points}
             start_time=start_ftime, end_time=end_ftime, duration=time_since(start_t),
             players_vs_string=players_vs_string, points=game_res.points)
 
-        game_history_string = str(game_res)
+        game_history_string = str(game_res.history)
 
         logger.info(results_string)
         logger.debug(game_history_string)
@@ -180,20 +177,76 @@ class AlwaysVsNeverTichu(Experiment):
         return game.start_game(target_points=target_points)
 
 
+class FirstMctsThenRandomVsRandom(Experiment):
+    def __init__(self):
+        agents = [
+            make_first_ismcts_then_random_agent(switch_length=5),
+            BalancedRandomAgent(),
+            make_first_ismcts_then_random_agent(switch_length=5),
+            BalancedRandomAgent()
+        ]
+        self._agents = agents
+
+    @property
+    def agents(self) -> list:
+        return self._agents
+
+    def _run_game(self, target_points=1000):
+
+        game = TichuGame(*self.agents)
+        return game.start_game(target_points=target_points)
+
+
+class RandomVsPoolDeterminization(Experiment):
+    def __init__(self):
+
+        agents = [
+            BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+            BaseMonteCarloAgent(InformationSetMCTSWeightedDeterminization(), iterations=100),
+            BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+            BaseMonteCarloAgent(InformationSetMCTSWeightedDeterminization(), iterations=100),
+        ]
+        self._agents = agents
+
+    @property
+    def agents(self) -> list:
+        return self._agents
+
+    def _run_game(self, target_points=1000):
+
+        game = TichuGame(*self.agents)
+        return game.start_game(target_points=target_points)
+
+
+class DQNUntrainedVsRandom(Experiment):
+    def __init__(self):
+
+        agents = [
+            DQN4LayerAgent(weights_file=None),
+            BalancedRandomAgent(),
+            BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+            DQN4LayerAgent(weights_file=None),
+        ]
+        self._agents = agents
+
+    @property
+    def agents(self) -> list:
+        return self._agents
+
+    def _run_game(self, target_points=1000):
+
+        game = TichuGame(*self.agents)
+        return game.start_game(target_points=target_points)
+
+
 experiments = {
     'cheat_vs_noncheat_ucb1': CheatVsNonCheatUCB1,
     'relative_vs_absolute_reward': RelativeVsAbsoluteReward,
     'tichu_random_vs_never': RandomVsNeverTichu,
     'tichu_always_vs_never': AlwaysVsNeverTichu,
-}
-
-
-LogMode = namedtuple('LM', ['console_log_level', 'all_log', 'info_log', 'warn_err_log'])
-LogMode.__new__.__defaults__ = (logging.DEBUG, 'all.log', 'info.log', 'warn_error.log')  # set default values
-log_modes = {
-    'cluster': LogMode(console_log_level=None, all_log=None),
-    'test': LogMode(console_log_level=logging.INFO),
-    'full': LogMode(),
+    'first_mcts_then_random_vs_random': FirstMctsThenRandomVsRandom,
+    'random_vs_pool_determinization': RandomVsPoolDeterminization,
+    'dqn_untrained_vs_random': DQNUntrainedVsRandom,
 }
 
 log_levels_map = {
@@ -205,9 +258,11 @@ log_levels_map = {
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run Experiments', allow_abbrev=False)
+    # EXPERIMENT
     parser.add_argument('experiment_name', metavar='name', type=str, choices=[k for k in experiments.keys()],
                         help='The name of the experiment to run')
 
+    # EXPERIMENT PARAMS
     parser.add_argument('--target', dest='target_points', type=int, required=False, default=1000,
                         help='The number of points to play for')
     parser.add_argument('--min_duration', dest='min_duration', type=int, required=False, default=None,
@@ -216,20 +271,16 @@ if __name__ == "__main__":
                         help='Does not start a new experiment when this amount of minutes passed. Must be bigger than --min_duration if specified. Overwrites --nbr_experiments')
     parser.add_argument('--nbr_experiments', dest='nbr_experiments', type=int, required=False, default=1,
                         help='The amount of experiments to run sequentially (Default is 1). If --min_duration is specified, then stops when both constraints are satisfied.')
-    parser.add_argument('--log_mode', dest='log_mode', type=str, required=False, default='cluster', choices=[k for k in log_modes.keys()],
-                        help='''The logging mode:
-                                "cluster": only logs info and above; 
-                                "test": logs all, and console log level is Info.
-                                "full": logs everything, console log level is Debug
-                            ''')
-    parser.add_argument('--console_log_level', dest='console_log_level_str', type=str, required=False, default=None, choices=[k for k in log_levels_map.keys()],
-                        help='The level of logging printed to console. Overwrites the --log_mode setting for console_log_level')
+    # LOGING
+    parser.add_argument('--log_mode', dest='log_mode', type=str, required=False, default='ExperimentMode', choices=[k for k in logginginit.logging_modes.keys()],
+                        help="{}".format('\n'.join("{}: {}".format(modestr, str(mode)) for modestr, mode in logginginit.logging_modes.items())))
     parser.add_argument('--ignore_debug', dest='ignore_debug', required=False, action='store_true',
                         help='Whether to log debug level (set flag to NOT log debug level). Overwrites the --log_mode setting for debug level')
     parser.add_argument('--ignore_info', dest='ignore_info', required=False, action='store_true',
-                        help='Whether to log info level (set flag to NOT log info level). Overwrites the --log_mode setting for info level')
+                        help='Whether to log info level (set flag to NOT log info (and debug) level). Overwrites the --log_mode setting for info level')
+    # POOL SIZE
     parser.add_argument('--pool_size', dest='pool_size', type=int, required=False, default=10,
-                        help='The amount of workers use in the Pool.')
+                        help='The amount of workers use in the Pool [default: 10].')
 
     args = parser.parse_args()
     print("args:", args)
@@ -246,17 +297,20 @@ if __name__ == "__main__":
     start_ftime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     log_folder_name = "./logs/" + args.experiment_name + "_" + start_ftime
 
-    logmode = log_modes[args.log_mode]
+    logmode = logginginit.logging_modes[args.log_mode]
     gym.undo_logger_setup()
-    logginginit.initialize_logger(log_folder_name,
-                                  console_log_level=logmode.console_log_level if not args.console_log_level_str else log_levels_map[args.console_log_level_str],
-                                  all_log=None if args.ignore_debug else logmode.all_log,
-                                  info_log=None if args.ignore_info else logmode.info_log,
-                                  warn_err_log=logmode.warn_err_log,
-                                  logger_name=None)
+    min_loglevel = logging.DEBUG
+    if args.ignore_debug:
+        min_loglevel = logging.INFO
+    if args.ignore_info:
+        min_loglevel = logging.WARNING
 
+    logginginit.initialize_loggers(output_dir=log_folder_name, logging_mode=logmode, min_loglevel=min_loglevel)
+
+    # nbr expreiments
     nbr_exp_left = args.nbr_experiments
 
+    # the experiment
     exp = experiments[args.experiment_name]
 
     # run several experiments in multiple processors
@@ -264,12 +318,14 @@ if __name__ == "__main__":
     if nbr_exp_left > 1:
         with Pool(processes=pool_size) as pool:
             logger.debug("Running experiments in Pool (of size {})".format(pool_size))
+            # run all experiments in Pool
             multiple_results = [pool.apply_async(exp().run, (), {'target_points': args.target_points}) for i in range(nbr_exp_left)]
             # wait for processes to complete
             for res in multiple_results:
                 res.get()
                 nbr_exp_left -= 1
 
+    # run experiment in parent process
     while (nbr_exp_left > 0 or time() < min_t) and time() < max_t:
         nbr_exp_left -= 1
         exp().run(target_points=args.target_points)
