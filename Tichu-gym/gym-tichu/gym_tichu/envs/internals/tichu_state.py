@@ -240,6 +240,7 @@ actions:
 
 class BaseTichuState(object, metaclass=abc.ABCMeta):
 
+    
     @abc.abstractmethod
     def next_state(self, action: Any)->'BaseTichuState':
         """
@@ -302,61 +303,6 @@ class TichuState(BaseTichuState, namedtuple("TichuState", [
         self._possible_actions_set: Set[PlayerAction] = None
         self._possible_actions_list: List[PlayerAction] = None
         self._state_transitions: Dict[PlayerAction, TichuState] = dict()
-
-    # @classmethod
-    # def initial(cls):
-    #     """
-    #
-    #     :return: TichuState without any cards distributed yet
-    #     """
-    #     return TichuState(
-    #             player_pos=0,
-    #             handcards=HandCards(),
-    #             won_tricks=WonTricks(),
-    #             trick_on_table=Trick(),
-    #             wish=None,
-    #             ranking=(),
-    #             announced_tichu=frozenset(),
-    #             announced_grand_tichu=frozenset(),
-    #             history=History()
-    #     )
-
-    # @classmethod
-    # def distributed_8_cards(cls, allow_tichu: bool=True):
-    #     """
-    #
-    #     :return: TichuState with 8 cards distributed to all 4 players
-    #     """
-    #     piles_of_8 = [p[:8] for p in Deck(full=True).split(nbr_piles=4, random_=True)]
-    #     assert len(piles_of_8) == 4
-    #     assert all(len(p) == 8 for p in piles_of_8)
-    #
-    #     handcards = HandCards(*piles_of_8)
-    #     return TichuState(
-    #             player_pos=0,
-    #             handcards=handcards,
-    #             won_tricks=WonTricks(),
-    #             trick_on_table=Trick(),
-    #             wish=None,
-    #             ranking=(),
-    #             announced_tichu=frozenset(),
-    #             announced_grand_tichu=frozenset(),
-    #             history=History(),
-    #             allow_tichu=allow_tichu
-    #     )
-    #
-    # def distribute_14_cards(self)->'TichuState':
-    #     """
-    #     Distributes the remaining cards.
-    #     :return:
-    #     :raises: ValueError when not all players have exactly 8 cards. And won_tricks is not empty.
-    #     """
-    #     remaining_cards = set(Deck(full=True)) - set(self.handcards.iter_all_cards())
-    #     piles = Deck(full=False, cards=remaining_cards).split(nbr_piles=4, random_=True)
-    #     assert len(piles) == 4
-    #     assert all(len(p) == 6 for p in piles), str(piles)
-    #     new_handcards = HandCards(*[itertools.chain(crds, piles[k]) for k, crds in enumerate(self.handcards)])
-    #     return self.change(handcards=new_handcards)
 
     @property
     def _current_player_handcards(self) -> CardSet:
@@ -862,3 +808,7 @@ class AfterTrading(TichuState):
 
     def is_terminal(self):
         return False
+
+
+class MutableTichuState(object):
+    pass

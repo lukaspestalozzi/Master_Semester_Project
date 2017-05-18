@@ -25,13 +25,13 @@ from gym_tichu.envs.internals.utils import check_param, flatten
 logger = logging.getLogger(__name__)
 
 __all__ = ('InformationSetMCTS', 'InformationSetMCTS_absolute_evaluation', 'EpicISMCTS', 'ISMctsLGR', 'ISMctsEpicLGR',
-           'InformationSetMCTSWeightedDeterminization')
+           'InformationSetMCTSWeightedDeterminization' 'InformationSetMCTSHighestUcbBestAction')
 
 NodeID = NewType('NodeID', Hashable)
 RewardVector = NewType('RewardVector', Tuple[int, int, int, int])
 
 
-@lru_cache(maxsize=2**16)  # 64k CacheInfo(hits=2274111, misses=43745, maxsize=65536, currsize=43745)
+@lru_cache(maxsize=2**15)  # with (2**16) 64k CacheInfo(hits=2274111, misses=43745, maxsize=65536, currsize=43745)
 def _uid_trick(trick: Trick) -> str:
     return ''.join(map(str, trick.combinations()))  # TODO improve
 
@@ -41,7 +41,7 @@ def _uid_cardset(cards: CardSet) -> str:
     return ''.join(map(str, cards))  # TODO improve
 
 
-@lru_cache(maxsize=2**16)  # with 131k (2**17):  CacheInfo(hits=233368, misses=331146, maxsize=131072, currsize=131072)
+@lru_cache(maxsize=2**15)  # with 131k (2**17):  CacheInfo(hits=233368, misses=331146, maxsize=131072, currsize=131072)
 def unique_infoset_id(state: TichuState, observer_id: int) -> str:
     return '|'.join(
             map(str, (
@@ -58,15 +58,15 @@ def unique_infoset_id(state: TichuState, observer_id: int) -> str:
         )
 
 
-@lru_cache(maxsize=2048)
+@lru_cache(maxsize=2**15)
 def position_in_episode(state: TichuState)->str:
-    # TODO try: - with/without passactions; - include/remove playerid; - use the trick and not history; use 'generic' actions (eg. pair(As) instead of Pair(As1, As2))
+    # TODO try: - with/without passactions; - include/remove playerid; - use the trick and not history; use 'genericcombinations'
 
     # history is the current trick on the table (only played combinations)
     if state.trick_on_table.is_empty():
-        return "ROOT_" + str(state.player_id)
+        return "ROOT_" + str(state.player_pos)
     else:
-        return '->'.join(map(str, state.trick_on_table.combinations()))
+        return _uid_trick(state.trick_on_table)
 
 
 def _atexit_caches_info():
@@ -76,7 +76,7 @@ def _atexit_caches_info():
     caches = [_uid_trick, _uid_cardset, unique_infoset_id, position_in_episode]
     print("=============== cache infos ===================")
     for cache in caches:
-        print(cache.__name__, ': ', cache.cache_info())
+        print('{}: {}'.format(cache.__name__, cache.cache_info()))
     print()
 
 atexit.register(_atexit_caches_info)
@@ -171,8 +171,10 @@ class InformationSetMCTS(MCTS):
     def __init__(self):
         self.graph = nx.DiGraph(name='GameGraph')
         self.observer_id = None
-        self._visited_records = set()
-        self._available_records = set()
+        # self._visited_records = set()
+        # self._available_records = set()
+        self._visited_records = defaultdict(int)
+        self._available_records = defaultdict(int)
         self._determinization_generator = None
 
     @timecall(immediate=False)
@@ -216,8 +218,8 @@ class InformationSetMCTS(MCTS):
         return "MCTS: {me.__class__.__name__}, observer: {me.observer_id}".format(me=self)
 
     def _init_iteration(self) -> None:
-        self._visited_records = set()
-        self._available_records = set()
+        self._visited_records.clear()
+        self._available_records.clear()
 
     def _graph_node_id(self, state: TichuState) -> NodeID:
         return unique_infoset_id(state=state, observer_id=self.observer_id)
@@ -263,6 +265,7 @@ class InformationSetMCTS(MCTS):
 
     def expand(self, leaf_state: TichuState) -> None:
         leaf_nid = self._graph_node_id(leaf_state)
+        self._visited_records[self.graph.node[leaf_nid]['record']] += 1
         for action in leaf_state.possible_actions_gen():
             to_nid = self._graph_node_id(state=leaf_state.next_state(action))
             self.add_child_node(from_nid=leaf_nid, to_nid=to_nid, action=action)
@@ -307,8 +310,9 @@ class InformationSetMCTS(MCTS):
         nid = self._graph_node_id(state)
         # store record for backpropagation
         rec = self.graph.node[nid]['record']
-        self._visited_records.add(rec)
-        self._available_records.add(rec)
+        self._visited_records[rec] += 1
+        # self._visited_records.add(rec)
+        # self._available_records.add(rec)
 
         # find max (return uniformly at random from max UCB1 value)
         poss_actions = set(state.possible_actions())
@@ -318,7 +322,8 @@ class InformationSetMCTS(MCTS):
             # logger.debug("Tree selection looking at "+str(action))
             if action in poss_actions:
                 child_record = self.graph.node[to_nid]['record']
-                self._available_records.add(child_record)
+                # self._available_records.add(child_record)
+                self._available_records[child_record] += 1
                 val = child_record.ucb(p=state.player_pos)
                 if max_val == val:
                     max_actions.append(action)
@@ -367,20 +372,24 @@ class InformationSetMCTS(MCTS):
         :return: 
         """
 
-        assert self._visited_records.issubset(self._available_records), "\nvisited: {}\n\navail: {}".format(self._visited_records, self._available_records)
+        # assert self._visited_records.issubset(self._available_records), "\nvisited: {}\n\navail: {}".format(self._visited_records, self._available_records)
+        # assert self._visited_records.issubset(self._available_records), "\nvisited: {}\n\navail: {}".format(self._visited_records, self._available_records)
+        #
+        # available = set(self._available_records.keys())
+        # visited = set(self._visited_records.keys())
 
         # logger.debug(f"visited: {len(self._visited_records)}, avail: {len(self._available_records)})")
-        for record in self._available_records:
-            record.increase_availability_count()
+        for record, amount in self._available_records.items():
+            record.increase_availability_count(amount=amount)
 
-        for record in self._visited_records:
+        for record, amount in self._visited_records.items():
             # logger.debug("record: {}".format(record))
-            record.increase_number_visits()
-            record.add_reward(reward_vector)
+            record.increase_number_visits(amount=amount)
+            record.add_reward([r*amount for r in reward_vector])
 
     def best_action(self, state: TichuState) -> PlayerAction:
         """
-        Returns the actions with the highest ucb value
+        Returns the actions with the highest visit count
         
         :param state: 
         :return: The best action to play from the given state
@@ -397,7 +406,7 @@ class InformationSetMCTS(MCTS):
         for _, to_nid, action in self.graph.out_edges_iter(nid, data='action', default=None):
             if action in possactions:
                 rec = self.graph.node[to_nid]['record']
-                val = rec.ucb(p=state.player_pos)
+                val = rec.visit_count
                 # logger.debug(f"   {val}->{action}: {rec}")
                 if val > max_v:
                     max_v = val
@@ -435,6 +444,39 @@ class InformationSetMCTSWeightedDeterminization(InformationSetMCTS):
 
     def _make__determinization_generator(self, state: TichuState, observer_id: int):
         return Determiner(state=state, observer=observer_id).weighted_determinization_gen()
+
+
+class InformationSetMCTSHighestUcbBestAction(InformationSetMCTS):
+    """
+    InformationSetMCTS where the best_action is the one with the highest ucb value.
+    """
+
+    def best_action(self, state: TichuState) -> PlayerAction:
+        """
+        Returns the actions with the highest ucb value
+
+        :param state: 
+        :return: The best action to play from the given state
+        """
+        nid = self._graph_node_id(state)
+
+        assert nid in self.graph
+        assert self.graph.out_degree(nid) > 0
+
+        possactions = state.possible_actions()
+
+        max_a = next(iter(possactions))
+        max_v = -float('inf')
+        for _, to_nid, action in self.graph.out_edges_iter(nid, data='action', default=None):
+            if action in possactions:
+                rec = self.graph.node[to_nid]['record']
+                val = rec.ucb(p=state.player_pos)
+                # logger.debug(f"   {val}->{action}: {rec}")
+                if val > max_v:
+                    max_v = val
+                    max_a = action
+
+        return max_a
 
 
 class EpicISMCTS(InformationSetMCTS):

@@ -9,6 +9,7 @@ from multiprocessing import Pool
 import logging
 
 import sys, os
+from typing import Tuple
 
 import gym
 
@@ -22,22 +23,17 @@ for p in [this_folder, parent_folder, Tichu_gym_folder]:  # Adds the parent fold
 
 from gamemanager import TichuGame
 from gym_agents.strategies import make_random_tichu_strategy, never_announce_tichu_strategy, always_announce_tichu_strategy
-from gym_agents import BaseMonteCarloAgent, BalancedRandomAgent, make_first_ismcts_then_random_agent, DQN4LayerAgent
-from gym_agents.mcts import InformationSetMCTS, InformationSetMCTS_absolute_evaluation, \
-    InformationSetMCTSWeightedDeterminization
+from gym_agents import (BaseMonteCarloAgent, BalancedRandomAgent, make_first_ismcts_then_random_agent, DQN4LayerAgent, DefaultGymAgent)
+from gym_agents.mcts import (InformationSetMCTS, InformationSetMCTS_absolute_evaluation,
+                             InformationSetMCTSWeightedDeterminization, EpicISMCTS,
+                             InformationSetMCTSHighestUcbBestAction)
 from gym_tichu.envs.internals.utils import time_since
 import logginginit
 
 
 logger = logging.getLogger(__name__)
 
-
-# print('PATH:', sys.path)
-# print('this_folder:', this_folder)
-# print('parent_folder:', parent_folder)
-
-
-class Experiment(object):
+class Experiment(object, metaclass=abc.ABCMeta):
 
     @property
     def name(self)->str:
@@ -45,7 +41,7 @@ class Experiment(object):
 
     @property
     @abc.abstractmethod
-    def agents(self)->list:
+    def agents(self)->Tuple[DefaultGymAgent, DefaultGymAgent, DefaultGymAgent, DefaultGymAgent]:
         pass
 
     def run(self, target_points):
@@ -96,19 +92,18 @@ Final Points: {points}
         pass
 
 
-class CheatVsNonCheatUCB1(Experiment):
+class SimpleExperiment(Experiment, metaclass=abc.ABCMeta):
+    """
+    Experiment that runs a game to a given amount of points with 4 agents.
+    The only method to overwrite is **_init_agents**
+    """
 
     def __init__(self):
-        agents = [
-            BaseMonteCarloAgent(InformationSetMCTS(), iterations=100, cheat=True),
-            BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
-            BaseMonteCarloAgent(InformationSetMCTS(), iterations=100, cheat=True),
-            BaseMonteCarloAgent(InformationSetMCTS(), iterations=100)
-        ]
+        agents = self._init_agents()
         self._agents = agents
 
     @property
-    def agents(self) -> list:
+    def agents(self)->Tuple[DefaultGymAgent, DefaultGymAgent, DefaultGymAgent, DefaultGymAgent]:
         return self._agents
 
     def _run_game(self, target_points=1000):
@@ -116,127 +111,90 @@ class CheatVsNonCheatUCB1(Experiment):
         game = TichuGame(*self.agents)
         return game.start_game(target_points=target_points)
 
-
-class RelativeVsAbsoluteReward(Experiment):
-    def __init__(self):
-        agents = [
-            BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
-            BaseMonteCarloAgent(InformationSetMCTS_absolute_evaluation(), iterations=100),
-            BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
-            BaseMonteCarloAgent(InformationSetMCTS_absolute_evaluation(), iterations=100)
-        ]
-        self._agents = agents
-
-    @property
-    def agents(self) -> list:
-        return self._agents
-
-    def _run_game(self, target_points=1000):
-
-        game = TichuGame(*self.agents)
-        return game.start_game(target_points=target_points)
+    @abc.abstractmethod
+    def _init_agents(self)->Tuple[DefaultGymAgent, DefaultGymAgent, DefaultGymAgent, DefaultGymAgent]:
+        raise NotImplementedError()
 
 
-class RandomVsNeverTichu(Experiment):
-    def __init__(self):
-        agents = [
-            BalancedRandomAgent(announce_tichu=make_random_tichu_strategy(announce_weight=0.5)),
-            BalancedRandomAgent(announce_tichu=never_announce_tichu_strategy),
-            BalancedRandomAgent(announce_tichu=never_announce_tichu_strategy),
-            BalancedRandomAgent(announce_tichu=never_announce_tichu_strategy),
-        ]
-        self._agents = agents
+class CheatVsNonCheatUCB1(SimpleExperiment):
 
-    @property
-    def agents(self) -> list:
-        return self._agents
-
-    def _run_game(self, target_points=1000):
-
-        game = TichuGame(*self.agents, )
-        return game.start_game(target_points=target_points)
+    def _init_agents(self):
+        return (BaseMonteCarloAgent(InformationSetMCTS(), iterations=100, cheat=True),
+                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100, cheat=True),
+                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))
 
 
-class AlwaysVsNeverTichu(Experiment):
-    def __init__(self):
-        agents = [
-            BalancedRandomAgent(announce_tichu=always_announce_tichu_strategy),
-            BalancedRandomAgent(announce_tichu=never_announce_tichu_strategy),
-            BalancedRandomAgent(announce_tichu=never_announce_tichu_strategy),
-            BalancedRandomAgent(announce_tichu=never_announce_tichu_strategy),
-        ]
-        self._agents = agents
+class EpicVsIsMcts(SimpleExperiment):
 
-    @property
-    def agents(self) -> list:
-        return self._agents
-
-    def _run_game(self, target_points=1000):
-
-        game = TichuGame(*self.agents, )
-        return game.start_game(target_points=target_points)
+    def _init_agents(self):
+        return (BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                BaseMonteCarloAgent(EpicISMCTS(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                BaseMonteCarloAgent(EpicISMCTS(), iterations=100))
 
 
-class FirstMctsThenRandomVsRandom(Experiment):
-    def __init__(self):
-        agents = [
-            make_first_ismcts_then_random_agent(switch_length=5),
-            BalancedRandomAgent(),
-            make_first_ismcts_then_random_agent(switch_length=5),
-            BalancedRandomAgent()
-        ]
-        self._agents = agents
+class IsmctsBestActionMaxUcbVsMostVisited(SimpleExperiment):
 
-    @property
-    def agents(self) -> list:
-        return self._agents
-
-    def _run_game(self, target_points=1000):
-
-        game = TichuGame(*self.agents)
-        return game.start_game(target_points=target_points)
+    def _init_agents(self):
+        return (BaseMonteCarloAgent(InformationSetMCTSHighestUcbBestAction(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTSHighestUcbBestAction(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))
 
 
-class RandomVsPoolDeterminization(Experiment):
-    def __init__(self):
+class RelativeVsAbsoluteReward(SimpleExperiment):
 
-        agents = [
-            BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
-            BaseMonteCarloAgent(InformationSetMCTSWeightedDeterminization(), iterations=100),
-            BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
-            BaseMonteCarloAgent(InformationSetMCTSWeightedDeterminization(), iterations=100),
-        ]
-        self._agents = agents
-
-    @property
-    def agents(self) -> list:
-        return self._agents
-
-    def _run_game(self, target_points=1000):
-
-        game = TichuGame(*self.agents)
-        return game.start_game(target_points=target_points)
+    def _init_agents(self):
+        return (BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS_absolute_evaluation(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS_absolute_evaluation(), iterations=100))
 
 
-class DQNUntrainedVsRandom(Experiment):
-    def __init__(self):
+class RandomVsNeverTichu(SimpleExperiment):
 
-        agents = [
-            DQN4LayerAgent(weights_file=None),
-            BalancedRandomAgent(),
-            BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
-            DQN4LayerAgent(weights_file=None),
-        ]
-        self._agents = agents
+    def _init_agents(self):
+        return (BalancedRandomAgent(announce_tichu=make_random_tichu_strategy(announce_weight=0.5)),
+                BalancedRandomAgent(announce_tichu=never_announce_tichu_strategy),
+                BalancedRandomAgent(announce_tichu=never_announce_tichu_strategy),
+                BalancedRandomAgent(announce_tichu=never_announce_tichu_strategy),)
 
-    @property
-    def agents(self) -> list:
-        return self._agents
 
-    def _run_game(self, target_points=1000):
+class AlwaysVsNeverTichu(SimpleExperiment):
 
-        game = TichuGame(*self.agents)
-        return game.start_game(target_points=target_points)
+    def _init_agents(self):
+        return (BalancedRandomAgent(announce_tichu=always_announce_tichu_strategy),
+                BalancedRandomAgent(announce_tichu=never_announce_tichu_strategy),
+                BalancedRandomAgent(announce_tichu=never_announce_tichu_strategy),
+                BalancedRandomAgent(announce_tichu=never_announce_tichu_strategy),)
+
+
+class FirstMctsThenRandomVsRandom(SimpleExperiment):
+
+    def _init_agents(self):
+        return (make_first_ismcts_then_random_agent(switch_length=5),
+                BalancedRandomAgent(),
+                make_first_ismcts_then_random_agent(switch_length=5),
+                BalancedRandomAgent())
+
+
+class RandomVsPoolDeterminization(SimpleExperiment):
+
+    def _init_agents(self):
+        return (BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTSWeightedDeterminization(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTSWeightedDeterminization(), iterations=100),)
+
+
+class DQNUntrainedVsRandom(SimpleExperiment):
+
+    def _init_agents(self):
+        return (DQN4LayerAgent(weights_file=None),
+                BalancedRandomAgent(),
+                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                DQN4LayerAgent(weights_file=None),)
 
 
 experiments = {
@@ -247,6 +205,9 @@ experiments = {
     'first_mcts_then_random_vs_random': FirstMctsThenRandomVsRandom,
     'random_vs_pool_determinization': RandomVsPoolDeterminization,
     'dqn_untrained_vs_random': DQNUntrainedVsRandom,
+    'epic_vs_ismcts': EpicVsIsMcts,
+    'ismcts_best_action_maxucb_vs_most_visited': IsmctsBestActionMaxUcbVsMostVisited,
+
 }
 
 log_levels_map = {
@@ -254,6 +215,7 @@ log_levels_map = {
     'INFO': logging.INFO,
     'WARNING': logging.WARNING,
     'ERROR': logging.ERROR,
+    'CRITICAL': logging.CRITICAL,
 }
 
 if __name__ == "__main__":
@@ -279,8 +241,8 @@ if __name__ == "__main__":
     parser.add_argument('--ignore_info', dest='ignore_info', required=False, action='store_true',
                         help='Whether to log info level (set flag to NOT log info (and debug) level). Overwrites the --log_mode setting for info level')
     # POOL SIZE
-    parser.add_argument('--pool_size', dest='pool_size', type=int, required=False, default=10,
-                        help='The amount of workers use in the Pool [default: 10].')
+    parser.add_argument('--pool_size', dest='pool_size', type=int, required=False, default=5,
+                        help='The amount of workers use in the Pool [default: 5].')
 
     args = parser.parse_args()
     print("args:", args)
@@ -312,6 +274,10 @@ if __name__ == "__main__":
 
     # the experiment
     exp = experiments[args.experiment_name]
+
+    # log the arguments
+    logger.warning("Experiment summary: ")
+    logger.warning("exp: {}; args: {}".format(exp.__name__, args))
 
     # run several experiments in multiple processors
     pool_size = 10

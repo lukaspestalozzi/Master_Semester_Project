@@ -19,7 +19,7 @@ from rl.policy import BoltzmannQPolicy, GreedyQPolicy, LinearAnnealedPolicy
 from rl.memory import SequentialMemory
 
 import logginginit
-from gym_agents import BalancedRandomAgent, dqn_agent_2layers, dqn_agent_4layers, dqn_trainagent_4layers
+from gym_agents import BalancedRandomAgent, make_dqn_agent_2layers, make_dqn_agent_4layers, make_dqn_trainagent_4layers
 
 logger = logging.getLogger(__name__)
 ENV_NAME = 'tichu_singleplayer-v0'
@@ -150,7 +150,7 @@ def train_dqn_experimenting():
 
 def train_dqn_agent(nbr_steps: int):
     print("Training DQN Agent for {} steps ...".format(nbr_steps))
-    agent = dqn_trainagent_4layers
+    agent = make_dqn_trainagent_4layers()
     agent.train(nbr_steps=nbr_steps, weights_out_file=agent.weights_file, verbose=1)
 
 
@@ -164,4 +164,4 @@ if __name__ == '__main__':
     logginginit.initialize_loggers(output_dir=log_folder_name, logging_mode=logging_mode, min_loglevel=logging.INFO)
 
     # run_singleplayer_with_random_agent(1000)
-    train_dqn_agent(nbr_steps=60000)
+    train_dqn_agent(nbr_steps=106)

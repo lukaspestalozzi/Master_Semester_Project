@@ -73,8 +73,8 @@ class TichuSinglePlayerAgainstRandomEnv(gym.Env):
         assert illegal_move_mode in ['loose'], "'raise' is not yet implemented"  # ['raise', 'loose']
 
         super().__init__()
-        from gym_agents import dqn_agent_4layers
-        self.agents = [None, dqn_agent_4layers, dqn_agent_4layers, dqn_agent_4layers]
+        from gym_agents import make_dqn_agent_4layers, BalancedRandomAgent
+        self.agents = [None, BalancedRandomAgent(), BalancedRandomAgent(), BalancedRandomAgent()]
 
         self._general_combinations = list(all_general_combinations_gen())
         self.action_space = spaces.Discrete(len(self._general_combinations)+1)  # +1 because there is also the Pass action

@@ -73,6 +73,10 @@ class RandomAgent(DefaultGymAgent):
     Returns one of the possible actions at random
     """
 
+    @property
+    def info(self):
+        return "{me.__class__.__name__}, Makes a random action".format(me=self)
+
     def action(self, state):
         logger.debug("RandomAgent chooses from actions: {}".format([str(a) for a in state.possible_actions()]))
         return random.choice(list(state.possible_actions()))
@@ -82,6 +86,10 @@ class BalancedRandomAgent(RandomAgent):
     """
     Chooses one combination type first, then returns one of the possible actions of this type (at random)
     """
+
+    @property
+    def info(self):
+        return "{me.__class__.__name__}, Chooses first a Combination category and then an action".format(me=self)
 
     def action(self, state):
         logger.debug("BalancedRandomAgent chooses from actions: {}".format([str(a) for a in state.possible_actions()]))
@@ -143,6 +151,10 @@ class HumanInputAgent(DefaultGymAgent):
         human_logger.info(f"You are Player Number {self._position}")
         human_logger.info(f"Your Teammate is {(self._position + 2) % 4}")
         self._can_announce_tichu = True
+
+    @property
+    def info(self):
+        return "{me.__class__.__name__}, Asks a human to choose actions".format(me=self)
 
     @staticmethod
     def give_dragon_away(state: TichuState, player: int)->int:
@@ -323,6 +335,7 @@ class LearningAgent(DefaultGymAgent):
     def __init__(self, agent: rl.core.Agent, weights_file: Optional[str]):
         super().__init__()
         self.agent = agent
+        self._weights_file = weights_file
         if weights_file:
             print("{} loading the weights from {}".format(self.__class__.__name__, weights_file))
             try:
@@ -330,6 +343,10 @@ class LearningAgent(DefaultGymAgent):
             except OSError as oserr:
                 logger.error("Could not load file. Continuing with previous weights.")
                 logger.exception(oserr)
+
+    @property
+    def info(self):
+        return "{me.__class__.__name__}, weights: {me._weights_file}".format(me=self)
 
     def action(self, state: TichuState)->PlayerAction:
         if len(state.possible_actions_list) == 1:
@@ -473,6 +490,10 @@ class DoubleAgent(DefaultGymAgent):
         self.first_agent = agent1
         self.second_agent = agent2
         self.switch_len = switch_length
+
+    @property
+    def info(self):
+        return "{me.__class__.__name__}, agent1: {me.first_agent}, switch_length: {me.switch_len}, agent2: {me.second_agent}".format(me=self)
 
     def action(self, state: TichuState)->PlayerAction:
         my_handcards = state.handcards[state.player_pos]

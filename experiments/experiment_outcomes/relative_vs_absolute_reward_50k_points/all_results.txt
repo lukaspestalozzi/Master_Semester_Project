@@ -1,0 +1,1013 @@
+
+All points summed:
+56465 : 54035
+
+=> No clear result, relative is leading slightly
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-04_19-01-41
+
+end-time: 2017-05-04_23:52
+
+duration: 17443.08665037155 seconds (4.0 hours,290.0 minutes and 43.086650371551514 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1150, 850)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-04_23-52-24
+
+end-time: 2017-05-05_04:46
+
+duration: 17674.78653240204 seconds (4.0 hours,294.0 minutes and 34.786532402038574 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1045, 855)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_04-46-59
+
+end-time: 2017-05-05_09:34
+
+duration: 17262.919404745102 seconds (4.0 hours,287.0 minutes and 42.91940474510193 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1025, 575)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_17-19-35
+
+end-time: 2017-05-05_20:19
+
+duration: 10824.153970241547 seconds (3.0 hours,180.0 minutes and 24.15397024154663 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (150, 1050)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_17-19-35
+
+end-time: 2017-05-05_20:50
+
+duration: 12648.712829589844 seconds (3.0 hours,210.0 minutes and 48.71282958984375 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1070, 430)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_17-19-35
+
+end-time: 2017-05-05_21:33
+
+duration: 15238.138602733612 seconds (4.0 hours,253.0 minutes and 58.13860273361206 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1100, 800)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_17-19-35
+
+end-time: 2017-05-05_21:39
+
+duration: 15579.484477996826 seconds (4.0 hours,259.0 minutes and 39.48447799682617 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (640, 1060)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_17-19-35
+
+end-time: 2017-05-05_22:16
+
+duration: 17813.642918109894 seconds (4.0 hours,296.0 minutes and 53.6429181098938 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (795, 1105)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_17-19-35
+
+end-time: 2017-05-05_22:27
+
+duration: 18464.90695619583 seconds (5.0 hours,307.0 minutes and 44.9069561958313 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1030, 570)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_17-19-35
+
+end-time: 2017-05-05_22:28
+
+duration: 18505.568588495255 seconds (5.0 hours,308.0 minutes and 25.568588495254517 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1005, 995)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_17-19-35
+
+end-time: 2017-05-05_22:33
+
+duration: 18848.965971708298 seconds (5.0 hours,314.0 minutes and 8.96597170829773 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (890, 1010)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_17-19-35
+
+end-time: 2017-05-05_23:02
+
+duration: 20602.023227214813 seconds (5.0 hours,343.0 minutes and 22.023227214813232 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (960, 1040)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_17-19-35
+
+end-time: 2017-05-05_23:17
+
+duration: 21481.417226791382 seconds (5.0 hours,358.0 minutes and 1.417226791381836 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (885, 1015)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_20-19-59
+
+end-time: 2017-05-06_00:09
+
+duration: 13742.33477807045 seconds (3.0 hours,229.0 minutes and 2.334778070449829 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1050, 350)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_21-39-15
+
+end-time: 2017-05-06_01:37
+
+duration: 14265.491648197174 seconds (3.0 hours,237.0 minutes and 45.49164819717407 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (475, 1025)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_20-50-24
+
+end-time: 2017-05-06_02:47
+
+duration: 21416.00227189064 seconds (5.0 hours,356.0 minutes and 56.00227189064026 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (860, 1040)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_22-16-29
+
+end-time: 2017-05-06_02:53
+
+duration: 16639.560748815536 seconds (4.0 hours,277.0 minutes and 19.5607488155365 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (475, 1025)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_21-33-33
+
+end-time: 2017-05-06_02:55
+
+duration: 19292.366859197617 seconds (5.0 hours,321.0 minutes and 32.36685919761658 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1075, 925)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_22-27-20
+
+end-time: 2017-05-06_02:58
+
+duration: 16291.173059463501 seconds (4.0 hours,271.0 minutes and 31.173059463500977 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1080, 720)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_23-02-57
+
+end-time: 2017-05-06_02:59
+
+duration: 14202.003041505814 seconds (3.0 hours,236.0 minutes and 42.0030415058136 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1035, 565)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_22-33-44
+
+end-time: 2017-05-06_03:42
+
+duration: 18547.40586400032 seconds (5.0 hours,309.0 minutes and 7.405864000320435 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1015, 985)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_22-28-01
+
+end-time: 2017-05-06_03:46
+
+duration: 19104.156052350998 seconds (5.0 hours,318.0 minutes and 24.156052350997925 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1015, 885)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_00-09-02
+
+end-time: 2017-05-06_03:47
+
+duration: 13109.66294336319 seconds (3.0 hours,218.0 minutes and 29.662943363189697 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1055, 345)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-05_23-17-37
+
+end-time: 2017-05-06_04:19
+
+duration: 18120.354277849197 seconds (5.0 hours,302.0 minutes and 0.3542778491973877 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1025, 875)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_01-37-00
+
+end-time: 2017-05-06_06:15
+
+duration: 16730.641319036484 seconds (4.0 hours,278.0 minutes and 50.641319036483765 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1020, 480)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_02-47-20
+
+end-time: 2017-05-06_06:55
+
+duration: 14911.842705488205 seconds (4.0 hours,248.0 minutes and 31.842705488204956 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1070, 430)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_02-58-51
+
+end-time: 2017-05-06_07:26
+
+duration: 16039.290119409561 seconds (4.0 hours,267.0 minutes and 19.290119409561157 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1015, 685)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_03-46-25
+
+end-time: 2017-05-06_07:33
+
+duration: 13648.380740642548 seconds (3.0 hours,227.0 minutes and 28.380740642547607 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (660, 1040)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_02-59-39
+
+end-time: 2017-05-06_07:43
+
+duration: 17004.826201677322 seconds (4.0 hours,283.0 minutes and 24.826201677322388 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (570, 1030)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_02-55-06
+
+end-time: 2017-05-06_07:59
+
+duration: 18251.61991906166 seconds (5.0 hours,304.0 minutes and 11.619919061660767 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (760, 1140)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_03-47-31
+
+end-time: 2017-05-06_08:28
+
+duration: 16885.491943359375 seconds (4.0 hours,281.0 minutes and 25.491943359375 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (600, 1000)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_02-53-48
+
+end-time: 2017-05-06_08:32
+
+duration: 20299.43633413315 seconds (5.0 hours,338.0 minutes and 19.436334133148193 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (995, 1005)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_04-19-37
+
+end-time: 2017-05-06_08:53
+
+duration: 16457.399875164032 seconds (4.0 hours,274.0 minutes and 17.399875164031982 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1080, 520)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_03-42-52
+
+end-time: 2017-05-06_09:07
+
+duration: 19481.01072883606 seconds (5.0 hours,324.0 minutes and 41.01072883605957 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (910, 1090)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_06-15-51
+
+end-time: 2017-05-06_11:16
+
+duration: 18015.458134174347 seconds (5.0 hours,300.0 minutes and 15.458134174346924 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (580, 1120)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_08-53-54
+
+end-time: 2017-05-06_12:07
+
+duration: 11602.763257741928 seconds (3.0 hours,193.0 minutes and 22.7632577419281 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (350, 1050)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_07-26-11
+
+end-time: 2017-05-06_12:08
+
+duration: 16919.840899944305 seconds (4.0 hours,281.0 minutes and 59.84089994430542 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (480, 1020)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_07-43-04
+
+end-time: 2017-05-06_12:50
+
+duration: 18444.7622153759 seconds (5.0 hours,307.0 minutes and 24.76221537590027 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1040, 960)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_06-55-52
+
+end-time: 2017-05-06_12:53
+
+duration: 21430.012677669525 seconds (5.0 hours,357.0 minutes and 10.012677669525146 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1020, 980)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_08-28-57
+
+end-time: 2017-05-06_12:59
+
+duration: 16220.00215625763 seconds (4.0 hours,270.0 minutes and 20.002156257629395 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1050, 650)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_08-32-08
+
+end-time: 2017-05-06_13:05
+
+duration: 16372.212455034256 seconds (4.0 hours,272.0 minutes and 52.21245503425598 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1050, 550)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_07-33-53
+
+end-time: 2017-05-06_13:31
+
+duration: 21455.398915290833 seconds (5.0 hours,357.0 minutes and 35.39891529083252 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (835, 1065)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_07-59-17
+
+end-time: 2017-05-06_13:40
+
+duration: 20444.530130386353 seconds (5.0 hours,340.0 minutes and 44.53013038635254 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1005, 995)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_09-07-33
+
+end-time: 2017-05-06_14:26
+
+duration: 19161.092118263245 seconds (5.0 hours,319.0 minutes and 21.09211826324463 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1105, 795)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_11-16-06
+
+end-time: 2017-05-06_15:25
+
+duration: 14970.439546108246 seconds (4.0 hours,249.0 minutes and 30.43954610824585 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1035, 565)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_12-07-17
+
+end-time: 2017-05-06_15:28
+
+duration: 12074.65556359291 seconds (3.0 hours,201.0 minutes and 14.655563592910767 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1045, 655)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_12-08-10
+
+end-time: 2017-05-06_16:12
+
+duration: 14684.128494024277 seconds (4.0 hours,244.0 minutes and 44.12849402427673 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1035, 665)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_12-50-29
+
+end-time: 2017-05-06_16:27
+
+duration: 13000.906873226166 seconds (3.0 hours,216.0 minutes and 40.90687322616577 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1055, 745)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_13-05-00
+
+end-time: 2017-05-06_16:52
+
+duration: 13666.854758024216 seconds (3.0 hours,227.0 minutes and 46.8547580242157 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1050, 450)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_13-40-02
+
+end-time: 2017-05-06_17:37
+
+duration: 14270.236950874329 seconds (3.0 hours,237.0 minutes and 50.23695087432861 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (735, 1065)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_12-53-02
+
+end-time: 2017-05-06_17:39
+
+duration: 17196.484040021896 seconds (4.0 hours,286.0 minutes and 36.48404002189636 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (885, 1015)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_13-31-29
+
+end-time: 2017-05-06_17:46
+
+duration: 15285.913525342941 seconds (4.0 hours,254.0 minutes and 45.913525342941284 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (780, 1020)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-06_12-59-17
+
+end-time: 2017-05-06_18:19
+
+duration: 19208.22255897522 seconds (5.0 hours,320.0 minutes and 8.222558975219727 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (785, 1015)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-04_19-26-32
+
+end-time: 2017-05-04_22:43
+
+duration: 11843.10244345665 seconds (3.0 hours,197.0 minutes and 23.10244345664978 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (500, 1000)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-04_19-26-32
+
+end-time: 2017-05-04_23:36
+
+duration: 15019.70536851883 seconds (4.0 hours,250.0 minutes and 19.705368518829346 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (525, 1075)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-04_19-26-32
+
+end-time: 2017-05-05_00:10
+
+duration: 17037.094365358353 seconds (4.0 hours,283.0 minutes and 57.09436535835266 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1020, 880)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-04_19-26-32
+
+end-time: 2017-05-05_00:16
+
+duration: 17390.018214702606 seconds (4.0 hours,289.0 minutes and 50.0182147026062 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (625, 1075)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-04_19-26-32
+
+end-time: 2017-05-05_00:23
+
+duration: 17792.379540205002 seconds (4.0 hours,296.0 minutes and 32.37954020500183 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1065, 735)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-04_19-26-32
+
+end-time: 2017-05-05_00:23
+
+duration: 17827.94681954384 seconds (4.0 hours,297.0 minutes and 7.946819543838501 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1080, 720)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-04_19-26-32
+
+end-time: 2017-05-05_00:38
+
+duration: 18701.424417972565 seconds (5.0 hours,311.0 minutes and 41.4244179725647 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1080, 720)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-04_19-26-32
+
+end-time: 2017-05-05_00:47
+
+duration: 19260.923211574554 seconds (5.0 hours,321.0 minutes and 0.9232115745544434 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (970, 1030)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-04_19-26-32
+
+end-time: 2017-05-05_01:02
+
+duration: 20170.019696712494 seconds (5.0 hours,336.0 minutes and 10.019696712493896 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1060, 940)
+
+
+################################## RELATIVEVSABSOLUTEREWARD ##################################
+start-time: 2017-05-04_19-26-32
+
+end-time: 2017-05-05_01:40
+
+duration: 22443.740215301514 seconds (6.0 hours,374.0 minutes and 3.740215301513672 seconds)
+
+0: ISMctsUCB1Agent[iterations: 100, cheat: False]
+2: ISMctsUCB1Agent[iterations: 100, cheat: False] 
+VS.
+1: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+3: ISMctsUCB1Agent_old_evalAgent[iterations: 100, cheat: False]
+
+Outcome: (1035, 965)

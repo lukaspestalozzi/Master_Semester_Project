@@ -50,7 +50,7 @@ def always_announce_tichu_strategy(state: TichuState, already_announced: Set[int
 
 def make_random_tichu_strategy(announce_weight: float)->TichuStrategyType:
     assert 0.0 <= announce_weight <= 1.0
-    return lambda state, already_announced: random.random() <= announce_weight
+    return lambda state, already_announced, player: random.random() <= announce_weight
 
 
 def give_dragon_to_the_right_strategy(state: TichuState, player: int) -> int:

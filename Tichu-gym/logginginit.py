@@ -25,14 +25,14 @@ DefaultMode = LoggingMode(redirect_stdout=False, console_logger_level=logging.IN
 TogetherMode = DefaultMode._replace(debug_file=None, info_file=None, warn_file=None, error_file=None, critical_file=None)
 SeparateMode = DefaultMode._replace(all_file=None, info_and_above_file=None, warn_and_above_file=None)
 
-ExperimentMode = SeparateMode._replace(redirect_stdout=True, console_logger_level=None, stderr_level=None)  # Only seperate files and no console output
+ExperimentMode = SeparateMode._replace(redirect_stdout=True, console_logger_level=None, stderr_level=None, debug_file=None, info_file=None)  # Only seperate files and no console output
 TrainMode = ExperimentMode._replace(redirect_stdout=False)
 HumanplayMode = DefaultMode._replace(redirect_stdout=True, stderr_level=logging.INFO)
 HumanplayCheatMode = HumanplayMode._replace(console_logger_level=logging.DEBUG)
 
 DebugMode = DefaultMode._replace(console_logger_level=logging.DEBUG, stderr_level=logging.DEBUG)  # Logs everything
 
-RunGameMode = ExperimentMode._replace(redirect_stdout=False, stderr_level=logging.WARNING)  # only stdout and seperate files.
+RunGameMode = SeparateMode._replace(redirect_stdout=False, stderr_level=logging.INFO)  # only stdout and seperate files.
 
 logging_modes = {"DefaultMode": DefaultMode, "TogetherMode": TogetherMode, "SeparateMode": SeparateMode,
                  "ExperimentMode": ExperimentMode, "TrainMode": TrainMode, "HumanplayMode": HumanplayMode,
