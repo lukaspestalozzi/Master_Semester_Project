@@ -2,6 +2,7 @@
 
 # My stuff
 *.zip
+*.h5f  # NN weights
 notebook_tests.ipynb
 _tests.py
 **/git-repos/*
