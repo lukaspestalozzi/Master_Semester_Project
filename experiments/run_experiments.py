@@ -13,6 +13,7 @@ from typing import Tuple
 
 import gym
 
+
 this_folder = '/'.join(os.getcwd().split('/')[:])
 parent_folder = '/'.join(os.getcwd().split('/')[:-1])
 Tichu_gym_folder = parent_folder+"/Tichu-gym"
@@ -23,15 +24,17 @@ for p in [this_folder, parent_folder, Tichu_gym_folder]:  # Adds the parent fold
 
 from gamemanager import TichuGame
 from gym_agents.strategies import make_random_tichu_strategy, never_announce_tichu_strategy, always_announce_tichu_strategy
-from gym_agents import (BaseMonteCarloAgent, BalancedRandomAgent, make_first_ismcts_then_random_agent, DQN4LayerAgent, DefaultGymAgent)
+from gym_agents import (BaseMonteCarloAgent, BalancedRandomAgent, make_first_ismcts_then_random_agent,
+                        DQN4LayerAgent, DefaultGymAgent, DQN2LayerAgent)
 from gym_agents.mcts import (InformationSetMCTS, InformationSetMCTS_absolute_evaluation,
                              InformationSetMCTSWeightedDeterminization, EpicISMCTS,
-                             InformationSetMCTSHighestUcbBestAction)
+                             InformationSetMCTSHighestUcbBestAction, InformationSetMCTS_ranking_evaluation)
 from gym_tichu.envs.internals.utils import time_since
 import logginginit
 
 
 logger = logging.getLogger(__name__)
+
 
 class Experiment(object, metaclass=abc.ABCMeta):
 
@@ -115,7 +118,7 @@ class SimpleExperiment(Experiment, metaclass=abc.ABCMeta):
     def _init_agents(self)->Tuple[DefaultGymAgent, DefaultGymAgent, DefaultGymAgent, DefaultGymAgent]:
         raise NotImplementedError()
 
-
+# CHEAT vs NONCHEAT
 class CheatVsNonCheatUCB1(SimpleExperiment):
 
     def _init_agents(self):
@@ -125,6 +128,7 @@ class CheatVsNonCheatUCB1(SimpleExperiment):
                 BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))
 
 
+#EPIC vs ISMCTS
 class EpicVsIsMcts(SimpleExperiment):
 
     def _init_agents(self):
@@ -134,6 +138,7 @@ class EpicVsIsMcts(SimpleExperiment):
                 BaseMonteCarloAgent(EpicISMCTS(), iterations=100))
 
 
+# BEST ACTION
 class IsmctsBestActionMaxUcbVsMostVisited(SimpleExperiment):
 
     def _init_agents(self):
@@ -143,6 +148,7 @@ class IsmctsBestActionMaxUcbVsMostVisited(SimpleExperiment):
                 BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))
 
 
+# REWARD
 class RelativeVsAbsoluteReward(SimpleExperiment):
 
     def _init_agents(self):
@@ -152,6 +158,24 @@ class RelativeVsAbsoluteReward(SimpleExperiment):
                 BaseMonteCarloAgent(InformationSetMCTS_absolute_evaluation(), iterations=100))
 
 
+class RelativeVsRankingReward(SimpleExperiment):
+    def _init_agents(self):
+        return (BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS_ranking_evaluation(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS_ranking_evaluation(), iterations=100))
+
+
+class RankingVsAbsoluteReward(SimpleExperiment):
+
+    def _init_agents(self):
+        return (BaseMonteCarloAgent(InformationSetMCTS_ranking_evaluation(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS_absolute_evaluation(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS_ranking_evaluation(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS_absolute_evaluation(), iterations=100))
+
+
+# TICHU
 class RandomVsNeverTichu(SimpleExperiment):
 
     def _init_agents(self):
@@ -170,6 +194,7 @@ class AlwaysVsNeverTichu(SimpleExperiment):
                 BalancedRandomAgent(announce_tichu=never_announce_tichu_strategy),)
 
 
+# SPLIT AGENTS
 class FirstMctsThenRandomVsRandom(SimpleExperiment):
 
     def _init_agents(self):
@@ -179,6 +204,7 @@ class FirstMctsThenRandomVsRandom(SimpleExperiment):
                 BalancedRandomAgent())
 
 
+# DETERMINIZATION
 class RandomVsPoolDeterminization(SimpleExperiment):
 
     def _init_agents(self):
@@ -188,26 +214,73 @@ class RandomVsPoolDeterminization(SimpleExperiment):
                 BaseMonteCarloAgent(InformationSetMCTSWeightedDeterminization(), iterations=100),)
 
 
+# DQN
 class DQNUntrainedVsRandom(SimpleExperiment):
 
     def _init_agents(self):
         return (DQN4LayerAgent(weights_file=None),
                 BalancedRandomAgent(),
-                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
-                DQN4LayerAgent(weights_file=None),)
+                DQN4LayerAgent(weights_file=None),
+                BalancedRandomAgent())
+
+
+class DQNRandomVsDQNLearned(SimpleExperiment):
+
+    def _init_agents(self):
+        return (DQN2LayerAgent(weights_file='./dqn/dqn_random.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_learned.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_random.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_learned.h5f'))
+
+
+class DQNRandomVsDQNLearning(SimpleExperiment):
+
+    def _init_agents(self):
+        return (DQN2LayerAgent(weights_file='./dqn/dqn_random.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_learning.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_random.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_learning.h5f'))
+
+
+class DQNLearnedVsDQNLearning(SimpleExperiment):
+
+    def _init_agents(self):
+        return (DQN2LayerAgent(weights_file='./dqn/dqn_learned.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_learning.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_learned.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_learning.h5f'))
+
+
+class DQNVsRandom(SimpleExperiment):
+
+    def _init_agents(self):
+        return (DQN2LayerAgent(weights_file='./dqn/dqn_vs_random.h5f'),
+                BalancedRandomAgent(),
+                DQN2LayerAgent(weights_file='./dqn/dqn_vs_random.h5f'),
+                BalancedRandomAgent())
 
 
 experiments = {
     'cheat_vs_noncheat_ucb1': CheatVsNonCheatUCB1,
+
     'relative_vs_absolute_reward': RelativeVsAbsoluteReward,
+    'relative_vs_ranking_reward': RelativeVsRankingReward,
+    'ranking_vs_absolute_reward': RankingVsAbsoluteReward,
+
     'tichu_random_vs_never': RandomVsNeverTichu,
     'tichu_always_vs_never': AlwaysVsNeverTichu,
+
     'first_mcts_then_random_vs_random': FirstMctsThenRandomVsRandom,
     'random_vs_pool_determinization': RandomVsPoolDeterminization,
+
     'dqn_untrained_vs_random': DQNUntrainedVsRandom,
+    'dqnrandom_vs_dqnlearned': DQNRandomVsDQNLearned,
+    'dqnrandom_vs_dqnlearning': DQNRandomVsDQNLearning,
+    'dqnlearned_vs_dqnlearning': DQNLearnedVsDQNLearning,
+    'dqn_vs_random': DQNVsRandom,
+
     'epic_vs_ismcts': EpicVsIsMcts,
     'ismcts_best_action_maxucb_vs_most_visited': IsmctsBestActionMaxUcbVsMostVisited,
-
 }
 
 log_levels_map = {
@@ -221,7 +294,7 @@ log_levels_map = {
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run Experiments', allow_abbrev=False)
     # EXPERIMENT
-    parser.add_argument('experiment_name', metavar='name', type=str, choices=[k for k in experiments.keys()],
+    parser.add_argument('experiment_name', metavar='experiment_name', type=str, choices=[k for k in experiments.keys()],
                         help='The name of the experiment to run')
 
     # EXPERIMENT PARAMS
@@ -280,7 +353,7 @@ if __name__ == "__main__":
     logger.warning("exp: {}; args: {}".format(exp.__name__, args))
 
     # run several experiments in multiple processors
-    pool_size = 10
+    pool_size = args.pool_size
     if nbr_exp_left > 1:
         with Pool(processes=pool_size) as pool:
             logger.debug("Running experiments in Pool (of size {})".format(pool_size))
