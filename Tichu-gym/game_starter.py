@@ -14,7 +14,7 @@ for p in [this_folder, parent_folder]:  # Adds the parent folder (ie. game) to t
     if p not in sys.path:
         sys.path.append(p)
 
-from gym_agents.mcts import InformationSetMCTS
+from gym_agents.mcts import InformationSetMCTS, ISMCTS_old_rollout
 from gamemanager import TichuGame
 from gym_agents import *
 
@@ -42,7 +42,9 @@ def create_agent_against_agent(type1, type2)->TichuGame:
 
 
 def dqn_against_random(target_points: int):
-    game = create_agent_against_agent(lambda: dqn_agent_4layers, RandomAgent)
+    weights_file1 = './gym_agents/agent_weights/dqn_4layers_weights.h5f'  # latest weights
+    game = create_agent_against_agent(lambda: DQN4LayerAgent(weights_file=weights_file1),
+                                      RandomAgent)
 
     res = game.start_game(target_points=target_points)
     return res
@@ -57,7 +59,7 @@ def dqn_against_ismcts(target_points: int):
 
 def dqn_against_dqn(target_points: int):
     weights_file1 = './gym_agents/agent_weights/dqn_4layers_weights.h5f'  # latest weights
-    weights_file2 = './gym_agents/agent_weights/dqn_4layers_weights_steps60000_2017-05-14_12-39-47.h5f'  # previous weights
+    weights_file2 = './gym_agents/agent_weights/old_dqn_4layers_weights'  # previous weights
     game = create_agent_against_agent(lambda: DQN4LayerAgent(weights_file=weights_file1),
                                       lambda: DQN4LayerAgent(weights_file=weights_file2))
 
@@ -91,13 +93,27 @@ def ismcts_against_random(target_points: int):
     res = game.start_game(target_points=target_points)
     return res
 
+
+def ismcts_against_ismctsoldrollout(target_points: int):
+    game = create_agent_against_agent(lambda: BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                                      lambda: BaseMonteCarloAgent(ISMCTS_old_rollout(), iterations=100))  # ISMCTS_new_rollout
+    res = game.start_game(target_points=target_points)
+    return res
+
+
+def ismcts_against_ismcts(target_points: int):
+    game = create_agent_against_agent(lambda: BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                                      lambda: BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))  # ISMCTS_new_rollout
+    res = game.start_game(target_points=target_points)
+    return res
+
 if __name__ == "__main__":
     gym.undo_logger_setup()
 
     start_ftime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     log_folder_name = "/mnt/Data/Dropbox/Studium/EPFL/MA4/sem_project/logs/game_starter_" + start_ftime
     logging_mode = logginginit.RunGameMode
-    logginginit.initialize_loggers(output_dir=log_folder_name, logging_mode=logging_mode, min_loglevel=logging.INFO)
+    logginginit.initialize_loggers(output_dir=log_folder_name, logging_mode=logging_mode, min_loglevel=logging.DEBUG)
 
-    res = dqn_against_random(target_points=10000)
+    res = random_against_random(target_points=10000)
     print_game_outcome(res)

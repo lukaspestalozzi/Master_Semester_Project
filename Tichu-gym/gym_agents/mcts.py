@@ -19,7 +19,8 @@ from scraper.tichumania_game_scraper import GenCombWeights
 from profilehooks import timecall, profile
 
 from gym_tichu.envs.internals import (TichuState, PlayerAction, PassAction, Trick, CardSet, HandCards, Card, CardRank,
-                                      GeneralCombination, Combination, all_general_combinations_gen, InitialState)
+                                      GeneralCombination, Combination, all_general_combinations_gen, InitialState,
+                                      RolloutTichuState)
 from gym_tichu.envs.internals.utils import check_param, flatten
 
 logger = logging.getLogger(__name__)
@@ -182,24 +183,25 @@ class InformationSetMCTS(MCTS):
         logger.debug(f"Started {self.__class__.__name__} with observer {observer_id}, for {iterations} iterations and cheat={cheat}")
         check_param(observer_id in range(4))
 
-        root_state: TichuState = TichuState(*root_state, allow_tichu=False, allow_wish=False)  # Don't allow tichus or wishes in the simulation
+        root_search_state: TichuState = TichuState(*root_state, allow_tichu=False, allow_wish=False)  # Don't allow tichus or wishes in the simulation
 
         self.observer_id = observer_id
-        self._determinization_generator = self._make__determinization_generator(root_state, observer_id)
-        root_nid = self._graph_node_id(root_state)
+        self._determinization_generator = self._make__determinization_generator(root_search_state, observer_id)
+        root_nid = self._graph_node_id(root_search_state)
 
         if root_nid not in self.graph and clear_graph_on_new_root:
             self.graph.clear()
         else:
             logger.debug("Could keep the graph :)")
-        self.add_root(root_state)
+        self.add_root(root_search_state)
 
         iteration = 0
         while iteration < iterations:
             iteration += 1
             self._init_iteration()
             # logger.debug("iteration "+str(iteration))
-            state_det = root_state if cheat else next(self._determinization_generator)
+            state_det = root_search_state if cheat else next(self._determinization_generator)
+            assert self._graph_node_id(state_det) == self._graph_node_id(root_search_state)  # make sure it is the same node
             # logger.debug("Tree policy")
             leaf_state = self.tree_policy(state_det)
             # logger.debug("rollout")
@@ -223,6 +225,9 @@ class InformationSetMCTS(MCTS):
 
     def _graph_node_id(self, state: TichuState) -> NodeID:
         return unique_infoset_id(state=state, observer_id=self.observer_id)
+
+    def _record_for_state(self, state: TichuState)->UCB1Record:
+        return self.graph.node[self._graph_node_id(state)]['record']
 
     def _make__determinization_generator(self, state: TichuState, observer_id: int):
         """
@@ -260,12 +265,12 @@ class InformationSetMCTS(MCTS):
             self.graph.add_edge(u=from_nid, v=to_nid, attr_dict={'action': action})
 
     def add_root(self, state: TichuState) -> None:
+        assert isinstance(state, TichuState)
         nid = self._graph_node_id(state)
         self.add_child_node(from_nid=nid, to_nid=None, action=None)
 
     def expand(self, leaf_state: TichuState) -> None:
         leaf_nid = self._graph_node_id(leaf_state)
-        self._visited_records[self.graph.node[leaf_nid]['record']] += 1
         for action in leaf_state.possible_actions_gen():
             to_nid = self._graph_node_id(state=leaf_state.next_state(action))
             self.add_child_node(from_nid=leaf_nid, to_nid=to_nid, action=action)
@@ -279,26 +284,32 @@ class InformationSetMCTS(MCTS):
         :return: The leaf_state used for simulation (rollout) policy
         """
         curr_state = state
+        # add the state to the available states since it is the root state
+        self._available_records[self._record_for_state(state)] += 1
         while not curr_state.is_terminal():
+            # add curr_state to visited nodes
+            self._visited_records[self._record_for_state(curr_state)] += 1
+            # check if needs to expand
             if not self.is_fully_expanded(curr_state):
                 self.expand(curr_state)
-                # logger.debug("tree_policy expand and return")
-                return curr_state.next_state(self.tree_selection(curr_state))
+                # select one of the nodes that just were expanded
+                ret_state = curr_state.next_state(self.tree_selection(curr_state))
+                # add the returned sate to the visited nodes
+                self._visited_records[self._record_for_state(ret_state)] += 1
+                return ret_state
             else:
+                # No expanding, just select next node
                 curr_state = curr_state.next_state(self.tree_selection(curr_state))
 
-        # logger.debug("tree_policy return (state is terminal)")
         return curr_state
 
     def is_fully_expanded(self, state: TichuState) -> bool:
-        poss_acs = set(state.possible_actions())
-        existing_actions = {action for _, _, action in
-                            self.graph.out_edges_iter(nbunch=[self._graph_node_id(state)], data='action', default=None)}
-        if len(existing_actions) < len(poss_acs):
+        existing_actions = {action for _, _, action in self.graph.out_edges_iter(nbunch=[self._graph_node_id(state)], data='action', default=None)}
+        if len(existing_actions) < len(state.possible_actions_set):
             return False
 
         # if all possible actions already exist -> is fully expanded
-        return poss_acs.issubset(existing_actions)
+        return state.possible_actions_set.issubset(existing_actions)
 
     def tree_selection(self, state: TichuState) -> PlayerAction:
         """
@@ -308,21 +319,15 @@ class InformationSetMCTS(MCTS):
         """
         # logger.debug("Tree selection")
         nid = self._graph_node_id(state)
-        # store record for backpropagation
-        rec = self.graph.node[nid]['record']
-        self._visited_records[rec] += 1
-        # self._visited_records.add(rec)
-        # self._available_records.add(rec)
 
         # find max (return uniformly at random from max UCB1 value)
-        poss_actions = set(state.possible_actions())
+        poss_actions = state.possible_actions_set
         max_val = -float('inf')
         max_actions = list()
         for _, to_nid, action in self.graph.out_edges_iter(nbunch=[nid], data='action', default=None):
             # logger.debug("Tree selection looking at "+str(action))
             if action in poss_actions:
                 child_record = self.graph.node[to_nid]['record']
-                # self._available_records.add(child_record)
                 self._available_records[child_record] += 1
                 val = child_record.ucb(p=state.player_pos)
                 if max_val == val:
@@ -343,11 +348,11 @@ class InformationSetMCTS(MCTS):
         :param state: 
         :return: the reward vector of this rollout
         """
-        rollout_state = state
-        while not rollout_state.is_terminal():
-            rollout_state = rollout_state.next_state(rollout_state.random_action())
-        return self.evaluate_state(rollout_state)
 
+        rollout_state = RolloutTichuState.from_tichustate(state)
+        return self.evaluate_state(rollout_state.random_rollout())  # TODO make RolloutState.random_rollout() to return a normal TichuState?
+
+    @timecall(immediate=False)
     def evaluate_state(self, state: TichuState) -> RewardVector:
         """
 
@@ -372,11 +377,15 @@ class InformationSetMCTS(MCTS):
         :return: 
         """
 
-        # assert self._visited_records.issubset(self._available_records), "\nvisited: {}\n\navail: {}".format(self._visited_records, self._available_records)
-        # assert self._visited_records.issubset(self._available_records), "\nvisited: {}\n\navail: {}".format(self._visited_records, self._available_records)
-        #
-        # available = set(self._available_records.keys())
-        # visited = set(self._visited_records.keys())
+        # def str_dict(d):
+        #     s = ""
+        #     for k, v in d.items():
+        #         s += "\n{} -> {}".format(repr(k), repr(v))
+        #     return s+"\n"
+
+        # all visited are were available at least once
+        assert set(self._visited_records.keys()).issubset(set(self._available_records.keys()))  #, "\nvisited: {} \n avail: {}".format(str_dict(self._visited_records), str_dict(self._available_records))
+        assert all(self._available_records[vk] >= vv for vk, vv in self._visited_records.items())  # at least as much available as visited
 
         # logger.debug(f"visited: {len(self._visited_records)}, avail: {len(self._available_records)})")
         for record, amount in self._available_records.items():
@@ -399,7 +408,7 @@ class InformationSetMCTS(MCTS):
         assert nid in self.graph
         assert self.graph.out_degree(nid) > 0
 
-        possactions = state.possible_actions()
+        possactions = state.possible_actions_set
 
         max_a = next(iter(possactions))
         max_v = -float('inf')
@@ -407,11 +416,14 @@ class InformationSetMCTS(MCTS):
             if action in possactions:
                 rec = self.graph.node[to_nid]['record']
                 val = rec.visit_count
-                # logger.debug(f"   {val}->{action}: {rec}")
+                logger.debug(f"   {val}->{action}: {rec}")
                 if val > max_v:
                     max_v = val
                     max_a = action
+            else:
+                logger.debug(f"    not possible: {action}")
 
+        logger.debug("---> {}".format(max_a))
         return max_a
 
     def _draw_graph(self, outfilename):
@@ -429,6 +441,19 @@ class InformationSetMCTS(MCTS):
         plt.savefig(outfilename)
 
 
+class ISMCTS_old_rollout(InformationSetMCTS):
+    """
+    Uses the older (slower) rollout loop (instead of the dedicated RolloutState class).
+    """
+
+    @timecall(immediate=False)
+    def rollout_policy(self, state: TichuState):
+        rollout_state = state
+        while not rollout_state.is_terminal():
+            rollout_state = rollout_state.next_state(rollout_state.random_action())
+        return self.evaluate_state(rollout_state)
+
+
 class InformationSetMCTS_absolute_evaluation(InformationSetMCTS):
     """
     Same as InformationSetMCTS, but the evaluation uses the absolute points instead of the difference.
@@ -438,6 +463,28 @@ class InformationSetMCTS_absolute_evaluation(InformationSetMCTS):
         points = state.count_points()
         assert points[0] == points[2] and points[1] == points[3]
         return points
+
+
+class InformationSetMCTS_ranking_evaluation(InformationSetMCTS):
+    """
+    Same as InformationSetMCTS, but the evaluation is:
+    +1 for doublewin 
+    -1 for double loss (enemy has doublewin)
+    0.5 for finishing first (but no doublewin)
+    0 for enemy finishing first (but no doublewin)
+    """
+
+    def evaluate_state(self, state: TichuState) -> RewardVector:
+        if len(state.ranking) == 2:
+            assert state.ranking[0] == (state.ranking[1] + 2) % 4
+            # doublewin, winner get 1, loosers -1
+            return (1, -1, 1, -1) if 0 in state.ranking else (-1, 1, -1, 1)
+        else:
+            # no doublewin, winner team gets 0.5, looser team 0
+            final_ranking = tuple(state.ranking) + tuple([ppos for ppos in range(4) if ppos not in state.ranking])  # TODO speed
+            assert len(final_ranking) == 4
+            winner = state.ranking[0]
+            return (0.5, 0, 0.5, 0) if winner == 0 or winner == 2 else (0, 0.5, 0, 0.5)
 
 
 class InformationSetMCTSWeightedDeterminization(InformationSetMCTS):
@@ -643,6 +690,7 @@ class Determiner(object):
         while True:
             yield self._pool_strategy()
 
+
     def _pool_strategy(self)->TichuState:
         # Setup stuff
         handcards = {ppos: list() for ppos in self._other_players}
@@ -759,12 +807,12 @@ if __name__ == '__main__':
         count_diff_proba_vs_rand += (diff_rand - diff_proba)  # if positive, proba was better, if negative, random was better
 
         print("{} - {}".format(diff_rand, diff_proba))
-        # for k in range(4):
-        #     print("Orig:       ", D.state.handcards[k])
-        #     print("Det:        ", det.handcards[k])
-        #     print("random Det: ", rand_det.handcards[k])
-        #     print()
-        # print("different cards to probabilistic: ", diff_proba)
-        # print("different cards to random: ", diff_rand)
+        for k in range(4):
+            print("Orig:       ", D._state.handcards[k])
+            print("Det:        ", det.handcards[k])
+            print("random Det: ", rand_det.handcards[k])
+            print()
+        print("different cards to probabilistic: ", diff_proba)
+        print("different cards to random: ", diff_rand)
 
     print(count_diff_proba_vs_rand)

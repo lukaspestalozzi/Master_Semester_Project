@@ -3,8 +3,10 @@ import os
 import logging
 
 import datetime
-import rl
+from math import ceil
 
+import rl
+from rl.callbacks import ModelIntervalCheckpoint, FileLogger
 
 import logginginit
 import random
@@ -14,7 +16,7 @@ from collections import defaultdict, OrderedDict
 import gym
 from gym_tichu.envs.internals import (TichuState, PlayerAction, CardRank, Card, wishable_card_ranks,
                                       PassAction, CardTrade, HandCards)
-from gym_tichu.envs.internals.utils import check_param
+from gym_tichu.envs.internals.utils import check_param, make_sure_path_exists
 import numpy as np
 
 import keras
@@ -34,8 +36,8 @@ from . import strategies
 
 __all__ = ('DefaultGymAgent', 'RandomAgent', 'BalancedRandomAgent', 'BaseMonteCarloAgent', 'HumanInputAgent',
            'make_information_set_mcts_agent', 'make_information_set_mcts_absolute_evaluation_agent', 'make_epic_ismcts_agent',
-           'DQNTichuAgent', 'make_dqn_agent_2layers', 'make_dqn_agent_4layers', 'make_dqn_trainagent_4layers', 'DQN4LayerAgent',
-           'make_first_ismcts_then_random_agent', 'make_information_set_mcts_agent_weighted_determinization')
+           'DQNTichuAgent', 'make_dqn_agent_2layers', 'make_dqn_agent_4layers', 'make_dqn_trainagent_2layers', 'make_dqn_trainagent_4layers', 'DQN4LayerAgent',
+           'make_first_ismcts_then_random_agent', 'make_information_set_mcts_agent_weighted_determinization', 'DQN2LayerAgent')
 
 logger = logging.getLogger(__name__)
 human_logger = logginginit.CONSOLE_LOGGER
@@ -78,8 +80,8 @@ class RandomAgent(DefaultGymAgent):
         return "{me.__class__.__name__}, Makes a random action".format(me=self)
 
     def action(self, state):
-        logger.debug("RandomAgent chooses from actions: {}".format([str(a) for a in state.possible_actions()]))
-        return random.choice(list(state.possible_actions()))
+        logger.debug("RandomAgent chooses from actions: {}".format([str(a) for a in state.possible_actions_list]))
+        return random.choice(state.possible_actions_list)
 
 
 class BalancedRandomAgent(RandomAgent):
@@ -92,11 +94,11 @@ class BalancedRandomAgent(RandomAgent):
         return "{me.__class__.__name__}, Chooses first a Combination category and then an action".format(me=self)
 
     def action(self, state):
-        logger.debug("BalancedRandomAgent chooses from actions: {}".format([str(a) for a in state.possible_actions()]))
+        logger.debug("BalancedRandomAgent chooses from actions: {}".format([str(a) for a in state.possible_actions_list]))
         d = defaultdict(list)
-        for action in state.possible_actions():
+        for action in state.possible_actions_list:
             try:
-                d[action.combination].append(action)
+                d[action.combination.__class__].append(action)
             except AttributeError:
                 d[action.__class__].append(action)
 
@@ -121,10 +123,11 @@ class BaseMonteCarloAgent(DefaultGymAgent):
             act = next(iter(state.possible_actions_set))
             logger.debug("There is only one possible action: {}".format(act))
             return act
-        return self._search.search(root_state=state,
-                                   observer_id=state.player_pos,
-                                   iterations=self.iterations,
-                                   cheat=self.cheat)
+        else:
+            return self._search.search(root_state=state,
+                                       observer_id=state.player_pos,
+                                       iterations=self.iterations,
+                                       cheat=self.cheat)
 
     def __str__(self):
         return "{me.__class__.__name__}({me.search.__class__.__name__}, {me.iterations}, {me.cheat})".format(me=self)
@@ -333,9 +336,13 @@ class HumanInputAgent(DefaultGymAgent):
 class LearningAgent(DefaultGymAgent):
 
     def __init__(self, agent: rl.core.Agent, weights_file: Optional[str]):
+        """
+        
+        :param agent: 
+        :param weights_file: Either a file with the weights, or None
+        """
         super().__init__()
         self.agent = agent
-        self._weights_file = weights_file
         if weights_file:
             print("{} loading the weights from {}".format(self.__class__.__name__, weights_file))
             try:
@@ -346,7 +353,7 @@ class LearningAgent(DefaultGymAgent):
 
     @property
     def info(self):
-        return "{me.__class__.__name__}, weights: {me._weights_file}".format(me=self)
+        return "{me.__class__.__name__}".format(me=self)
 
     def action(self, state: TichuState)->PlayerAction:
         if len(state.possible_actions_list) == 1:
@@ -358,7 +365,7 @@ class LearningAgent(DefaultGymAgent):
         logger.debug("Q-agent chooses action {} -> {}".format(chosen_nbr, action))
         return action
 
-    def train(self, weights_out_file: str, nbr_steps: int, verbose: int):
+    def train(self, nbr_steps: int):
         """
         Trains the agent
         :param weights_out_file: saves the weights to that file after training.
@@ -379,8 +386,8 @@ NBR_TICHU_ACTIONS = 258
 def _make_2Layer_model()->Model:
     main_input_len = 56 * 5
     main_input = Input(shape=(main_input_len,), name='cards_input')
-    main_line = Dense(main_input_len, activation='tanh')(main_input)
-    main_line = Dense(NBR_TICHU_ACTIONS, activation='sigmoid')(main_line)
+    main_line = Dense(NBR_TICHU_ACTIONS * 5, activation='elu')(main_input)
+    main_line = Dense(NBR_TICHU_ACTIONS, activation='elu')(main_line)
 
     # combine with the possible_actions input
     possible_actions_input = Input(shape=(NBR_TICHU_ACTIONS,), name='possible_actions_input')
@@ -417,13 +424,12 @@ def _make_dqn_agent(model, policy: rl.policy.Policy=BoltzmannQPolicy(clip=(-500,
 class DQNTichuAgent(LearningAgent):
 
     def __init__(self, model: Model, weights_file: Optional[str]):
-        self.weights_file = weights_file
         self.model = model
         self.processor = self._make_processor()
         agent = self._make_agent()
         super().__init__(agent=agent, weights_file=weights_file)
 
-    def train(self, weights_out_file: str, nbr_steps: int=1000, verbose: int=1):
+    def train(self, nbr_steps: int=1000):
         raise NotImplementedError("Use class DQNTrainableAgent to train the agent")
 
     def _process_tichu_state(self, state: TichuState)->Any:
@@ -444,25 +450,48 @@ class DQNTichuAgent(LearningAgent):
 
 
 class DQNTrainableAgent(DQNTichuAgent):
-    def train(self, weights_out_file: str, nbr_steps: int=1000, verbose: int=1):
+
+    def train(self, base_folder: str, nbr_steps: int=1000, description: str='', env_name='tichu_singleplayer-v0'):
         """
         Trains on the 'tichu_singleplayer-v0' environment.
         After training saves the weights to the given file as well as a timestamped file.
-        :param weights_out_file: saves the weights to that file after training.
         :param nbr_steps: 
+        :param description: short description for the training
         """
-        self.agent.fit(gym.make('tichu_singleplayer-v0'), nb_steps=nbr_steps, visualize=False, verbose=verbose, nb_max_start_steps=0)
+        timef = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+        # filenames
+        weights_out_filename = 'dqn_weights_{t}_trained_{nbr}.h5f'.format(t=timef, nbr=nbr_steps)
+        checkpoint_weights_filename = 'dqn_checkpoint_weights_'+timef+'_{step}.h5f'
+        log_filename = 'trainlog_dqn_{}.json'.format(timef)
+
+        # full path of files
+        template = '{folder}/{filename}'
+        weights_out_file        = template.format(folder=base_folder, filename=weights_out_filename)
+        checkpoint_weights_file = template.format(folder=base_folder, filename=checkpoint_weights_filename)
+        log_file                = template.format(folder=base_folder, filename=log_filename)
+
+        # Make sure the files/folders exists
+        make_sure_path_exists(base_folder)
+        for fn in [weights_out_file, log_file]:
+            if not os.path.exists(fn):
+                with open(fn, "w"):
+                    pass
+
+        callbacks = [ModelIntervalCheckpoint(checkpoint_weights_file, interval=ceil(nbr_steps//5))]  # 5 checkpoints
+        callbacks += [FileLogger(log_file, interval=ceil(nbr_steps//100))]  # update 100 times
+
+        # set LinearAnnealedPolicy policy such that tau reaches min value at 90% of nbr_steps
+        self.agent.policy = LinearAnnealedPolicy(BoltzmannQPolicy(clip=(-500, 300)), attr='tau', value_max=1.0,
+                                                 value_min=0.1, value_test=0.01, nb_steps=ceil(nbr_steps*0.75))
+
+        self.agent.fit(gym.make(env_name), nb_steps=nbr_steps, visualize=False, verbose=0, nb_max_start_steps=0, callbacks=callbacks)
+
         logger.info("saving the weights to {}".format(weights_out_file))
         self.agent.save_weights(weights_out_file, overwrite=True)
-        unique_out_file = "{orig_f}_steps{steps}_{time_stamp}.{file_ending}".format(time_stamp=datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
-                                                                                    orig_f=''.join(weights_out_file.split('.')[:-1]),
-                                                                                    steps=nbr_steps,
-                                                                                    file_ending=weights_out_file.split('.')[-1])
-        logger.info("saving the weights to unique file {}".format(unique_out_file))
-        self.agent.save_weights(unique_out_file, overwrite=True)
 
     def _make_agent(self):
-        return _make_dqn_agent(self.model, policy=LinearAnnealedPolicy(BoltzmannQPolicy(clip=(-500, 300)), attr='tau', value_max=1., value_min=.1, value_test=.01, nb_steps=50000))
+        return _make_dqn_agent(self.model, policy=LinearAnnealedPolicy(BoltzmannQPolicy(clip=(-500, 300)), attr='tau', value_max=2., value_min=.1, value_test=.01, nb_steps=1000000))
 
 
 class DQN4LayerAgent(DQNTichuAgent):
@@ -470,10 +499,29 @@ class DQN4LayerAgent(DQNTichuAgent):
     def __init__(self, weights_file: Optional[str]):
         super().__init__(model=_make_4Layer_model(), weights_file=weights_file)
 
-make_dqn_agent_2layers = lambda: DQNTichuAgent(model=_make_2Layer_model(), weights_file='{}/agent_weights/dqn_2layers_weights.h5f'.format(os.path.dirname(os.path.realpath(__file__))))
-make_dqn_agent_4layers = lambda: DQN4LayerAgent(weights_file='{}/agent_weights/dqn_4layers_weights.h5f'.format(os.path.dirname(os.path.realpath(__file__))))
-make_dqn_trainagent_4layers = lambda: DQNTrainableAgent(model=_make_4Layer_model(), weights_file='{}/agent_weights/dqn_4layers_weights.h5f'.format(os.path.dirname(os.path.realpath(__file__))))
 
+class DQN2LayerAgent(DQNTichuAgent):
+    def __init__(self, weights_file: Optional[str]):
+        super().__init__(model=_make_2Layer_model(), weights_file=weights_file)
+
+
+def make_dqn_agent_2layers(weights_file):
+    return DQN2LayerAgent(weights_file=weights_file)
+
+
+def make_dqn_agent_4layers(weights_file=None):
+    return DQN4LayerAgent(weights_file=weights_file)
+
+
+def make_dqn_trainagent_2layers(weights_file=None):
+    return DQNTrainableAgent(model=_make_2Layer_model(), weights_file=weights_file)
+
+
+def make_dqn_trainagent_4layers(weights_file=None):
+    return DQNTrainableAgent(model=_make_4Layer_model(), weights_file=weights_file)
+
+
+agent_to_train = make_dqn_trainagent_2layers(weights_file=None)
 
 # ################## Composite ####################
 

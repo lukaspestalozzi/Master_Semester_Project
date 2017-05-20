@@ -1,2 +1,2 @@
-from .tichu_multiplayer_env import TichuMultiplayerEnv, TichuSinglePlayerAgainstRandomEnv
+from .tichu_multiplayer_env import *
 

@@ -1,6 +1,6 @@
 import abc
 from collections import namedtuple, OrderedDict
-from typing import Collection, Optional, Union, Iterable, Tuple, Generator, Set, Dict, List, Any
+from typing import Collection, Optional, Union, Iterable, Tuple, Generator, Set, Dict, List, Any, Callable
 
 
 from profilehooks import timecall
@@ -9,7 +9,8 @@ import logging
 import itertools
 import random
 
-from .actions import pass_actions, tichu_actions, no_tichu_actions, play_dog_actions, all_wish_actions_gen, TradeAction
+from .actions import pass_actions, tichu_actions, no_tichu_actions, play_dog_actions, all_wish_actions_gen, TradeAction, \
+    MutableTrick
 from .actions import (PlayerAction, PlayCombination, PlayFirst, PlayBomb, TichuAction, WishAction, PassAction,
                       WinTrickAction, GiveDragonAwayAction, CardTrade, Trick)
 from .cards import CardSet, Card, CardRank, Deck, DOG_COMBINATION
@@ -17,12 +18,14 @@ from .error import TichuEnvValueError, LogicError, IllegalActionError
 from .utils import check_param, check_isinstance, check_all_isinstance, check_true
 
 __all__ = ('TichuState', 'HandCards', 'History', 'BaseTichuState',
-           'InitialState', 'FullCardsState', 'BeforeTrading', 'AfterTrading')
+           'InitialState', 'FullCardsState', 'BeforeTrading', 'AfterTrading', 'RolloutTichuState')
 
 logger = logging.getLogger(__name__)
 
 
 class HandCards(object):
+
+    __slots__ = ('_cards', )
 
     def __init__(self, cards0: Iterable=(), cards1: Iterable=(), cards2: Iterable=(), cards3: Iterable=()):
         self._cards: Tuple[CardSet, CardSet, CardSet, CardSet] = (CardSet(cards0),
@@ -93,7 +96,7 @@ class HandCards(object):
                 and all(sc == oc for sc, oc in itertools.zip_longest(self.iter_all_cards(),
                                                                      other.iter_all_cards())))
 
-    def __str__(self):
+    def __repr__(self):
         return(
         """
             0: {}
@@ -101,10 +104,53 @@ class HandCards(object):
             2: {}
             3: {}
         """
-        ).format(*[str(crds) for crds in self._cards])
+        ).format(*map(str, self._cards))
+
+    def __str__(self):
+        return self.__repr__()
+
+
+class MutableHandCards(HandCards):
+    __slots__ = ('_cards',)
+
+    def __init__(self, cards0: Iterable = (), cards1: Iterable = (), cards2: Iterable = (), cards3: Iterable = ()):
+        super().__init__(cards0, cards1, cards2, cards3)
+        # make list
+        self._cards: List[CardSet] = list(self._cards)
+
+    @classmethod
+    def from_immutable(cls, handcards):
+        return cls(*handcards._cards)
+
+    def remove_cards(self, player: int, cards: Collection[Card], raise_on_uncomplete=True):
+
+        len_oldcards = len(self._cards[player])
+        self._cards[player] = CardSet((c for c in self._cards[player] if c not in cards))
+
+        if raise_on_uncomplete and len(self._cards[player]) + len(cards) != len_oldcards:
+            raise TichuEnvValueError("Not all cards can be removed.")
+        else:
+            return self
+
+    def __hash__(self):
+        raise AttributeError("MutableHandCards can't be hashed")
+
+    def __eq__(self, other):
+        return self is other
+
+    def __str__(self):
+        return(
+        """ {me.__class__.__name__}
+            0: {}
+            1: {}
+            2: {}
+            3: {}
+        """
+        ).format(*map(str, self._cards), me=self)
 
 
 class WonTricks(object):
+    __slots__ = ('_tricks',)
 
     def __init__(self, tricks0: Iterable[Trick]=(), tricks1: Iterable[Trick]=(), tricks2: Iterable[Trick]=(), tricks3: Iterable[Trick]=()):
         self._tricks: Tuple[Tuple[Trick, ...]] = (tuple(tricks0), tuple(tricks1), tuple(tricks2), tuple(tricks3))
@@ -153,7 +199,36 @@ class WonTricks(object):
         ).format(*[str(len(wt)) for wt in self._tricks])
 
 
+class MutableWonTricks(WonTricks):
+    __slots__ = ('_tricks',)
+
+    def __init__(self, tricks0: Iterable[Trick]=(), tricks1: Iterable[Trick]=(), tricks2: Iterable[Trick]=(), tricks3: Iterable[Trick]=()):
+        super().__init__(tricks0, tricks1, tricks2, tricks3)
+
+        self._tricks: Tuple[List[Trick, ...]] = (list(tricks0), list(tricks1), list(tricks2), list(tricks3))
+
+    @classmethod
+    def from_immutable(cls, wontricks):
+        return cls(*wontricks._tricks)
+
+    def add_trick(self, player: int, trick: Trick):
+        """
+        :param player: 
+        :param trick: 
+        :return: self
+        """
+        self._tricks[player].append(trick)
+        return self
+
+    def __hash__(self):
+        raise AttributeError("MutableWonTricks can't be hashed")
+
+    def __eq__(self, other):
+        return self is other
+
+
 class History(object):
+    __slots__ = ('_wished', '_state_action_tuple')
 
     def __init__(self, _wished: bool=False, _tup=tuple()):
         self._wished: bool = _wished
@@ -240,64 +315,7 @@ actions:
 
 class BaseTichuState(object, metaclass=abc.ABCMeta):
 
-    
-    @abc.abstractmethod
-    def next_state(self, action: Any)->'BaseTichuState':
-        """
-        
-        :param action: 
-        :return: The next state for this action
-        """
-        pass
-
-    @abc.abstractmethod
-    def is_terminal(self):
-        """
-        
-        :return: True iff the state is terminal. False otherwise
-        """
-
-
-class TichuState(BaseTichuState, namedtuple("TichuState", [
-            "player_pos",
-            "handcards",
-            "won_tricks",
-            "trick_on_table",
-            "wish",
-            "ranking",
-            "announced_tichu",
-            "announced_grand_tichu",
-            "history"
-        ])):
-
-    def __new__(cls, *args, allow_tichu=True, allow_wish=True, **kwargs):
-        return super().__new__(cls, *args, **kwargs)
-
-    def __init__(self, player_pos: int, handcards: HandCards, won_tricks: WonTricks,
-                 trick_on_table: Trick, wish: Optional[CardRank], ranking: tuple,
-                 announced_tichu: frozenset, announced_grand_tichu: frozenset,
-                 history: History, allow_tichu: bool=True, allow_wish: bool=True):
-        super().__init__()
-
-        # some paranoid checks
-        assert player_pos in range(4)
-        assert isinstance(handcards, HandCards)
-
-        assert isinstance(won_tricks, WonTricks)
-
-        assert wish is None or isinstance(wish, CardRank)
-
-        assert isinstance(ranking, tuple)
-        assert all(r in range(4) for r in ranking)
-
-        assert isinstance(announced_tichu, frozenset)
-        assert isinstance(announced_grand_tichu, frozenset)
-        assert all(r in range(4) for r in announced_tichu)
-        assert all(r in range(4) for r in announced_grand_tichu)
-
-        assert isinstance(trick_on_table, Trick)
-        assert isinstance(history, History)
-
+    def __init__(self, allow_tichu=True, allow_wish=True):
         self._allow_tichu = allow_tichu
         self._allow_wish = allow_wish
         self._possible_actions_set: Set[PlayerAction] = None
@@ -305,28 +323,75 @@ class TichuState(BaseTichuState, namedtuple("TichuState", [
         self._state_transitions: Dict[PlayerAction, TichuState] = dict()
 
     @property
-    def _current_player_handcards(self) -> CardSet:
-        return self.handcards[self.player_pos]
-
-    @timecall(immediate=False)
-    def __init_possible_actions_list_and_set(self):
-        self._possible_actions_list = list(self.possible_actions_gen())
-        self._possible_actions_set = frozenset(self._possible_actions_list)
+    @abc.abstractmethod
+    def player_pos(self):
+        raise NotImplementedError("Is an abstract method!")
 
     @property
+    @abc.abstractmethod
+    def handcards(self):
+        raise NotImplementedError("Is an abstract method!")
+
+    @property
+    @abc.abstractmethod
+    def won_tricks(self):
+        raise NotImplementedError("Is an abstract method!")
+
+    @property
+    @abc.abstractmethod
+    def trick_on_table(self):
+        raise NotImplementedError("Is an abstract method!")
+
+    @property
+    @abc.abstractmethod
+    def wish(self):
+        raise NotImplementedError("Is an abstract method!")
+
+    @property
+    @abc.abstractmethod
+    def ranking(self):
+        raise NotImplementedError("Is an abstract method!")
+
+    @property
+    @abc.abstractmethod
+    def announced_tichu(self):
+        raise NotImplementedError("Is an abstract method!")
+
+    @property
+    @abc.abstractmethod
+    def announced_grand_tichu(self):
+        raise NotImplementedError("Is an abstract method!")
+
+    @property
+    @abc.abstractmethod
+    def history(self):
+        raise NotImplementedError("Is an abstract method!")
+
+    @property
+    def _current_player_handcards(self):
+        return self.handcards[self.player_pos]
+
+    @property
+    @timecall(immediate=False)
     def possible_actions_set(self)->Set[PlayerAction]:
-        if self._possible_actions_set is None or self._possible_actions_list is None:
-            self.__init_possible_actions_list_and_set()
+        if self._possible_actions_set is None:
+            self._possible_actions_set = frozenset(self.possible_actions_list)
         return self._possible_actions_set
 
     @property
+    @timecall(immediate=False)
     def possible_actions_list(self)->List[PlayerAction]:
-        if self._possible_actions_set is None or self._possible_actions_list is None:
-            self.__init_possible_actions_list_and_set()
+        if self._possible_actions_list is None:
+            self._possible_actions_list = list(self.possible_actions_gen())
         return self._possible_actions_list
 
-    def possible_actions(self)->Set[PlayerAction]:
-        return self.possible_actions_set
+    @abc.abstractmethod
+    def change(self, **attributes_to_change) -> 'TichuState':
+        """
+
+        :param attributes_to_change: kwargs with the name of TichuState Attributes
+        :return: A copy ot this TichuState instance with the given attributes replaced
+        """
 
     def possible_actions_gen(self)->Generator[PlayerAction, None, None]:
         """
@@ -374,10 +439,12 @@ class TichuState(BaseTichuState, namedtuple("TichuState", [
         if self.trick_on_table.is_finished():
             # dragon away?
             if Card.DRAGON in last_combination:
+                assert isinstance(self.player_pos, int), str(self.player_pos)
                 yield GiveDragonAwayAction(self.player_pos, (self.player_pos + 1) % 4, trick=self.trick_on_table)
                 yield GiveDragonAwayAction(self.player_pos, (self.player_pos - 1) % 4, trick=self.trick_on_table)
             # Normal Trick
             else:
+                assert isinstance(self.player_pos, int), str(self.player_pos)
                 yield WinTrickAction(player_pos=self.player_pos, trick=self.trick_on_table)
             return  # No more actions allowed
 
@@ -391,6 +458,7 @@ class TichuState(BaseTichuState, namedtuple("TichuState", [
         can_fulfill_wish = False
         # initialise possible combinations ignoring the wish
         possible_combinations = list(self._current_player_handcards.possible_combinations(played_on=last_combination))
+        # logger.debug("possible_combinations: {}".format(possible_combinations))
         if self.wish and self._current_player_handcards.contains_cardrank(self.wish):
             # player may have to fulfill the wish
             possible_combinations_wish = list(self._current_player_handcards.possible_combinations(played_on=last_combination, contains_rank=self.wish))
@@ -414,9 +482,8 @@ class TichuState(BaseTichuState, namedtuple("TichuState", [
 
         # TODO bombs ?
 
-    @timecall(immediate=False)
     def next_state(self, action: PlayerAction)->'TichuState':
-        if action not in self.possible_actions():
+        if action not in self.possible_actions_set:
             raise IllegalActionError("{} is not a legal action in state: {}".format(action, self))
 
         # cache the state transitions
@@ -448,11 +515,9 @@ class TichuState(BaseTichuState, namedtuple("TichuState", [
         self._state_transitions[action] = next_s
         return next_s
 
-    @timecall(immediate=False)
     def random_action(self)->PlayerAction:
         return random.choice(self.possible_actions_list)
 
-    @timecall(immediate=False)
     def _next_state_on_wish(self, wish_action: WishAction)->'TichuState':
         return self.change(
                 wish=wish_action.wish,
@@ -460,7 +525,6 @@ class TichuState(BaseTichuState, namedtuple("TichuState", [
                 history=self.history.new_state_action(self, wish_action)
         )
 
-    @timecall(immediate=False)
     def _next_state_on_tichu(self, tichu_action: TichuAction)->'TichuState':
         h = self.history.new_state_action(self, tichu_action)
         tot = self.trick_on_table + tichu_action
@@ -479,7 +543,6 @@ class TichuState(BaseTichuState, namedtuple("TichuState", [
                     history=h
             )
 
-    @timecall(immediate=False)
     def _next_state_on_win_trick(self, win_trick_action: WinTrickAction)->'TichuState':
         winner = win_trick_action.player_pos
         assert self.player_pos == winner or len(self.ranking) >= 3, "action: {act}, winner:{winner}, state:{state}".format(act=win_trick_action, winner=winner, state=self)
@@ -503,7 +566,6 @@ class TichuState(BaseTichuState, namedtuple("TichuState", [
             history=self.history.new_state_action(self, win_trick_action)
         )
 
-    @timecall(immediate=False)
     def _next_state_on_pass(self, pass_action: PassAction)->'TichuState':
         assert pass_action.player_pos == self.player_pos
         leading_player = self.trick_on_table.last_combination_action.player_pos
@@ -529,7 +591,6 @@ class TichuState(BaseTichuState, namedtuple("TichuState", [
                     history=self.history.new_state_action(self, pass_action)
             )
 
-    @timecall(immediate=False)
     def _next_state_on_combination(self, comb_action: PlayCombination)->'TichuState':
         played_comb = comb_action.combination
         assert comb_action.player_pos == self.player_pos
@@ -578,18 +639,6 @@ class TichuState(BaseTichuState, namedtuple("TichuState", [
         """
 
         return next((ppos % 4 for ppos in range(self.player_pos + 1, self.player_pos + 4) if len(self.handcards[ppos % 4]) > 0))
-
-    @timecall(immediate=False)
-    def change(self, **attributes_to_change)->'TichuState':
-        """
-        
-        :param attributes_to_change: kwargs with the name of TichuState Attributes
-        :return: A copy ot this TichuState instance with the given attributes replaced
-        """
-        if len(attributes_to_change) == 0:
-            return self
-
-        return TichuState(*self._replace(**attributes_to_change), allow_tichu=self._allow_tichu, allow_wish=self._allow_wish)
 
     def has_cards(self, player: int, cards: Collection[Card])->bool:
         """
@@ -676,17 +725,131 @@ class TichuState(BaseTichuState, namedtuple("TichuState", [
         """).format(me=self)
 
 
-class InitialState(BaseTichuState):
+class _BaseTichuStateImpl(BaseTichuState, metaclass=abc.ABCMeta):
+    """
+    Implements the properties of BaseTichuState with 'raise AttributeError'
+    """
+    __slots__ = ()
+
+    @property
+    def player_pos(self):
+        raise AttributeError()
+
+    @property
+    def handcards(self):
+        raise AttributeError()
+
+    @property
+    def won_tricks(self):
+        raise AttributeError()
+
+    @property
+    def trick_on_table(self):
+        raise AttributeError()
+
+    @property
+    def wish(self):
+        raise AttributeError()
+
+    @property
+    def ranking(self):
+        raise AttributeError()
+
+    @property
+    def announced_tichu(self):
+        raise AttributeError()
+
+    @property
+    def announced_grand_tichu(self):
+        raise AttributeError()
+
+    @property
+    def history(self):
+        raise AttributeError()
+
+    def change(self, **attributes_to_change):
+        raise AttributeError()
+
+
+class TichuState(namedtuple("TichuState", [
+            "player_pos",
+            "handcards",
+            "won_tricks",
+            "trick_on_table",
+            "wish",
+            "ranking",
+            "announced_tichu",
+            "announced_grand_tichu",
+            "history"
+        ]), _BaseTichuStateImpl):
+
+    __slots__ = ()
+
+    def __new__(cls, *args, allow_tichu=True, allow_wish=True, **kwargs):
+        return super().__new__(cls, *args, **kwargs)
+
+    def __init__(self, player_pos: int, handcards: HandCards, won_tricks: WonTricks,
+                 trick_on_table: Trick, wish: Optional[CardRank], ranking: tuple,
+                 announced_tichu: frozenset, announced_grand_tichu: frozenset,
+                 history: History, allow_tichu: bool=True, allow_wish: bool=True):
+        super().__init__(allow_tichu=allow_tichu, allow_wish=allow_wish)
+
+        # some paranoid checks
+        assert player_pos in range(4)
+        assert isinstance(handcards, HandCards)
+
+        assert isinstance(won_tricks, WonTricks)
+
+        assert wish is None or isinstance(wish, CardRank)
+
+        assert isinstance(ranking, tuple)
+        assert all(r in range(4) for r in ranking)
+
+        assert isinstance(announced_tichu, frozenset)
+        assert isinstance(announced_grand_tichu, frozenset)
+        assert all(r in range(4) for r in announced_tichu)
+        assert all(r in range(4) for r in announced_grand_tichu)
+
+        assert isinstance(trick_on_table, Trick)
+        assert isinstance(history, History)
+
+    @timecall(immediate=False)
+    def change(self, **attributes_to_change)->'TichuState':
+        """
+        
+        :param attributes_to_change: kwargs with the name of TichuState Attributes
+        :return: A copy ot this TichuState instance with the given attributes replaced
+        """
+        if len(attributes_to_change) == 0:
+            return self
+
+        return TichuState(*self._replace(**attributes_to_change), allow_tichu=self._allow_tichu, allow_wish=self._allow_wish)
+
+
+class InitialState(_BaseTichuStateImpl):
     """
     State where all players have 8 cards (before announcing their grand tichus)
     """
-    def __init__(self):  # TODO maybe add possibility to predetermine the handcards
+
+    __slots__ = ('_handcards', '_history')
+
+    def __init__(self):
         piles_of_8 = [p[:8] for p in Deck(full=True).split(nbr_piles=4, random_=True)]
         assert len(piles_of_8) == 4
         assert all(len(p) == 8 for p in piles_of_8)
 
-        self.handcards = HandCards(*piles_of_8)
-        self.history = History()
+        super().__init__()
+
+        self._handcards = HandCards(*piles_of_8)
+        self._history = History()
+
+    @property
+    def handcards(self):
+        return self._handcards
+
+    @property
+    def history(self):
+        return self._history
 
     def next_state(self, players: Iterable[int]) -> 'FullCardsState':
         players = frozenset(players)
@@ -700,11 +863,14 @@ class InitialState(BaseTichuState):
         return False
 
 
-class FullCardsState(BaseTichuState):
+class FullCardsState(_BaseTichuStateImpl):
     """
     State where the players have 14 cards and announced their grand tichus.
     All players may announce a Tichu now
     """
+
+    __slots__ = ('_handcards', '_history', '_announced_grand_tichu')
+
     def __init__(self, initial_state: InitialState, players_announced_grand_tichu: Iterable[int]):
         players_announced_grand_tichu = frozenset(players_announced_grand_tichu)
         check_param(all(i in range(4) for i in players_announced_grand_tichu))
@@ -714,9 +880,23 @@ class FullCardsState(BaseTichuState):
         assert len(piles) == 4
         assert all(len(p) == 6 for p in piles), str(piles)
 
-        self.handcards = HandCards(*(itertools.chain(crds, piles[k]) for k, crds in enumerate(initial_state.handcards)))
-        self.announced_grand_tichu = players_announced_grand_tichu
-        self.history = initial_state.history.new_state_actions(initial_state, (TichuAction(pp, announce_tichu=pp in players_announced_grand_tichu, grand=True) for pp in range(4)))
+        super().__init__()
+
+        self._handcards = HandCards(*(itertools.chain(crds, piles[k]) for k, crds in enumerate(initial_state.handcards)))
+        self._announced_grand_tichu = players_announced_grand_tichu
+        self._history = initial_state.history.new_state_actions(initial_state, (TichuAction(pp, announce_tichu=pp in players_announced_grand_tichu, grand=True) for pp in range(4)))
+
+    @property
+    def handcards(self):
+        return self._handcards
+
+    @property
+    def history(self):
+        return self._history
+
+    @property
+    def announced_grand_tichu(self):
+        return self._announced_grand_tichu
 
     def next_state(self, players: Iterable[int]) -> 'BeforeTrading':
         players = frozenset(players)
@@ -730,20 +910,40 @@ class FullCardsState(BaseTichuState):
         return False
 
 
-class BeforeTrading(BaseTichuState):
+class BeforeTrading(_BaseTichuStateImpl):
     """
     In this state all players have to trade 3 cards.
     """
+
+    __slots__ = ('_handcards', '_history', '_announced_grand_tichu', '_announced_tichu')
 
     def __init__(self, prev_state: FullCardsState, players_announced_tichu: Iterable[int]):
         players_announced_tichu = frozenset(players_announced_tichu)
         check_param(all(i in range(4) for i in players_announced_tichu))
         check_isinstance(prev_state, FullCardsState)
 
-        self.handcards = prev_state.handcards
-        self.announced_grand_tichu = prev_state.announced_grand_tichu
-        self.announced_tichu = players_announced_tichu
-        self.history = prev_state.history.new_state_actions(prev_state, (TichuAction(pp, announce_tichu=pp in players_announced_tichu) for pp in range(4)))
+        super().__init__()
+
+        self._handcards = prev_state.handcards
+        self._announced_grand_tichu = prev_state.announced_grand_tichu
+        self._announced_tichu = players_announced_tichu
+        self._history = prev_state.history.new_state_actions(prev_state, (TichuAction(pp, announce_tichu=pp in players_announced_tichu) for pp in range(4)))
+
+    @property
+    def handcards(self):
+        return self._handcards
+
+    @property
+    def history(self):
+        return self._history
+
+    @property
+    def announced_grand_tichu(self):
+        return self._announced_grand_tichu
+
+    @property
+    def announced_tichu(self):
+        return self._announced_tichu
 
     def next_state(self, trades: Collection[CardTrade]) -> 'AfterTrading':
         check_all_isinstance(trades, CardTrade)
@@ -768,6 +968,8 @@ class AfterTrading(TichuState):
     
     This is a 
     """
+
+    __slots__ = ()
 
     def __init__(self, *args, **kwargs):
         check_true(Card.MAHJONG in self.handcards[self.player_pos])
@@ -810,5 +1012,224 @@ class AfterTrading(TichuState):
         return False
 
 
-class MutableTichuState(object):
-    pass
+class RolloutTichuState(BaseTichuState):
+    __slots__ = ('_handcards', '_announced_grand_tichu', '_announced_tichu', '_player_pos', '_won_tricks',
+                 '_trick_on_table', '_wish', '_ranking')
+
+    def __init__(self, player_pos: int, handcards: HandCards, won_tricks: WonTricks,
+                 trick_on_table: Trick, wish: Optional[CardRank], ranking: tuple,
+                 announced_tichu: frozenset, announced_grand_tichu: frozenset,
+                 history: History):
+        super().__init__(allow_tichu=False, allow_wish=False)
+
+        assert isinstance(player_pos, int), str(player_pos)
+
+        self._player_pos = player_pos
+        self._handcards = MutableHandCards.from_immutable(handcards)
+        self._won_tricks = MutableWonTricks.from_immutable(won_tricks)
+        self._trick_on_table = MutableTrick.from_immutable(trick_on_table)
+        self._wish = wish
+        self._ranking = list(ranking)
+        self._announced_tichu = announced_tichu
+        self._announced_grand_tichu = announced_grand_tichu
+        # self._history = history
+
+    @classmethod
+    def from_tichustate(cls, state: TichuState):
+        return cls(*state)
+
+    @property
+    def handcards(self):
+        return self._handcards
+
+    @property
+    def trick_on_table(self):
+        return self._trick_on_table
+
+    @property
+    def wish(self):
+        return self._wish
+
+    @property
+    def announced_tichu(self):
+        return self._announced_tichu
+
+    @property
+    def ranking(self):
+        return self._ranking
+
+    @property
+    def player_pos(self):
+        return self._player_pos
+
+    @property
+    def history(self):
+        raise LogicError()
+
+    @property
+    def announced_grand_tichu(self):
+        return self._announced_grand_tichu
+
+    @property
+    def won_tricks(self):
+        return self._won_tricks
+
+    def random_action(self)->PlayerAction:
+        return random.choice(self.possible_actions_list)
+
+    def rollout(self, policy: Callable[[BaseTichuState], PlayerAction])->Tuple[int, int, int, int]:
+        while not self.is_terminal():
+            action = policy(self)
+            self.apply_action(action)
+        return self.count_points()
+
+    def random_rollout(self):
+        while not self.is_terminal():
+            self.apply_action(random.choice(self.possible_actions_list))
+        return self
+
+    @timecall(immediate=False)
+    def apply_action(self, action: PlayerAction)->'RolloutTichuState':
+        """
+        Applies the action on this state (Modifies the calling instance).
+        :param action: 
+        :return: self
+        """
+        if action not in self.possible_actions_set:
+            raise IllegalActionError("{} is not a legal action in state: {}".format(action, self))
+
+        # (No Tichu and wish in rollout)
+
+        # win trick (includes dragon away)?
+        elif isinstance(action, WinTrickAction):
+            self._apply_win_trick_action(action)
+
+        # pass
+        elif isinstance(action, PassAction):
+            self._apply_pass_action(action)
+
+        # combinations (includes playfirst, playdog, playbomb)
+        elif isinstance(action, PlayCombination):
+            self._apply_combination(action)
+        else:
+            raise LogicError("An unknown action has been played")
+
+        # reset possible actions cache
+        self._possible_actions_set = None
+        self._possible_actions_list = None
+        return self
+
+    def _apply_win_trick_action(self, win_trick_action: WinTrickAction):
+
+        winner = win_trick_action.player_pos
+        assert self.player_pos == winner or len(self.ranking) >= 3, "action: {act}, winner:{winner}, state:{state}".format(act=win_trick_action, winner=winner, state=self)
+
+        # give trick to correct player
+        trick_to = winner
+        if isinstance(win_trick_action, GiveDragonAwayAction):
+            trick_to = win_trick_action.to
+
+        # determine next player
+        try:
+            next_player = winner if len(self.handcards[winner]) else self._next_player_turn()
+        except StopIteration:
+            # happens only right before the game ends
+            next_player = winner
+            assert self.is_double_win() or len(self.ranking) >= 3
+
+        self._player_pos = next_player
+        assert isinstance(self._won_tricks, MutableWonTricks)
+        self._won_tricks.add_trick(player=trick_to, trick=win_trick_action.trick)
+        self._trick_on_table = MutableTrick()
+
+    def _apply_pass_action(self, pass_action: PassAction):
+        assert pass_action.player_pos == self.player_pos
+        assert isinstance(self.player_pos, int), str(self.player_pos)
+        leading_player = self.trick_on_table.last_combination_action.player_pos
+        assert isinstance(leading_player, int), str(leading_player)+" "+str(self.trick_on_table)
+        next_player_pos = self._next_player_turn()
+
+        if (leading_player == next_player_pos
+                or self.player_pos < leading_player < next_player_pos
+                or next_player_pos < self.player_pos < leading_player
+                or leading_player < next_player_pos < self.player_pos):
+            # trick ends with leading as winner
+            self._player_pos = leading_player
+            assert isinstance(self.player_pos, int), str(self.player_pos)
+            self._trick_on_table = self.trick_on_table.finish(last_action=pass_action)
+
+        else:
+            self._player_pos = next_player_pos
+            assert isinstance(self._trick_on_table, MutableTrick)
+            assert isinstance(next_player_pos, int), str(next_player_pos)
+            self._trick_on_table.append(pass_action)
+        assert isinstance(self.player_pos, int), str(self.player_pos)
+
+    def _apply_combination(self, comb_action: PlayCombination):
+        played_comb = comb_action.combination
+        assert comb_action.player_pos == self.player_pos
+
+        # remove from handcards and add to trick on table
+        self._trick_on_table.append(comb_action)
+        assert isinstance(self._handcards, MutableHandCards)
+        self._handcards.remove_cards(player=self.player_pos, cards=played_comb.cards)
+
+        # ranking
+        if len(self._handcards[self.player_pos]) == 0:
+            # player finished
+            assert self.player_pos not in self.ranking
+            assert len(self.ranking) == len(set(self.ranking))
+            self.ranking.append(self.player_pos)
+
+        # dog
+        if played_comb == DOG_COMBINATION:
+            assert len(self.trick_on_table) == 1, str(self.trick_on_table)
+            self._player_pos = (self.player_pos + 2) % 4  # Teammate
+        else:
+            self._player_pos = self._next_player_turn()
+
+        # wish fullfilled?
+        if played_comb.contains_cardrank(self.wish):
+            self._wish = None
+
+    def _next_player_turn(self) -> int:
+        """
+        :return: the next player with non empty handcards
+        """
+
+        return next((ppos % 4 for ppos in range(self.player_pos + 1, self.player_pos + 4) if len(self.handcards[ppos % 4]) > 0))
+
+    def has_cards(self, player: int, cards: Collection[Card])->bool:
+        """
+        
+        :param player: 
+        :param cards: 
+        :return: True if the player has the given card, False otherwise
+        """
+        return self.handcards.has_cards(player=player, cards=cards)
+
+    def is_terminal(self):
+        return self.is_double_win() or (self.trick_on_table.is_empty() and len(self.ranking) >= 3)
+
+    def is_double_win(self)->bool:
+        return len(self.ranking) >= 2 and self.ranking[0] == (self.ranking[1] + 2) % 4
+
+    # FOLLOWING METHODS SHOULD NOT BE USED AND RAISE LOGIC_ERROR
+    def change(self, **attributes_to_change) -> 'TichuState':
+        raise LogicError()
+
+    def _next_state_on_wish(self, wish_action: WishAction):
+        raise LogicError()
+
+    def _next_state_on_tichu(self, tichu_action: TichuAction):
+        raise LogicError()
+
+    def _next_state_on_win_trick(self, win_trick_action: WinTrickAction):
+        raise LogicError()
+
+    def _next_state_on_pass(self, pass_action: PassAction):
+        raise LogicError()
+
+    def _next_state_on_combination(self, comb_action: PlayCombination):
+        raise LogicError()
+

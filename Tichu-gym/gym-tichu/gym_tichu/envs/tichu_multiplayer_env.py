@@ -16,7 +16,8 @@ from .internals.error import IllegalActionError, LogicError
 
 logger = logging.getLogger(__name__)
 
-__all__ = ('TichuMultiplayerEnv',)
+__all__ = ('TichuMultiplayerEnv', 'TichuSinglePlayerAgainstRandomEnv',
+           'TichuSinglePlayerAgainstLatestQAgentEnv', 'TichuSinglePlayerAgainstTheTrainingQAgentEnv')
 
 
 class TichuMultiplayerEnv(gym.Env):
@@ -73,8 +74,8 @@ class TichuSinglePlayerAgainstRandomEnv(gym.Env):
         assert illegal_move_mode in ['loose'], "'raise' is not yet implemented"  # ['raise', 'loose']
 
         super().__init__()
-        from gym_agents import make_dqn_agent_4layers, BalancedRandomAgent
-        self.agents = [None, BalancedRandomAgent(), BalancedRandomAgent(), BalancedRandomAgent()]
+
+        self.agents = [None] + self._make_3_enemy_agents()
 
         self._general_combinations = list(all_general_combinations_gen())
         self.action_space = spaces.Discrete(len(self._general_combinations)+1)  # +1 because there is also the Pass action
@@ -198,6 +199,10 @@ class TichuSinglePlayerAgainstRandomEnv(gym.Env):
         else:
             logger.debug(message, *args, **kwargs)
 
+    def _make_3_enemy_agents(self)->list:
+        from gym_agents import BalancedRandomAgent
+        return [BalancedRandomAgent(), BalancedRandomAgent(), BalancedRandomAgent()]
+
     @timecall(immediate=False)
     def encode_state(self, state: TichuState)->Any:
         """
@@ -242,3 +247,19 @@ class TichuSinglePlayerAgainstRandomEnv(gym.Env):
         enc = (np.array(encoded, dtype=bool), np.array(encoded_gen_actions))
         # logger.warning("enc: {}".format(enc))
         return enc
+
+
+class TichuSinglePlayerAgainstLatestQAgentEnv(TichuSinglePlayerAgainstRandomEnv):
+
+    def _make_3_enemy_agents(self)->list:
+        from gym_agents import make_dqn_agent_2layers
+        return [make_dqn_agent_2layers('./dqn_2layers_weights.h5f'),
+                make_dqn_agent_2layers('./dqn_2layers_weights.h5f'),
+                make_dqn_agent_2layers('./dqn_2layers_weights.h5f')]
+
+
+class TichuSinglePlayerAgainstTheTrainingQAgentEnv(TichuSinglePlayerAgainstRandomEnv):
+
+    def _make_3_enemy_agents(self)->list:
+        from gym_agents.agents import agent_to_train
+        return [agent_to_train, agent_to_train, agent_to_train]

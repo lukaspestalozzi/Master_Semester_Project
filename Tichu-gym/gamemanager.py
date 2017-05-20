@@ -38,7 +38,6 @@ class TichuGame(object):
     def agents(self):
         return self._agents
 
-    @timecall(immediate=False)
     def start_game(self, target_points=1000)->Tuple[Tuple[int, int], List[History]]:
         """
         Starts the tichu game
@@ -65,7 +64,6 @@ class TichuGame(object):
 
         return GameOutcome(points, round_histories)
 
-    @timecall(immediate=False)
     def _start_round(self)->Tuple[Tuple[int, int], History]:
         start_t = time()
         console_logger.info("[ROUND START] Start round...")
@@ -141,7 +139,6 @@ class TichuGame(object):
         console_logger.warning("[ROUND END] Round ended: ranking: {}, outcome: {} [Time: {}]".format(curr_state.ranking, points, time_since(since=start_t)))
         return GameOutcome(points, curr_state.history)
 
-    @timecall(immediate=False)
     def _setup_round(self)->Tuple[TichuState, Tuple[int, int, int, int], bool, dict]:
         """
         Sets up the round until the first player can play a combinaiton

@@ -3,6 +3,8 @@ from collections import abc as collectionsabc
 from decorator import contextmanager
 from time import time
 from datetime import timedelta
+import os
+import errno
 
 # constants
 # all primes smaller than 200
@@ -66,6 +68,14 @@ def indent(n, s="-"):
     :return: string containing a copy of n times the string s
     """
     return s.join("" for _ in range(n))
+
+
+def make_sure_path_exists(path):
+    try:
+        os.makedirs(path)
+    except OSError as exception:
+        if exception.errno != errno.EEXIST:
+            raise
 
 
 def check_true(expr, ex=AssertionError, msg="expr was not True"):

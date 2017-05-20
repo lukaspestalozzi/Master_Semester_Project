@@ -26,7 +26,7 @@ TogetherMode = DefaultMode._replace(debug_file=None, info_file=None, warn_file=N
 SeparateMode = DefaultMode._replace(all_file=None, info_and_above_file=None, warn_and_above_file=None)
 
 ExperimentMode = SeparateMode._replace(redirect_stdout=True, console_logger_level=None, stderr_level=None, debug_file=None, info_file=None)  # Only seperate files and no console output
-TrainMode = ExperimentMode._replace(redirect_stdout=False)
+TrainMode = ExperimentMode._replace(redirect_stdout=True)
 HumanplayMode = DefaultMode._replace(redirect_stdout=True, stderr_level=logging.INFO)
 HumanplayCheatMode = HumanplayMode._replace(console_logger_level=logging.DEBUG)
 

@@ -1,13 +1,13 @@
 
 import abc
 from collections import namedtuple
-from typing import Optional, Generator, Sequence
+from typing import Optional, Generator, Sequence, List
 from profilehooks import timecall
 
 import itertools
 import logging
 
-from .utils import check_all_isinstance
+from .utils import check_all_isinstance, check_isinstance
 from .cards import Combination, DOG_COMBINATION, CardRank
 from .error import NotSupportedError
 
@@ -42,6 +42,7 @@ class PlayerAction(object, metaclass=abc.ABCMeta):
 
 
 class PlayCombination(PlayerAction):
+    __slots__ = ('_combination',)
 
     def __init__(self, player_pos: int, combination: Combination):
         super().__init__(player_pos=player_pos)
@@ -65,10 +66,11 @@ class PlayCombination(PlayerAction):
 
 
 class PlayFirst(PlayCombination):
-    pass
+    __slots__ = ()
 
 
 class PlayDog(PlayFirst):
+    __slots__ = ()
 
     def __init__(self, player_pos: int):
         super().__init__(player_pos=player_pos, combination=DOG_COMBINATION)
@@ -78,6 +80,7 @@ class PlayDog(PlayFirst):
 
 
 class PlayBomb(PlayCombination):
+    __slots__ = ()
 
     def __init__(self, player_pos: int, combination: Combination):
         assert combination.is_bomb()
@@ -85,12 +88,14 @@ class PlayBomb(PlayCombination):
 
 
 class PassAction(PlayerAction):
+    __slots__ = ()
 
     def __str__(self):
         return "PASS({me.player_pos})".format(me=self)
 
 
 class TichuAction(PlayerAction):
+    __slots__ = ('_announce', '_grand')
 
     def __init__(self, player_pos: int, announce_tichu: bool, grand: bool=False):
         """
@@ -128,6 +133,8 @@ class TichuAction(PlayerAction):
 
 
 class WinTrickAction(PlayerAction):
+    __slots__ = ('_trick',)
+
     def __init__(self, player_pos: int, trick: 'Trick'):
         super().__init__(player_pos=player_pos)
         self._trick = trick
@@ -150,6 +157,7 @@ class WinTrickAction(PlayerAction):
 
 
 class GiveDragonAwayAction(WinTrickAction):
+    __slots__ = ('_to',)
 
     def __init__(self, player_from: int, player_to: int, trick: 'Trick'):
         assert player_to in range(4)
@@ -304,7 +312,7 @@ class Trick(tuple):
 
     # TODO add repr
     # TODO add pretty string method maybe
-    def __str__(self):
+    def __repr__(self):
         return "{me.__class__.__name__}[Leader: {me.winner}]: {tricks_str}".format(me=self, tricks_str=' -> '.join(map(str, iter(self))))
 
 
@@ -326,3 +334,86 @@ class FinishedTrick(Trick):
 
     def __add__(self, *args, **kwargs):
         raise NotSupportedError("Can't add action to finished Trick.")
+
+
+class MutableTrick(object):
+    def __init__(self, actions_: Sequence[PlayerAction]=()):
+        super().__init__()
+        check_all_isinstance(actions_, PlayerAction)
+        self._last_combination_action = 'NotInitialized'  # cache
+        self._actions: List = list(actions_)
+
+    @property
+    def last_combination(self) -> Optional['Combination']:
+        try:
+            return self.last_combination_action.combination
+        except AttributeError:
+            return None
+
+    @property
+    def last_combination_action(self) -> Optional['PlayCombination']:
+        if self._last_combination_action == 'NotInitialized':
+            try:
+                self._last_combination_action = next((a for a in reversed(self._actions) if isinstance(a, PlayCombination)))
+            except StopIteration:
+                self._last_combination_action = None
+        return self._last_combination_action
+
+    @property
+    def last_action(self):
+        return self._actions[-1] if len(self._actions) else None
+
+    @property
+    def points(self):
+        return self.count_points()
+
+    @property
+    def winner(self):
+        return self.last_combination_action.player_pos if len(self._actions) else 'NoLeader'
+
+    @classmethod
+    def from_immutable(cls, trick):
+        return cls(trick)
+
+    def combinations(self) -> Generator[Combination, None, None]:
+        yield from (act.combination for act in self._actions if isinstance(act, PlayCombination))
+
+    def count_points(self):
+        return sum([comb.points for comb in self.combinations()])
+
+    def is_empty(self):
+        return len(self._actions) == 0
+
+    def is_dragon_trick(self):
+        return self.last_combination.contains_dragon()
+
+    def is_finished(self) -> bool:
+        return False
+
+    def finish(self, last_action: Optional['PlayerAction'] = None) -> 'FinishedTrick':
+        """
+        A Finished trick raises an Error when trying to add another action to it.
+        :param last_action: if not None, then this action is appended to the finished trick and therefore is the last action of this trick
+        :return: a new (finished) trick
+        """
+        acts = tuple(self)
+        if last_action:
+            acts += (last_action,)
+        return FinishedTrick(acts)
+
+    def append(self, action: 'PlayerAction'):
+        check_isinstance(action, PlayerAction)
+        if isinstance(action, PlayCombination):
+            self._last_combination_action = action
+        self._actions.append(action)
+
+    def __iter__(self):
+        return self._actions.__iter__()
+
+    def __len__(self):
+        return len(self._actions)
+
+    def __repr__(self):
+        return "{me.__class__.__name__}[Leader: {me.winner}]: {tricks_str}".format(me=self, tricks_str=' -> '.join(map(str, iter(self._actions))))
+
+

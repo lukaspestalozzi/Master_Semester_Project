@@ -382,7 +382,9 @@ card_rank_to_sword_card = {
 
 class CardSet(TypedFrozenSet):
 
-    #TODO add pretty string method
+    __slots__ = ('_rank_dict', '_all_generalcombs_cache', '_poss_combs_cache', '_singles_cache', '_pairs_cache',
+                 '_trios_cache', '_straights_cache', '_pairsteps_cache', '_fullhouses_cache', '_straightbombs_cache')
+
     def __init__(self, cards: Iterable=()):
         """
         :param cards: An iterable containing Card instances. If it is another CardSet, then it will be copied.
@@ -390,8 +392,20 @@ class CardSet(TypedFrozenSet):
         cards = set(cards)  # if cards is a generator
         check_all_isinstance(cards, Card)
         super().__init__(cards)
+        # caches
         self._rank_dict = None
         self._all_generalcombs_cache = None
+
+        self._poss_combs_cache: Dict[Tuple[Optional['Combination'], Optional[CardRank]], List['Combination']] = dict()
+
+        self._singles_cache: Dict[Tuple[Optional['Combination'], Optional[CardRank]], List['Single']] = dict()
+        self._pairs_cache: Dict[Tuple[Optional['Combination'], Optional[CardRank]], List['Pair']] = dict()
+        self._trios_cache: Dict[Tuple[Optional['Combination'], Optional[CardRank]], List['Trio']] = dict()
+        # self._quads_cache = None  # probably Not worth it
+        self._straights_cache: Dict[Tuple[Optional['Combination'], Optional[CardRank]], List['Straight']] = dict()
+        self._pairsteps_cache: Dict[Tuple[Optional['Combination'], Optional[CardRank]], List['PairSteps']] = dict()
+        self._fullhouses_cache: Dict[Tuple[Optional['Combination'], Optional[CardRank]], List['FullHouse']] = dict()
+        self._straightbombs_cache: Dict[Tuple[Optional['Combination'], Optional[CardRank]], List['StraightBomb']] = dict()
 
     def rank_dict(self, exclude_special: bool=False)->Dict[CardRank, List[Card]]:
         """
@@ -402,7 +416,7 @@ class CardSet(TypedFrozenSet):
             temp_dict = defaultdict(lambda: [])
             for c in self:
                 temp_dict[c.card_rank].append(c)
-            self._rank_dict = {k: tuple(v) for k, v in temp_dict.items()}
+            self._rank_dict = {k: tuple(sorted(v)) for k, v in temp_dict.items()}
 
         # return the right dict
         if exclude_special:
@@ -438,6 +452,23 @@ class CardSet(TypedFrozenSet):
 
     # Combinations methods
     def possible_combinations(self, played_on: Optional['Combination']=None, contains_rank: Optional[CardRank]=None)->Generator['Combination', None, None]:
+        """
+        Note, caches the result
+        
+        :param played_on: 
+        :param contains_rank: 
+        :return: An Generator yielding all possible combinations respecting played_on and contains_rank
+        """
+        # TODO make better adapted to different parametervalues (eg. try to fethc (None, None) and adapt)
+        # logger.debug("possible_combinations with arguments {} and {}".format(played_on, contains_rank))
+        param_tup = (played_on, contains_rank)
+        if param_tup not in self._poss_combs_cache:
+            # logger.debug("Not cached")
+            self._poss_combs_cache[param_tup] = list(self._possible_combinations_gen(played_on=played_on, contains_rank=contains_rank))
+        # logger.debug("yield from : {}".format(self._poss_combs_cache[param_tup]))
+        yield from self._poss_combs_cache[param_tup]
+
+    def _possible_combinations_gen(self, played_on: Optional['Combination']=None, contains_rank: Optional[CardRank]=None)->Generator['Combination', None, None]:
         assert played_on is None or isinstance(played_on, Combination)
         assert contains_rank is None or isinstance(contains_rank, CardRank)
 
@@ -488,8 +519,14 @@ class CardSet(TypedFrozenSet):
                 yield from self.straights(played_on=played_on, contains_rank=contains_rank)
 
     def singles(self, played_on: Optional['Single']=None, contains_rank: Optional[CardRank]=None)->Generator['Single', None, None]:
+        param_tup = (played_on, contains_rank)
+        if param_tup not in self._singles_cache:
+            self._singles_cache[param_tup] = list(self._singles_gen(played_on=played_on, contains_rank=contains_rank))
+        yield from self._singles_cache[param_tup]
+
+    def _singles_gen(self, played_on: Optional['Single']=None, contains_rank: Optional[CardRank]=None)->Generator['Single', None, None]:
         # TODO handle presence of streetbomb
-        # TODO cache
+
         if played_on is not None and not isinstance(played_on, Single):
             return  # Nothing to do here
 
@@ -513,6 +550,12 @@ class CardSet(TypedFrozenSet):
             yield from (Single(crds[0]) for crds in rank_dict.values())
 
     def pairs(self, played_on: Optional['Pair']=None, contains_rank: Optional[CardRank]=None)->Generator['Pair', None, None]:
+        param_tup = (played_on, contains_rank)
+        if param_tup not in self._pairs_cache:
+            self._pairs_cache[param_tup] = list(self._pairs_gen(played_on=played_on, contains_rank=contains_rank))
+        yield from self._pairs_cache[param_tup]
+
+    def _pairs_gen(self, played_on: Optional['Pair']=None, contains_rank: Optional[CardRank]=None)->Generator['Pair', None, None]:
         # TODO handle presence of streetbomb
         # TODO cache
         if played_on is not None and not isinstance(played_on, Pair):
@@ -534,6 +577,12 @@ class CardSet(TypedFrozenSet):
                     yield pair
 
     def trios(self, played_on: Optional['Trio']=None, contains_rank: Optional[CardRank]=None)->Generator['Trio', None, None]:
+        param_tup = (played_on, contains_rank)
+        if param_tup not in self._trios_cache:
+            self._trios_cache[param_tup] = list(self._trios_gen(played_on=played_on, contains_rank=contains_rank))
+        yield from self._trios_cache[param_tup]
+
+    def _trios_gen(self, played_on: Optional['Trio']=None, contains_rank: Optional[CardRank]=None)->Generator['Trio', None, None]:
         # TODO handle presence of streetbomb
         # TODO cache
         if played_on is not None and not isinstance(played_on, Trio):
@@ -572,10 +621,14 @@ class CardSet(TypedFrozenSet):
                     yield sq
 
     def straightbombs(self, played_on: Optional['Combination']=None, contains_rank: Optional[CardRank]=None)->Generator['StraightBomb', None, None]:
-        # TODO cache suitdict
-        # TODO cache
+        param_tup = (played_on, contains_rank)
+        if param_tup not in self._straightbombs_cache:
+            self._straightbombs_cache[param_tup] = list(self._straightbombs_gen(played_on=played_on, contains_rank=contains_rank))
+        yield from self._straightbombs_cache[param_tup]
+
+    def _straightbombs_gen(self, played_on: Optional['Combination']=None, contains_rank: Optional[CardRank]=None)->Generator['StraightBomb', None, None]:
         # group by card suit
-        suitdict = defaultdict(lambda: [])
+        suitdict = defaultdict(list)
         for c in self:
             suitdict[c.suit].append(c)
 
@@ -592,6 +645,12 @@ class CardSet(TypedFrozenSet):
                                self.straightbombs(played_on=played_on, contains_rank=contains_rank))
 
     def straights(self, played_on: Optional['Straight'] = None, contains_rank: Optional[CardRank] = None)->Generator['Straight', None, None]:
+        param_tup = (played_on, contains_rank)
+        if param_tup not in self._straights_cache:
+            self._straights_cache[param_tup] = list(self._straights_gen(played_on=played_on, contains_rank=contains_rank))
+        yield from self._straights_cache[param_tup]
+
+    def _straights_gen(self, played_on: Optional['Straight'] = None, contains_rank: Optional[CardRank] = None)->Generator['Straight', None, None]:
         if played_on and not isinstance(played_on, Straight):
             return  # Nothing to do here
 
@@ -671,6 +730,12 @@ class CardSet(TypedFrozenSet):
                 yield from (st for st in gen if st.can_be_played_on(played_on))
 
     def fullhouses(self, played_on: Optional['FullHouse'] = None, contains_rank: Optional[CardRank] = None)->Generator['FullHouse', None, None]:
+        param_tup = (played_on, contains_rank)
+        if param_tup not in self._fullhouses_cache:
+            self._fullhouses_cache[param_tup] = list(self._fullhouses_gen(played_on=played_on, contains_rank=contains_rank))
+        yield from self._fullhouses_cache[param_tup]
+
+    def _fullhouses_gen(self, played_on: Optional['FullHouse'] = None, contains_rank: Optional[CardRank] = None)->Generator['FullHouse', None, None]:
         if played_on is not None and not isinstance(played_on, FullHouse):
             return  # Nothing to do here
 
@@ -692,6 +757,12 @@ class CardSet(TypedFrozenSet):
                         yield fh
 
     def pairsteps(self, played_on: Optional['PairSteps'] = None, contains_rank: Optional[CardRank] = None)->Generator['PairSteps', None, None]:
+        param_tup = (played_on, contains_rank)
+        if param_tup not in self._pairsteps_cache:
+            self._pairsteps_cache[param_tup] = list(self._pairsteps_gen(played_on=played_on, contains_rank=contains_rank))
+        yield from self._pairsteps_cache[param_tup]
+
+    def _pairsteps_gen(self, played_on: Optional['PairSteps'] = None, contains_rank: Optional[CardRank] = None)->Generator['PairSteps', None, None]:
         if played_on is not None and not isinstance(played_on, PairSteps) or len(self) < 4:
             return  # Nothing to do here
 
@@ -1095,6 +1166,8 @@ class Deck(list):
 
 class Combination(metaclass=abc.ABCMeta):
 
+    __slots__ = ('_cards', '_ranks')
+
     def __init__(self, cards: Iterable[Card]):
         try:
             next(iter(cards))
@@ -1464,7 +1537,7 @@ class PairSteps(Combination):
 
 class Straight(Combination):
 
-    __slots__ = ("_height", "_ph_as")
+    __slots__ = ("_height", "_ph_as", '_lowest_rank', '_highest_rank')
 
     def __init__(self, cards: Iterable[Card], phoenix_as: Optional[Card]=None):
         # TODO speed!
@@ -1531,6 +1604,7 @@ class Bomb(Combination, metaclass=abc.ABCMeta):
     """
     Helps to make instance-checks for any bomb type
     """
+    __slots__ = ()
 
     def is_bomb(self)->bool:
         return True
@@ -1566,7 +1640,7 @@ class SquareBomb(Bomb):
 
 class StraightBomb(Bomb):
 
-    __slots__ = ("_height", )
+    __slots__ = ("_height", '_straight')
 
     def __init__(self, straight):
         check_isinstance(straight, Straight)
@@ -1657,7 +1731,6 @@ class GeneralCombination(object):
 
         except StopIteration:
             raise ValueError("Can't find '{}' in '{}'".format(self, cards))
-
 
     @staticmethod
     def _single_height(single):
