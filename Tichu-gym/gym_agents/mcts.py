@@ -14,7 +14,7 @@ from operator import itemgetter
 from typing import Optional, Union, Hashable, NewType, TypeVar, Tuple, List, Dict, Iterable, Generator, Set, FrozenSet
 from math import sqrt, log
 from time import time
-from scraper.tichumania_game_scraper import GenCombWeights
+from scraper.tichumania_game_scraper import GenCombWeights  # TODO not nice, make better
 
 from profilehooks import timecall, profile
 
@@ -34,36 +34,53 @@ RewardVector = NewType('RewardVector', Tuple[int, int, int, int])
 
 @lru_cache(maxsize=2**15)  # with (2**16) 64k CacheInfo(hits=2274111, misses=43745, maxsize=65536, currsize=43745)
 def _uid_trick(trick: Trick) -> str:
-    return ''.join(map(str, trick.combinations()))  # TODO improve
+    if trick.is_empty():
+        return 'EmptyTrick'
+
+    lastcombact = trick.last_combination_action
+    lastact = trick.last_action
+    if lastcombact:
+        return '{winner}:{len_}{lastcomb}&{lastact}'.format(winner=trick.winner,
+                                                            len_=len(trick),
+                                                            lastcomb='{}{},{},{}'.format(lastcombact.__class__.__name__,
+                                                                                         lastcombact.player_pos,
+                                                                                         lastcombact.combination.__class__.__name__,
+                                                                                         lastcombact.combination.height),
+                                                            lastact=lastact.__class__.__name__)
+    else:
+        return '{player}:{lastact}'.format(player=lastact.player_pos, lastact=lastact.__class__.__name__)
 
 
 @lru_cache(maxsize=2048)  # CacheInfo(hits=329379, misses=1767, maxsize=2048, currsize=1767)
 def _uid_cardset(cards: CardSet) -> str:
-    return ''.join(map(str, cards))  # TODO improve
+    return ''.join(c.name for c in sorted(cards))
 
 
 @lru_cache(maxsize=2**15)  # with 131k (2**17):  CacheInfo(hits=233368, misses=331146, maxsize=131072, currsize=131072)
 def unique_infoset_id(state: TichuState, observer_id: int) -> str:
-    return '|'.join(
+    idstr = '|'.join(
             map(str, (
-                state.player_pos,
+                int(state.player_pos),
                 state.wish.height if state.wish else 'NoWish',
-                state.ranking,
+                tuple(state.ranking),
                 sorted(state.announced_tichu),
                 sorted(state.announced_grand_tichu),
                 _uid_trick(state.trick_on_table),
+                sum(map(len, state.won_tricks)),  # how many tricks have been won so far
                 *map(_uid_trick, state.won_tricks.iter_all_tricks()),
                 *map(len, state.handcards),  # length of handcards.
                 _uid_cardset(state.handcards[observer_id])
             ))
         )
+    # logger.debug(idstr)
+    return idstr
 
 
 @lru_cache(maxsize=2**15)
 def position_in_episode(state: TichuState)->str:
     # TODO try: - with/without passactions; - include/remove playerid; - use the trick and not history; use 'genericcombinations'
 
-    # history is the current trick on the table (only played combinations)
+    # history is the current trick on the table
     if state.trick_on_table.is_empty():
         return "ROOT_" + str(state.player_pos)
     else:
@@ -172,8 +189,6 @@ class InformationSetMCTS(MCTS):
     def __init__(self):
         self.graph = nx.DiGraph(name='GameGraph')
         self.observer_id = None
-        # self._visited_records = set()
-        # self._available_records = set()
         self._visited_records = defaultdict(int)
         self._available_records = defaultdict(int)
         self._determinization_generator = None
@@ -227,7 +242,8 @@ class InformationSetMCTS(MCTS):
         return unique_infoset_id(state=state, observer_id=self.observer_id)
 
     def _record_for_state(self, state: TichuState)->UCB1Record:
-        return self.graph.node[self._graph_node_id(state)]['record']
+        nid = self._graph_node_id(state)
+        return self.graph.node[nid]['record']
 
     def _make__determinization_generator(self, state: TichuState, observer_id: int):
         """
@@ -283,12 +299,13 @@ class InformationSetMCTS(MCTS):
         :param state: 
         :return: The leaf_state used for simulation (rollout) policy
         """
-        curr_state = state
-        # add the state to the available states since it is the root state
+
+        # add the state to the available and visited states since it is the root state
         self._available_records[self._record_for_state(state)] += 1
+        self._visited_records[self._record_for_state(state)] += 1
+
+        curr_state = state
         while not curr_state.is_terminal():
-            # add curr_state to visited nodes
-            self._visited_records[self._record_for_state(curr_state)] += 1
             # check if needs to expand
             if not self.is_fully_expanded(curr_state):
                 self.expand(curr_state)
@@ -300,6 +317,13 @@ class InformationSetMCTS(MCTS):
             else:
                 # No expanding, just select next node
                 curr_state = curr_state.next_state(self.tree_selection(curr_state))
+                # add curr_state to visited nodes
+                try:
+                    self._visited_records[self._record_for_state(curr_state)] += 1
+                except KeyError:
+                    logger.error("KeyError for state: {}, treepolicy start state: {}".format(curr_state, state))
+                    logger.error("nid state: {}, nid start state: {}".format(self._graph_node_id(curr_state), self._graph_node_id(state)))
+                    raise
 
         return curr_state
 
@@ -350,7 +374,7 @@ class InformationSetMCTS(MCTS):
         """
 
         rollout_state = RolloutTichuState.from_tichustate(state)
-        return self.evaluate_state(rollout_state.random_rollout())  # TODO make RolloutState.random_rollout() to return a normal TichuState?
+        return self.evaluate_state(rollout_state.random_rollout())
 
     @timecall(immediate=False)
     def evaluate_state(self, state: TichuState) -> RewardVector:
@@ -376,16 +400,20 @@ class InformationSetMCTS(MCTS):
         :param reward_vector: 
         :return: 
         """
-
-        # def str_dict(d):
-        #     s = ""
-        #     for k, v in d.items():
-        #         s += "\n{} -> {}".format(repr(k), repr(v))
-        #     return s+"\n"
+        def str_dict(d):
+            s = ""
+            for k, v in d.items():
+                s += "\n{} -> {}".format(repr(k), repr(v))
+            return s+"\n"
 
         # all visited are were available at least once
-        assert set(self._visited_records.keys()).issubset(set(self._available_records.keys()))  #, "\nvisited: {} \n avail: {}".format(str_dict(self._visited_records), str_dict(self._available_records))
-        assert all(self._available_records[vk] >= vv for vk, vv in self._visited_records.items())  # at least as much available as visited
+        # assert set(self._visited_records.keys()).issubset(set(self._available_records.keys()))  #, "\nvisited: {} \n avail: {}".format(str_dict(self._visited_records), str_dict(self._available_records))
+        #
+        # # at least as much available as visited
+        # for vk, vv in self._visited_records.items():
+        #     assert self._available_records[vk] >= vv, "visited {}->{}, avail: {}, \n\nvisit {}\n\navail {}".format(vk, vv, self._available_records[vk], str_dict(self._visited_records), str_dict(self._available_records))
+        #         # self._visited_records[vk] = self._available_records[vk]
+        #         # logger.warning("backpropagation more visited than available")
 
         # logger.debug(f"visited: {len(self._visited_records)}, avail: {len(self._available_records)})")
         for record, amount in self._available_records.items():
@@ -510,7 +538,7 @@ class InformationSetMCTSHighestUcbBestAction(InformationSetMCTS):
         assert nid in self.graph
         assert self.graph.out_degree(nid) > 0
 
-        possactions = state.possible_actions()
+        possactions = state.possible_actions_set
 
         max_a = next(iter(possactions))
         max_v = -float('inf')
@@ -587,9 +615,8 @@ class ISMctsLGR(InformationSetMCTS):
                 self._made_moves.append(self.MOVE_BREAK)
 
             if (last_action in self._lgr_map
-                and self._lgr_map[last_action] is not None
-                and self._lgr_map[last_action][
-                    rollout_state.player_id] in rollout_state.possible_actions()):  # only take possible actions
+                    and self._lgr_map[last_action] is not None
+                    and self._lgr_map[last_action][rollout_state.player_id] in rollout_state.possible_actions()):  # only take possible actions
                 next_action = self._lgr_map[last_action][rollout_state.player_id]
                 # logger.debug("LGR hit: {}->{}".format(last_action, next_action))
             else:
@@ -628,6 +655,43 @@ class ISMctsEpicLGR(ISMctsLGR, EpicISMCTS):
     **Best Action:** Most Visited
     """
     pass
+
+
+class EpicNoRollout(EpicISMCTS):
+    """
+    Epic search with no rollout.
+    """
+
+    @timecall(immediate=False)
+    def tree_policy(self, state: TichuState)->TichuState:
+
+        # add the state to the available states since it is the first
+        self._available_records[self._record_for_state(state)] += 1
+        self._visited_records[self._record_for_state(state)] += 1
+
+        curr_state = state
+        while not curr_state.is_terminal():
+            # check if needs to expand
+            if not self.is_fully_expanded(curr_state):
+                self.expand(curr_state)
+            # select next state
+            prev_state = curr_state
+            curr_state = curr_state.next_state(self.tree_selection(curr_state))  # results in random action when just expanded
+            # add curr_state to visited nodes
+            try:
+                self._visited_records[self._record_for_state(curr_state)] += 1
+            except KeyError:
+                logger.error("KeyError for state: {}, \n prev_state: {}, \ntreepolicy start state: {}".format(curr_state, prev_state, state))
+                logger.error("nid state: {}, nid start state: {}".format(self._graph_node_id(curr_state), self._graph_node_id(state)))
+                raise
+
+        return curr_state
+
+    @timecall(immediate=False)
+    def rollout_policy(self, state: TichuState) -> RewardVector:
+        # state should be final
+        assert state.is_terminal()
+        return self.evaluate_state(state)
 
 
 PlayerPos = NewType('PlayerPos', int)  # a playerposition (in range(4))

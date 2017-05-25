@@ -313,9 +313,7 @@ class Card(ComparableEnum):
 
         self._str = (f"{str(self._cardrank)}{self._suit.pretty_string()}" if self._suit is not CardSuit.SPECIAL
                      else f"{str(self._cardrank)}")
-        self._repr = "Card({}, {})".format(repr(self._cardrank), repr(self._suit))
 
-    # TODO add pretty string method
     @property
     def suit(self)->CardSuit:
         return self._suit
@@ -352,7 +350,7 @@ class Card(ComparableEnum):
         return not self.__eq__(other)
 
     def __repr__(self):
-        return __name__+"{c}({n}, {r}, {s})".format(c=self.__class__, n=self.name, r=repr(self.rank), s=repr(self.suit))
+        return '{}({})'.format(self.__class__.__name__, self.name)
 
     def __str__(self):
         return self._str
@@ -807,116 +805,6 @@ class CardSet(TypedFrozenSet):
         else:
             yield from (ps for ps in gen if ps.can_be_played_on(played_on))
 
-    # All combinations
-    # def all_combinations(self, max_length=None):
-    #     """
-    #
-    #     :param max_length:
-    #     :return: All possible combinations (ignoring the phoenix, but differentiating between cards)
-    #     """
-    #
-    #     if max_length is None:
-    #         max_length = len(self)
-    #     if max_length < 1:
-    #         return
-    #     # TODO cache ?
-    #
-    #     rank_dict = self.rank_dict(exclude_special=False)
-    #     # ####### Singles ##########
-    #     for c in self:
-    #         yield Single(c)
-    #     if max_length == 1:
-    #         return
-    #     # ####### pairs, trios, squarebombs ##########
-    #     trios = set()
-    #     pairs = set()
-    #     for rank, cards in rank_dict.items():
-    #         if len(cards) == 2:
-    #             pairs.add(Pair(*cards))
-    #         if len(cards) == 3:
-    #             pairs.update(Pair(a, b) for a, b in itertools.combinations(cards, r=2))
-    #             trios.add(Trio(*cards))
-    #         if len(cards) == 4:
-    #             pairs.update(Pair(a, b) for a, b in itertools.combinations(cards, r=2))
-    #             trios.update(Trio(a, b, c) for a, b, c in itertools.combinations(cards, r=3))
-    #             if max_length >= 4:
-    #                 yield SquareBomb(*cards)
-    #     if max_length >= 2:
-    #         yield from pairs
-    #     if max_length >= 3:
-    #         yield from trios
-    #
-    #     # ####### FullHouses ##########
-    #     if max_length >= 5:
-    #         for trio in trios:
-    #             for pair in pairs:
-    #                 if pair.height != trio.height:
-    #                     yield FullHouse(pair=pair, trio=trio)
-    #
-    #     # ####### STRAIGHTS ##########
-    #     def straights():
-    #         sorted_cards = sorted((c for c in self if c is not Card.PHOENIX and c is not Card.DOG and c is not Card.DRAGON), key=lambda c: c.rank)
-    #
-    #         next_card: Dict[int, List[Card]] = defaultdict(lambda: [])  # card rank -> list of cards with rank 1 higher
-    #         for c in sorted_cards:
-    #             next_card[c.rank.value - 1].append(c)
-    #
-    #         def gen_from(card, remlength):
-    #             if remlength <= 1:
-    #                 yield [card]  # finish a straight with this card
-    #
-    #             # a straight for all possible continuation
-    #             next_cards = next_card[card.rank.value]
-    #             for ncard in next_cards:
-    #                 for st in gen_from(ncard, remlength - 1):
-    #                     yield [card] + st
-    #
-    #         def gen_all_straights():
-    #             """ Take all possible starting cards and generate straights from them """
-    #             max_start_rank = CardRank.TEN  # there is no possible straight starting from J (must have length 5)
-    #
-    #             for c in sorted_cards:
-    #                 if c.rank <= max_start_rank:
-    #                     yield from gen_from(card=c, remlength=5)  # all straights starting with normal card
-    #
-    #         # make and yield the Straights:
-    #         yield from (Straight(st) for st in gen_all_straights() if len(st) <= max_length)
-    #
-    #     if max_length >= 5:
-    #         yield from straights()
-    #
-    #     # ####### PAIRSTEPS ##########
-    #     def pairsteps():
-    #         sorted_pairs = sorted(pairs, key=lambda p: p.height)
-    #         next_pair_no_ph = defaultdict(lambda: [])
-    #         for p in sorted_pairs:
-    #             next_pair_no_ph[p.height - 1].append(p)
-    #
-    #         def gen_from(pair, remlength)->Generator[List['Pair'], None, None]:
-    #             if remlength <= 1:
-    #                 yield [pair]
-    #
-    #             # continue without phoenix:
-    #             with ignored(StopIteration, IndexError):
-    #                 for nextp in next_pair_no_ph[pair.height]:
-    #                     for ps in gen_from(nextp, remlength - 1):
-    #                         yield [pair] + ps
-    #
-    #
-    #         def gen_all_pairsteps()->Generator[List['Pair'], None, None]:
-    #             """ Take all possible starting pairs and generate pairsteps from them """
-    #             max_height = CardRank.A.value  # there is no possible pairstep starting from As (must have length 2)
-    #
-    #             for pair in sorted_pairs:
-    #                 if pair.height <= max_height:
-    #                     yield from gen_from(pair, 2)  # all steps starting with the pair
-    #
-    #         # make and yield the pairsteps:
-    #         yield from (PairSteps(pairs) for pairs in gen_all_pairsteps() if len(pairs) <= max_length)
-    #
-    #     if max_length >= 4:
-    #         yield from pairsteps()
-
     def all_general_combinations(self)->Set['GeneralCombination']:
         if self._all_generalcombs_cache is None:
             retset = set()
@@ -966,149 +854,11 @@ class CardSet(TypedFrozenSet):
         return self._all_generalcombs_cache
 
     def __str__(self):
-        return "Cards{{{}}}".format(', '.join(str(c) for c in sorted(self)))
+        return "{{{}}}".format(', '.join(map(str, sorted(self))))
 
-# class _ConsecutiveCards(object):
-#     """
-#     Class representing a bunch of cards with consecutive ranks.
-#     """
-#     _card_rank_to_sword_card = {
-#         2: Card.TWO_SWORD,
-#         3: Card.THREE_SWORD,
-#         4: Card.FOUR_SWORD,
-#         5: Card.FIVE_SWORD,
-#         6: Card.SIX_SWORD,
-#         7: Card.SEVEN_SWORD,
-#         8: Card.EIGHT_SWORD,
-#         9: Card.NINE_SWORD,
-#         10: Card.TEN_SWORD,
-#         11: Card.J_SWORD,
-#         12: Card.Q_SWORD,
-#         13: Card.K_SWORD,
-#         14: Card.A_SWORD,
-#     }
-#
-#     def __init__(self, cards: Iterable[Card]=tuple(), phoenix_as: Optional[Card]=None):
-#         self._cards: Tuple[Card, ...] = tuple(cards)
-#         self._len = len(self._cards)
-#         self._max_rank: CardRank = max(phoenix_as.rank if c is Card.PHOENIX else c.rank for c in self._cards)
-#         self._min_rank: CardRank = min(phoenix_as.rank if c is Card.PHOENIX else c.rank for c in self._cards)
-#         self._phoenix_as = phoenix_as
-#
-#         # some checking
-#         if __debug__:
-#             rank_set = {c.rank for c in self._cards}
-#             assert self._max_rank.height - self._min_rank.height + 1 == len(self._cards)  # consecutive
-#             assert len(rank_set) == len(self._cards)  # no duplicated ranks
-#             assert CardRank.DOG not in rank_set and CardRank.DRAGON not in rank_set  # No dragon or dog
-#             if phoenix_as:
-#                 assert self.min < phoenix_as.rank.height < self.max
-#                 assert Card.PHOENIX in self._cards
-#
-#     @property
-#     def max(self)->int:
-#         return self._max_rank.height
-#
-#     @property
-#     def min(self)->int:
-#         return self._min_rank.height
-#
-#     @property
-#     def max_rank(self) -> CardRank:
-#         return self._max_rank
-#
-#     @property
-#     def min_rank(self) -> CardRank:
-#         return self._min_rank
-#
-#     def merge(self, other: '_ConsecutiveCards')->'_ConsecutiveCards':
-#         """
-#         :param other: must have a gap of exactly 1 card to this consecutive cards
-#         :return: the two consecutivecards merged with the phoenix in between of them
-#         """
-#         # TODO assert mergableness?
-#         lower, upper = (self, other) if self.max < other.min else (other, self)
-#         assert upper.min - lower.max == 2
-#         fill_card = self._card_rank_to_sword_card[lower.max + 1]
-#         return _ConsecutiveCards(itertools.chain(lower, [Card.PHOENIX], upper), phoenix_as=fill_card)
-#
-#     def make_straights(self, phoenix: bool)->Generator['Straight', None, None]:
-#         """
-#
-#         :param phoenix: if the phoenix should be used or not
-#         :return: generator yielding all different straight that can be made from this ConsecutiveCards
-#         """
-#         if len(self) == 4 and phoenix:
-#             # add before
-#             if self.min_rank > CardRank.TWO:
-#                 yield Straight(itertools.chain(self._cards, (Card.PHOENIX,)), phoenix_as=self._card_rank_to_sword_card[self.min - 1])
-#             # add at the end
-#             if self.min_rank < CardRank.A:
-#                 yield Straight(itertools.chain(self._cards, (Card.PHOENIX,)), phoenix_as=self._card_rank_to_sword_card[self.max + 1])
-#             return
-#         if len(self) < 5:
-#             return
-#
-#         # TODO shortcut if self._len == 5 and dont phoenix?
-#         print("Make straights in ", self, 'with phoenix: ', phoenix)
-#         # all without phoenix
-#         streets = list()
-#         for length in range(5, self._len+1):
-#             for start in range(0, self._len - length + 1):
-#                 st = Straight(self._cards[start:start + length], phoenix_as=self._phoenix_as)
-#                 assert len(st) == length
-#                 streets.append(st)
-#                 print("yield", st)
-#                 yield st
-#
-#         if phoenix:
-#             ph_tuple = (Card.PHOENIX,)
-#             for street in streets:
-#                 print("------- looking at", street, '----------')
-#                 if not street.contains_phoenix():
-#                     print("can use phoenix")
-#                     cards = list(street.cards)
-#                     # replace each card with the Phoenix
-#                     before = []
-#                     after = list(reversed(cards))
-#
-#                     logger.debug("{} should be the same as:".format(cards))
-#                     while len(before) != len(cards):
-#                         card = after.pop()
-#                         print("before", before, "card", card, "after", after)
-#                         if card.suit is not CardSuit.SPECIAL:
-#                             print("yield", before, ph_tuple, after)
-#                             yield Straight(itertools.chain(before, ph_tuple, after), phoenix_as=card)
-#                         before.append(card)
-#                         logger.debug("{}".format(card))
-#
-#                     # add phoenix to the beginning
-#                     print("add at the beginning")
-#                     if not street.cards.contains_cardrank(CardRank.TWO):
-#                         print("yield", ph_tuple, cards, 'with phoenix as', self._card_rank_to_sword_card[street.lowest.value - 1])
-#                         new_st = Straight(itertools.chain(ph_tuple, cards), phoenix_as=self._card_rank_to_sword_card[street.lowest.value - 1])
-#                         yield new_st
-#
-#                     # add phoenix to the end
-#                     print("add at the end")
-#                     if not street.cards.contains_cardrank(CardRank.A):
-#                         print("yield", cards, ph_tuple, 'with phoenix as', self._card_rank_to_sword_card[street.highest.value + 1])
-#                         yield Straight(itertools.chain(cards, ph_tuple), phoenix_as=self._card_rank_to_sword_card[street.highest.value + 1])
-#
-#     def __len__(self):
-#         return self._len
-#
-#     def __contains__(self, item: Card):
-#         return self._cards.__contains__(item)
-#
-#     def __iter__(self):
-#         return self._cards.__iter__()
-#
-#     def __str__(self):
-#         return "CC({})".format(sorted(self._cards))
+    def __repr__(self):
+        return "{}{{{}}}".format(self.__class__.__name__, ', '.join(map(repr, sorted(self))))
 
-
-# ######################### DECK #########################
 
 class Deck(list):
     """
@@ -1295,8 +1045,11 @@ class Combination(metaclass=abc.ABCMeta):
     def __contains__(self, card: Card)->bool:
         return self._cards.__contains__(card)
 
+    def __str__(self):
+        return "{}({})".format(self.__class__.__name__.upper(), str(self._cards))
+
     def __repr__(self)->str:
-        return "{}({})".format(self.__class__.__name__.upper(), ",".join(str(c) for c in sorted(self._cards)))
+        return "{}({})".format(self.__class__, repr(self._cards))
 
 
 class Single(Combination):
@@ -1472,7 +1225,7 @@ class FullHouse(Combination):
         return hash((self._trio, self._pair))
 
     def __str__(self):
-        return "{}(<{}><{}>)".format(self.__class__.__name__.upper(), ",".join(str(c) for c in self._trio), ",".join(str(c) for c in self._pair))
+        return "{}(<{}><{}>)".format(self.__class__.__name__.upper(), ",".join(map(str, sorted(self._trio))), ",".join(map(str, sorted(self._pair))))
 
 
 class PairSteps(Combination):

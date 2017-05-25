@@ -39,6 +39,8 @@ def flatten(iterable):
     [1, 'abc', 'de', 3, 'fg', 9]
     >>> list(flatten([1, 2, [3, [4, 5, 6], 7], [8, 9], (10, 11, {12}), 13, 14, [[[[[[15, 16]]], 17]], 18]]))
     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+    >>> list(flatten([[[[[1]]]]]))
+    [1]
 
 
     Flattens the given iterable. Does treat strings and bytes not as iterables.

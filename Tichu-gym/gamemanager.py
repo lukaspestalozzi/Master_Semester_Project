@@ -23,11 +23,11 @@ GameOutcome = namedtuple("GameOutcome", ["points", "history"])
 
 
 class TichuGame(object):
+    """
+    Plays a 4-player game
+    """
 
     def __init__(self, agent0, agent1, agent2, agent3):
-        """
-
-        """
         env = gym.make('tichu_multiplayer-v0')
         # env = wrappers.Monitor(env, "/home/lu/semester_project/tmp/gym-results")
         self.env = env
@@ -43,24 +43,35 @@ class TichuGame(object):
         Starts the tichu game
         Returns a tuple containing the points the two teams made
         """
-        with error_logged(logger):
+        with error_logged(logger):  # log all raised errors
             start_t = time()
             console_logger.info("Starting game... target: {}".format(target_points))
 
             round_histories = list()
+            nbr_errors = 0
+            nbr_errors_to_ignore = 0
 
             points = (0, 0)
 
             while points[0] < target_points and points[1] < target_points:
                 # run rounds until there is a winner
-                round_points, round_history = self._start_round()
-                round_histories.append(round_history)
-                points = (round_points[0] + points[0], round_points[1] + points[1])
-                console_logger.warning("=========================================")
-                console_logger.warning("Intermediate Result: {}".format(points))
-                console_logger.warning("=========================================")
+                try:
+                    round_points, round_history = self._start_round()
+                    round_histories.append(round_history)
+                    points = (round_points[0] + points[0], round_points[1] + points[1])
+                    console_logger.warning("=========================================")
+                    console_logger.warning("Intermediate Result: {}".format(points))
+                    console_logger.warning("=========================================")
+                except Exception as err:
+                    # log the 10 first errors, but continue with next round.
+                    nbr_errors += 1
+                    if nbr_errors > nbr_errors_to_ignore:
+                        raise
+                    else:
+                        logger.error("There was en error while running a round. Next {} errors will be ignored.".format(nbr_errors_to_ignore-nbr_errors))
+                        logger.exception(err)
 
-            console_logger.info("[GAME END] Game ended: {p} [Time: {time_passed}]".format(p=points, time_passed=time_since(since=start_t)))
+            console_logger.info("[GAME END] Game ended: {p} [Nbr_Errors: {nbr_errs}, Time: {time_passed}]".format(p=points, nbr_errs=nbr_errors, time_passed=time_since(since=start_t)))
 
         return GameOutcome(points, round_histories)
 

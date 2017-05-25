@@ -825,6 +825,13 @@ class TichuState(namedtuple("TichuState", [
 
         return TichuState(*self._replace(**attributes_to_change), allow_tichu=self._allow_tichu, allow_wish=self._allow_wish)
 
+    # state is immutable, so we can simplify the deepcopies.
+    def __deepcopy__(self, memo):
+        return self
+
+    def __copy__(self):
+        return self
+
 
 class InitialState(_BaseTichuStateImpl):
     """
@@ -1077,13 +1084,13 @@ class RolloutTichuState(BaseTichuState):
     def random_action(self)->PlayerAction:
         return random.choice(self.possible_actions_list)
 
-    def rollout(self, policy: Callable[[BaseTichuState], PlayerAction])->Tuple[int, int, int, int]:
+    def rollout(self, policy: Callable[[BaseTichuState], PlayerAction])->BaseTichuState:
         while not self.is_terminal():
             action = policy(self)
             self.apply_action(action)
-        return self.count_points()
+        return self
 
-    def random_rollout(self):
+    def random_rollout(self)->BaseTichuState:
         while not self.is_terminal():
             self.apply_action(random.choice(self.possible_actions_list))
         return self

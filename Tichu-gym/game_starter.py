@@ -5,19 +5,15 @@ import datetime
 import gym
 from profilehooks import timecall
 
-
-
-this_folder = '/'.join(os.getcwd().split('/')[:])
-parent_folder = '/'.join(os.getcwd().split('/')[:-1])
-
-for p in [this_folder, parent_folder]:  # Adds the parent folder (ie. game) to the python path
-    if p not in sys.path:
-        sys.path.append(p)
-
-from gym_agents.mcts import InformationSetMCTS, ISMCTS_old_rollout
+# this_folder = '/'.join(os.getcwd().split('/')[:])
+# parent_folder = '/'.join(os.getcwd().split('/')[:-1])
+#
+# for p in [this_folder, parent_folder]:  # Adds the parent folder (ie. game) to the python path
+#     if p not in sys.path:
+#         sys.path.append(p)
 from gamemanager import TichuGame
-from gym_agents import *
-
+from gym_agents import RandomAgent, DQNAgent2L_56x5, BaseMonteCarloAgent, BalancedRandomAgent, HumanInputAgent
+from gym_agents.mcts import InformationSetMCTS, ISMCTS_old_rollout, EpicISMCTS, EpicNoRollout
 import logginginit
 
 logger = logging.getLogger(__name__)
@@ -42,8 +38,7 @@ def create_agent_against_agent(type1, type2)->TichuGame:
 
 
 def dqn_against_random(target_points: int):
-    weights_file1 = './gym_agents/agent_weights/dqn_4layers_weights.h5f'  # latest weights
-    game = create_agent_against_agent(lambda: DQN4LayerAgent(weights_file=weights_file1),
+    game = create_agent_against_agent(DQNAgent2L_56x5,
                                       RandomAgent)
 
     res = game.start_game(target_points=target_points)
@@ -51,17 +46,15 @@ def dqn_against_random(target_points: int):
 
 
 def dqn_against_ismcts(target_points: int):
-    game = create_agent_against_agent(lambda: dqn_agent_4layers, lambda: BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))
+    game = create_agent_against_agent(DQNAgent2L_56x5, lambda: BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))
 
     res = game.start_game(target_points=target_points)
     return res
 
 
 def dqn_against_dqn(target_points: int):
-    weights_file1 = './gym_agents/agent_weights/dqn_4layers_weights.h5f'  # latest weights
-    weights_file2 = './gym_agents/agent_weights/old_dqn_4layers_weights'  # previous weights
-    game = create_agent_against_agent(lambda: DQN4LayerAgent(weights_file=weights_file1),
-                                      lambda: DQN4LayerAgent(weights_file=weights_file2))
+    game = create_agent_against_agent(DQNAgent2L_56x5,
+                                      DQNAgent2L_56x5)
 
     res = game.start_game(target_points=target_points)
     return res
@@ -103,7 +96,21 @@ def ismcts_against_ismctsoldrollout(target_points: int):
 
 def ismcts_against_ismcts(target_points: int):
     game = create_agent_against_agent(lambda: BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
-                                      lambda: BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))  # ISMCTS_new_rollout
+                                      lambda: BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))
+    res = game.start_game(target_points=target_points)
+    return res
+
+
+def epic_against_ismcts(target_points: int):
+    game = create_agent_against_agent(lambda: BaseMonteCarloAgent(EpicISMCTS(), iterations=100),
+                                      lambda: BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))
+    res = game.start_game(target_points=target_points)
+    return res
+
+
+def epicnorollout_against_ismcts(target_points: int):
+    game = create_agent_against_agent(lambda: BaseMonteCarloAgent(EpicNoRollout(), iterations=100),
+                                      lambda: BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))
     res = game.start_game(target_points=target_points)
     return res
 
@@ -112,8 +119,8 @@ if __name__ == "__main__":
 
     start_ftime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     log_folder_name = "/mnt/Data/Dropbox/Studium/EPFL/MA4/sem_project/logs/game_starter_" + start_ftime
-    logging_mode = logginginit.RunGameMode
+    logging_mode = logginginit.DebugMode
     logginginit.initialize_loggers(output_dir=log_folder_name, logging_mode=logging_mode, min_loglevel=logging.DEBUG)
 
-    res = random_against_random(target_points=10000)
+    res = dqn_against_random(target_points=10000)
     print_game_outcome(res)

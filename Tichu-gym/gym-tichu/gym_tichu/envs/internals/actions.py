@@ -59,7 +59,7 @@ class PlayCombination(PlayerAction):
         return super().__eq__(other) and self.combination == other.combination
 
     def __repr__(self):
-        return "{me.__class__.__name__}({me.player_pos}, {me._combination})".format(me=self)
+        return "{me.__class__.__name__}({me.player_pos}, {comb})".format(me=self, comb=repr(self._combination))
 
     def __str__(self):
         return "[{me.player_pos}, {me._combination}]".format(me=self)
@@ -150,7 +150,7 @@ class WinTrickAction(PlayerAction):
         return super().__eq__(other) and self.trick == other.trick
 
     def __repr__(self):
-        return "{me.__class__.__name__}({me.player_pos}, {me._trick})".format(me=self)
+        return "{me.__class__.__name__}({me.player_pos}, {tr})".format(me=self, tr=repr(self._trick))
 
     def __str__(self):
         return "{me.__class__.__name__}({me.player_pos}, points: {me.trick.points})".format(me=self)
@@ -175,7 +175,7 @@ class GiveDragonAwayAction(WinTrickAction):
         return super().__eq__(other) and self.to == other.to
 
     def __repr__(self):
-        return "{me.__class__.__name__}({me.player_pos} -> {me._to}, {me.trick})".format(me=self)
+        return "{me.__class__.__name__}({me.player_pos} -> {me._to}, {tr})".format(me=self, tr=repr(self.trick))
 
     def __str__(self):
         return "{me.__class__.__name__}({me.player_pos} -> {me._to})".format(me=self)
@@ -201,7 +201,7 @@ class WishAction(PlayerAction):
         return super().__eq__(other) and self.wish == other.wish
 
     def __repr__(self):
-        return "{me.__class__.__name__}({me.player_pos}, {me._wish})".format(me=self)
+        return "{me.__class__.__name__}({me.player_pos}, {w})".format(me=self, w=repr(self._wish))
 
     def __str__(self):
         return "WISH({me.player_pos}, {me._wish})".format(me=self)
@@ -213,7 +213,7 @@ class TradeAction(PlayerAction, CardTrade):
         super().__init__(player_pos=from_)
 
     def __repr__(self):
-        return "{me.__class__.__name__}({me.from_}: {me.card} -> {me.to})".format(me=self)
+        return "{me.__class__.__name__}({me.from_}: {crd} -> {me.to})".format(me=self, crd=repr(self.card))
 
     def __str__(self):
         return "Trade({me.from_}: {me.card} -> {me.to})".format(me=self)
@@ -310,10 +310,11 @@ class Trick(tuple):
     def __add__(self, action: 'PlayerAction')->'Trick':
         return Trick(itertools.chain(self, (action,)))
 
-    # TODO add repr
-    # TODO add pretty string method maybe
-    def __repr__(self):
+    def __str__(self):
         return "{me.__class__.__name__}[Leader: {me.winner}]: {tricks_str}".format(me=self, tricks_str=' -> '.join(map(str, iter(self))))
+
+    def __repr__(self):
+        return "{me.__class__.__name__}: {tricks_str}".format(me=self, tricks_str=' -> '.join(map(repr, iter(self))))
 
 
 class FinishedTrick(Trick):

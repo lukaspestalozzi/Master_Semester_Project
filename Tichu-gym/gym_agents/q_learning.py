@@ -4,7 +4,7 @@ from typing import Any, Dict, Tuple, Iterable
 import numpy as np
 import logging
 
-from gym_tichu.envs.internals import TichuState
+from gym_tichu.envs.internals import TichuState, BaseTichuState
 from gym_tichu.envs.internals.actions import *
 from gym_tichu.envs.internals.cards import *
 from rl.core import Processor
@@ -62,7 +62,7 @@ GENERALCOMBINATION_TO_NBR = {gcomb: idx for idx, gcomb in enumerate(all_general_
 class DQNProcessor(Processor):
 
     # My functions
-    def encode_tichu_state(self, state: TichuState)->Tuple[Any, Dict[int, PlayerAction]]:
+    def encode_tichu_state(self, state: BaseTichuState)->Tuple[Any, Dict[int, PlayerAction]]:
         """
         Encodes the tichu-state for the NN,
         :param state: 
@@ -183,3 +183,4 @@ class DQNProcessor(Processor):
 # PHOENIX = 1.5
 # MAHJONG = 1
 # DOG = 0
+
