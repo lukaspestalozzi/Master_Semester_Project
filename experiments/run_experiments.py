@@ -2,9 +2,9 @@ import abc
 import datetime
 import argparse
 from collections import namedtuple
-from time import time
+from time import time, sleep
 import multiprocessing as mp
-from multiprocessing import Pool
+from multiprocessing import Pool, Lock
 
 import logging
 
@@ -25,10 +25,11 @@ for p in [this_folder, parent_folder, Tichu_gym_folder]:  # Adds the parent fold
 from gamemanager import TichuGame
 from gym_agents.strategies import make_random_tichu_strategy, never_announce_tichu_strategy, always_announce_tichu_strategy
 from gym_agents import (BaseMonteCarloAgent, BalancedRandomAgent, make_first_ismcts_then_random_agent,
-                        DQN4LayerAgent, DefaultGymAgent, DQN2LayerAgent)
+                        DQN4LayerAgent, DefaultGymAgent, DQN2LayerAgent, make_best_agent)
 from gym_agents.mcts import (InformationSetMCTS, InformationSetMCTS_absolute_evaluation,
                              InformationSetMCTSWeightedDeterminization, EpicISMCTS,
-                             InformationSetMCTSHighestUcbBestAction, InformationSetMCTS_ranking_evaluation)
+                             InformationSetMCTSHighestUcbBestAction, InformationSetMCTS_ranking_evaluation,
+                             EpicNoRollout)
 from gym_tichu.envs.internals.utils import time_since
 import logginginit
 
@@ -48,6 +49,7 @@ class Experiment(object, metaclass=abc.ABCMeta):
         pass
 
     def run(self, target_points):
+        logger.warning("Running {}".format(self.name))
         start_t = time()
         start_ftime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
@@ -90,6 +92,8 @@ Final Points: {points}
         with open(log_folder_name+"/results.log", "a") as f:
             f.write(results_string)
 
+        logger.warning("Finished Running {}".format(self.name))
+
     @abc.abstractmethod
     def _run_game(self, target_points):
         pass
@@ -118,6 +122,7 @@ class SimpleExperiment(Experiment, metaclass=abc.ABCMeta):
     def _init_agents(self)->Tuple[DefaultGymAgent, DefaultGymAgent, DefaultGymAgent, DefaultGymAgent]:
         raise NotImplementedError()
 
+
 # CHEAT vs NONCHEAT
 class CheatVsNonCheatUCB1(SimpleExperiment):
 
@@ -128,14 +133,30 @@ class CheatVsNonCheatUCB1(SimpleExperiment):
                 BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))
 
 
-#EPIC vs ISMCTS
+#EPIC
 class EpicVsIsMcts(SimpleExperiment):
 
     def _init_agents(self):
-        return (BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
-                BaseMonteCarloAgent(EpicISMCTS(), iterations=100),
+        return (BaseMonteCarloAgent(EpicISMCTS(), iterations=100),
                 BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                BaseMonteCarloAgent(EpicISMCTS(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))
+
+
+class EpicNoRolloutVsEpic(SimpleExperiment):
+    def _init_agents(self):
+        return (BaseMonteCarloAgent(EpicNoRollout(), iterations=100),
+                BaseMonteCarloAgent(EpicISMCTS(), iterations=100),
+                BaseMonteCarloAgent(EpicNoRollout(), iterations=100),
                 BaseMonteCarloAgent(EpicISMCTS(), iterations=100))
+
+
+class EpicNoRolloutVsIsmcts(SimpleExperiment):
+    def _init_agents(self):
+        return (BaseMonteCarloAgent(EpicNoRollout(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                BaseMonteCarloAgent(EpicNoRollout(), iterations=100),
+                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))
 
 
 # BEST ACTION
@@ -251,36 +272,210 @@ class DQNLearnedVsDQNLearning(SimpleExperiment):
                 DQN2LayerAgent(weights_file='./dqn/dqn_learning.h5f'))
 
 
-class DQNVsRandom(SimpleExperiment):
+class DQNRandomVsDQNismcts(SimpleExperiment):
 
     def _init_agents(self):
-        return (DQN2LayerAgent(weights_file='./dqn/dqn_vs_random.h5f'),
+        return (DQN2LayerAgent(weights_file='./dqn/dqn_random.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_ismcts.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_random.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_ismcts.h5f'))
+
+
+class DQNLearnedVsDQNismcts(SimpleExperiment):
+
+    def _init_agents(self):
+        return (DQN2LayerAgent(weights_file='./dqn/dqn_learned.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_ismcts.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_learned.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_ismcts.h5f'))
+
+
+class DQNLearningVsDQNismcts(SimpleExperiment):
+
+    def _init_agents(self):
+        return (DQN2LayerAgent(weights_file='./dqn/dqn_learning.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_ismcts.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_learning.h5f'),
+                DQN2LayerAgent(weights_file='./dqn/dqn_ismcts.h5f'))
+
+
+class DQNUntrainedVsDQNismcts(SimpleExperiment):
+
+    def _init_agents(self):
+        return (DQN2LayerAgent(weights_file=None),
+                DQN2LayerAgent(weights_file='./dqn/dqn_ismcts.h5f'),
+                DQN2LayerAgent(weights_file=None),
+                DQN2LayerAgent(weights_file='./dqn/dqn_ismcts.h5f'))
+
+
+# All together agent
+class BestVsRandom(SimpleExperiment):
+    def _init_agents(self):
+        return (make_best_agent(),
                 BalancedRandomAgent(),
-                DQN2LayerAgent(weights_file='./dqn/dqn_vs_random.h5f'),
+                make_best_agent(),
                 BalancedRandomAgent())
+
+
+class BestVsIsmcts(SimpleExperiment):
+    def _init_agents(self):
+        return (make_best_agent(),
+                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                make_best_agent(),
+                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))
+
+
+class BestVsRandomDet(SimpleExperiment):
+    def _init_agents(self):
+        return (make_best_agent(),
+                make_best_agent(det=False),
+                make_best_agent(),
+                make_best_agent(det=False))
+
+
+class BestVsRandomRollout(SimpleExperiment):
+    def _init_agents(self):
+        return (make_best_agent(),
+                make_best_agent(rollout=False),
+                make_best_agent(),
+                make_best_agent(rollout=False))
+
+
+class BestVsEpic(SimpleExperiment):
+    def _init_agents(self):
+        return (make_best_agent(),
+                BaseMonteCarloAgent(EpicISMCTS(), iterations=100),
+                make_best_agent(),
+                BaseMonteCarloAgent(EpicISMCTS(), iterations=100))
+
+
+class BestVsEpicNoRollout(SimpleExperiment):
+    def _init_agents(self):
+        return (make_best_agent(),
+                BaseMonteCarloAgent(EpicNoRollout(), iterations=100),
+                make_best_agent(),
+                BaseMonteCarloAgent(EpicNoRollout(), iterations=100),)
+
+
+# Multiple Experiments Together
+class MultipleExperiments(Experiment):
+
+    def __init__(self, experiment_clazzes, nbr_to_run_each: int, parallel: bool, poolsize: int=5):
+        self.experiment_clazzes = experiment_clazzes
+        self.nbr_to_run_each = nbr_to_run_each
+        self.parallel = parallel
+        self._current_agents = None
+        self.poolsize = poolsize
+        assert nbr_to_run_each > 0
+
+    @property
+    def name(self) -> str:
+        return ' and '.join(ex.__name__ for ex in self.experiment_clazzes)
+
+    @property
+    def agents(self):
+        raise AttributeError("MultipleExperiments has no agents, this should not be used")
+
+    def run(self, target_points):
+        if self.parallel:
+            return self._run_parallel(target_points=target_points)
+        else:
+            return self._run_sequential(target_points=target_points)
+
+    def _run_parallel(self, target_points):
+        """
+        Runs all experiments in different processes. (in a pool of size 'self.poolsize')
+        :param target_points: 
+        :return: None
+        """
+        logger.warning("Running the MultipleExperiments in Pool (of size {}): {}  ({} times each)".format(self.poolsize, self.experiment_clazzes, self.nbr_to_run_each))
+        assert self.poolsize > 0
+
+        with Pool(processes=self.poolsize) as pool:
+            # run all experiments in Pool
+            jobs = list()
+            for n in range(self.nbr_to_run_each):
+                for exp in self.experiment_clazzes:
+                    experiment = exp()
+                    print("experiment: ", experiment)
+                    jobs.append(pool.apply_async(experiment.run, (), {'target_points': target_points}))
+
+            # wait for processes to complete
+            for k, job in enumerate(jobs):
+                logger.warning("waiting for job {k}".format(k=k))
+                job.get()
+
+        print("Pool exit")
+
+    def _run_sequential(self, target_points):
+        """
+        Runs all experiments in this process.
+        Each experiment is run 'self.nbr_to_run_each' times.
+        
+        :param target_points: 
+        :return: None
+        """
+        logger.warning("Running the MultipleExperiments sequential")
+        for n in range(self.nbr_to_run_each):
+            for exp in self.experiment_clazzes:
+                logger.warning("Sequential MultipleExperiments starting {}".format(exp))
+                exp().run(target_points=target_points)
+
+    def _run_game(self, target_points):
+        raise AttributeError("MultipleExperiments has single game to be run, this should not be used")
+
+    # To be able to do:
+    # exp = MultipleExperiments([exp1, exp2], nbr_to_run_each=2, parallel=True)
+    # exp().run(target_points=args.target_points)
+    #     ^
+    def __call__(self):
+        return self
 
 
 experiments = {
     'cheat_vs_noncheat_ucb1': CheatVsNonCheatUCB1,
 
+    'all_rewards': MultipleExperiments([RelativeVsAbsoluteReward, RelativeVsRankingReward, RankingVsAbsoluteReward], nbr_to_run_each=10, parallel=True),
     'relative_vs_absolute_reward': RelativeVsAbsoluteReward,
     'relative_vs_ranking_reward': RelativeVsRankingReward,
     'ranking_vs_absolute_reward': RankingVsAbsoluteReward,
 
-    'tichu_random_vs_never': RandomVsNeverTichu,
-    'tichu_always_vs_never': AlwaysVsNeverTichu,
-
+    'all_split_experiments': MultipleExperiments([FirstMctsThenRandomVsRandom], nbr_to_run_each=10, parallel=True),
     'first_mcts_then_random_vs_random': FirstMctsThenRandomVsRandom,
+
+    'all_determinization_vs': MultipleExperiments([RandomVsPoolDeterminization], nbr_to_run_each=10, parallel=True),
     'random_vs_pool_determinization': RandomVsPoolDeterminization,
 
-    'dqn_untrained_vs_random': DQNUntrainedVsRandom,
-    'dqnrandom_vs_dqnlearned': DQNRandomVsDQNLearned,
-    'dqnrandom_vs_dqnlearning': DQNRandomVsDQNLearning,
-    'dqnlearned_vs_dqnlearning': DQNLearnedVsDQNLearning,
-    'dqn_vs_random': DQNVsRandom,
+    'all_dqn_vs_dqn': MultipleExperiments([DQNUntrainedVsRandom, DQNRandomVsDQNLearned,
+                                           DQNRandomVsDQNLearning, DQNLearnedVsDQNLearning,
+                                           DQNRandomVsDQNismcts, DQNLearnedVsDQNismcts,
+                                           DQNLearningVsDQNismcts, DQNUntrainedVsDQNismcts],
+                                          nbr_to_run_each=1, parallel=False),
 
+    'dqn_untrained_vs_random_agent': DQNUntrainedVsRandom,
+    'dqn_random_vs_learned': DQNRandomVsDQNLearned,
+    'dqn_random_vs_learning': DQNRandomVsDQNLearning,
+    'dqn_learned_vs_learning': DQNLearnedVsDQNLearning,
+    'dqn_random_vs_dqnismcts': DQNRandomVsDQNismcts,
+    'dqn_learned_vs_dqnismcts': DQNLearnedVsDQNismcts,
+    'dqn_learning_vs_dqnismcts': DQNLearningVsDQNismcts,
+    'dqn_untrained_vs_dqnismcts': DQNUntrainedVsDQNismcts,
+
+    'all_epic_vs': MultipleExperiments([EpicVsIsMcts, EpicNoRolloutVsEpic, EpicNoRolloutVsIsmcts], nbr_to_run_each=10, parallel=True),
     'epic_vs_ismcts': EpicVsIsMcts,
+    'epic_norollout_vs_epic': EpicNoRolloutVsEpic,
+    'epic_norollout_vs_ismcts': EpicNoRolloutVsIsmcts,
+
     'ismcts_best_action_maxucb_vs_most_visited': IsmctsBestActionMaxUcbVsMostVisited,
+
+    'all_best_vs': MultipleExperiments([BestVsRandom, BestVsIsmcts, BestVsRandomDet, BestVsRandomRollout, BestVsEpic, BestVsEpicNoRollout], nbr_to_run_each=10, parallel=True),
+    'best_vs_random': BestVsRandom,
+    'best_vs_plain_ismcts': BestVsIsmcts,
+    'best_vs_random_det': BestVsRandomDet,
+    'best_vs_random_rollout': BestVsRandomRollout,
+    'best_vs_epic': BestVsEpic,
+    'best_vs_epic_no_rollout': BestVsEpicNoRollout,
+
 }
 
 log_levels_map = {
@@ -350,21 +545,29 @@ if __name__ == "__main__":
 
     # log the arguments
     logger.warning("Experiment summary: ")
-    logger.warning("exp: {}; args: {}".format(exp.__name__, args))
+    try:
+        expname = exp.__name__
+    except AttributeError:
+        # exp is probably a MultipleExperiments instance
+        expname = exp.name
+    logger.warning("exp: {}; args: {}".format(expname, args))
 
     # run several experiments in multiple processors
     pool_size = args.pool_size
-    if nbr_exp_left > 1:
+    if nbr_exp_left > 1 and pool_size > 1:
         with Pool(processes=pool_size) as pool:
-            logger.debug("Running experiments in Pool (of size {})".format(pool_size))
+            logger.warning("Running experiments in Pool (of size {})".format(pool_size))
             # run all experiments in Pool
-            multiple_results = [pool.apply_async(exp().run, (), {'target_points': args.target_points}) for i in range(nbr_exp_left)]
+            multiple_results = list()
+            for i in range(nbr_exp_left):
+                multiple_results.append(pool.apply_async(exp().run, (), {'target_points': args.target_points}))
             # wait for processes to complete
             for res in multiple_results:
                 res.get()
                 nbr_exp_left -= 1
 
     # run experiment in parent process
+    logger.warning("Run the experiments in parent process")
     while (nbr_exp_left > 0 or time() < min_t) and time() < max_t:
         nbr_exp_left -= 1
         exp().run(target_points=args.target_points)
