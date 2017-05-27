@@ -664,10 +664,10 @@ class CardSet(TypedFrozenSet):
             # does not contain the 'contains_value' card -> return
             return
         else:
-            sorted_cards = sorted((c for c in self
-                                   if c is not Card.PHOENIX and c is not Card.DOG and c is not Card.DRAGON),
-                                  key=lambda c: c.rank)
+            # TODO speed
+            sorted_cards = sorted(filter(lambda card: card is not Card.PHOENIX and card is not Card.DOG and card is not Card.DRAGON, self))
             # print("sorted_cards", sorted_cards)
+
             # TODO to exclude 'logical' duplicates, remove all duplicated ranks from sorted_cards
 
             next_card: Dict[int, List[Card]] = defaultdict(lambda: [])  # card rank -> list of cards with rank 1 higher

@@ -13,7 +13,7 @@ from profilehooks import timecall
 #         sys.path.append(p)
 from gamemanager import TichuGame
 from gym_agents import RandomAgent, DQNAgent2L_56x5, BaseMonteCarloAgent, BalancedRandomAgent, HumanInputAgent
-from gym_agents.mcts import InformationSetMCTS, ISMCTS_old_rollout, EpicISMCTS, EpicNoRollout
+from gym_agents.mcts import *
 import logginginit
 
 logger = logging.getLogger(__name__)
@@ -101,6 +101,14 @@ def ismcts_against_ismcts(target_points: int):
     return res
 
 
+def no_movegroups_vs_movegroups(target_points: int):
+
+    game = create_agent_against_agent(lambda: BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
+                                      lambda: BaseMonteCarloAgent(InformationSetMCTS_move_groups(), iterations=100))
+    res = game.start_game(target_points=target_points)
+    return res
+
+
 def epic_against_ismcts(target_points: int):
     game = create_agent_against_agent(lambda: BaseMonteCarloAgent(EpicISMCTS(), iterations=100),
                                       lambda: BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))
@@ -114,6 +122,27 @@ def epicnorollout_against_ismcts(target_points: int):
     res = game.start_game(target_points=target_points)
     return res
 
+
+def newismcts_against_random(target_points: int):
+    game = create_agent_against_agent(lambda: BaseMonteCarloAgent(DefaultIsmcts(), iterations=100),
+                                      BalancedRandomAgent)
+    res = game.start_game(target_points=target_points)
+    return res
+
+
+def makesearch_against_random(target_points: int):
+    game = create_agent_against_agent(lambda: BaseMonteCarloAgent(make_ismctsearch(name='GameStarterMakesearchISMCTS',
+                                                                                   nodeidpolicy=DefaultNodeIdPolicy,
+                                                                                   determinizationpolicy=RandomDeterminePolicy,
+                                                                                   treepolicy=UCBTreePolicy,
+                                                                                   rolloutpolicy=RandomRolloutPolicy,
+                                                                                   evaluationpolicy=RankingEvaluationPolicy,
+                                                                                   bestactionpolicy=MostVisitedBestActionPolicy),
+                                                                  iterations=100),
+                                      BalancedRandomAgent)
+    res = game.start_game(target_points=target_points)
+    return res
+
 if __name__ == "__main__":
     gym.undo_logger_setup()
 
@@ -122,5 +151,5 @@ if __name__ == "__main__":
     logging_mode = logginginit.DebugMode
     logginginit.initialize_loggers(output_dir=log_folder_name, logging_mode=logging_mode, min_loglevel=logging.DEBUG)
 
-    res = dqn_against_random(target_points=10000)
+    res = newismcts_against_random(target_points=1)
     print_game_outcome(res)
