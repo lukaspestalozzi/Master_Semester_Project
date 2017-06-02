@@ -1,0 +1,29 @@
+
+Games
+
+split_9  8100, 10100  split_7
+split_9  3690, 10010  split_5
+split_9  3730, 10170  split_3
+split_9  10045, 5055  Random
+split_7  7700, 10000  split_5
+split_7  5275, 10125  split_3
+split_7  10020, 4980  Random
+split_5  7030, 10170  split_3
+split_5  10065, 3135  Random
+split_3  10065, 2335  Random
+
+
+Winns
+
+split_9: 1
+split_7: 2
+split_5: 3
+split_3: 4
+Random : 0
+
+-> Makes sence, the longer random, the more winns
+
+
+
+
+### split_x -> mcts until x handcards, then random

@@ -24,8 +24,7 @@ for p in [this_folder, parent_folder, Tichu_gym_folder]:  # Adds the parent fold
 
 from gamemanager import TichuGame
 from gym_agents.strategies import make_random_tichu_strategy, never_announce_tichu_strategy, always_announce_tichu_strategy
-from gym_agents import (BaseMonteCarloAgent, BalancedRandomAgent, make_first_ismcts_then_random_agent,
-                        DefaultGymAgent, make_best_agent, DQNAgent2L_56x5)
+from gym_agents import *
 from gym_agents.mcts import *
 from gym_tichu.envs.internals.utils import time_since, check_param
 import logginginit
@@ -335,56 +334,6 @@ class DQNUntrainedVsDQNismcts(SimpleExperiment):
                 DQNAgent2L_56x5(weights_file=None),
                 DQNAgent2L_56x5(weights_file='{}/dqn/dqn_ismcts.h5f'.format(_this_folder)))
 
-
-# All together agent
-class BestVsRandom(SimpleExperiment):
-    def _init_agents(self):
-        return (make_best_agent(),
-                BalancedRandomAgent(),
-                make_best_agent(),
-                BalancedRandomAgent())
-
-
-class BestVsIsmcts(SimpleExperiment):
-    def _init_agents(self):
-        return (make_best_agent(),
-                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100),
-                make_best_agent(),
-                BaseMonteCarloAgent(InformationSetMCTS(), iterations=100))
-
-
-class BestVsRandomDet(SimpleExperiment):
-    def _init_agents(self):
-        return (make_best_agent(),
-                make_best_agent(det=False),
-                make_best_agent(),
-                make_best_agent(det=False))
-
-
-class BestVsRandomRollout(SimpleExperiment):
-    def _init_agents(self):
-        return (make_best_agent(),
-                make_best_agent(rollout=False),
-                make_best_agent(),
-                make_best_agent(rollout=False))
-
-
-class BestVsEpic(SimpleExperiment):
-    def _init_agents(self):
-        return (make_best_agent(),
-                BaseMonteCarloAgent(EpicISMCTS(), iterations=100),
-                make_best_agent(),
-                BaseMonteCarloAgent(EpicISMCTS(), iterations=100))
-
-
-class BestVsEpicNoRollout(SimpleExperiment):
-    def _init_agents(self):
-        return (make_best_agent(),
-                BaseMonteCarloAgent(EpicNoRollout(), iterations=100),
-                make_best_agent(),
-                BaseMonteCarloAgent(EpicNoRollout(), iterations=100))
-
-
 # Multiple Experiments Together
 class MultipleExperiments(Experiment):
 
@@ -461,28 +410,40 @@ class MultipleExperiments(Experiment):
         return self
 
 
-class Tournament(MultipleExperiments):
+class Tournament(Experiment):
     """
     Given some agents plays each agent against each other agent once.
     NOTE: There are n*(n+1)/2 games played.
     """
+
     def __init__(self, *agents):
         check_param(len(agents) >= 2)
-        participating_agents = list(agents)
-        exps = list()
-        for k0 in range(len(participating_agents)):
-            for k1 in range(k0+1, len(participating_agents)):
-                agent0 = participating_agents[k0]
-                agent1 = participating_agents[k1]
+        self.participating_agents = list(agents)
 
-                # logger.error(agent0.info+" vs "+agent1.info)
+    @property
+    def agents(self) -> Tuple[DefaultGymAgent, DefaultGymAgent, DefaultGymAgent, DefaultGymAgent]:
+        raise AttributeError("Tournament has no agents, this should not be used")
 
-                expclazz = type("Tournament_{}_vs_{}".format(agent0.__class__.__name__, agent1.__class__.__name__), (SimpleExperiment, object),
+    def _run_game(self, target_points):
+        raise AttributeError("Tournament has no agents, this should not be used")
+
+    def run(self, target_points):
+        for k0, agent0 in enumerate(self.participating_agents):
+            for agent1 in self.participating_agents[k0+1:]:
+                expclazz = type("Tournament_{}_vs_{}".format(agent0.__class__.__name__, agent1.__class__.__name__),
+                                (SimpleExperiment, object),
                                 {'_init_agents': lambda self_: (agent0, agent1, agent0, agent1)})
-                # logger.error("expclazz: "+str(expclazz))
-                # logger.error("expclazz().agents: " + str(list(a.info for a in expclazz().agents)))
-                exps.append(expclazz)
-        super().__init__(experiment_clazzes=exps, nbr_to_run_each=1, parallel=False)
+                exp = expclazz()
+                logger.warning("Tournament starting game {}".format(exp))
+                exp.run(target_points=target_points)
+
+                # To be able to do:
+
+    # exp = Tournament(agent1, agent2)
+    # exp().run(target_points=args.target_points)
+    #     ^
+    def __call__(self):
+        return self
 
 
 experiments = {
@@ -537,13 +498,21 @@ experiments = {
             BalancedRandomAgent()
     ),
 
+    'split_tournament_upper': Tournament(
+            make_first_ismcts_then_random_agent(switch_length=13),
+            make_first_ismcts_then_random_agent(switch_length=12),
+            make_first_ismcts_then_random_agent(switch_length=11),
+            make_first_ismcts_then_random_agent(switch_length=10),
+            make_first_ismcts_then_random_agent(switch_length=9),
+            BalancedRandomAgent()
+    ),
+
     'dqn_tournament': Tournament(
             BalancedRandomAgent(),
-            DQNAgent2L_56x5(weights_file=None),
-            DQNAgent2L_56x5(weights_file='{}/dqn/dqn_random.h5f'.format(_this_folder)),
-            DQNAgent2L_56x5(weights_file='{}/dqn/dqn_learned.h5f'.format(_this_folder)),
-            DQNAgent2L_56x5(weights_file='{}/dqn/dqn_learning.h5f'.format(_this_folder)),
-            DQNAgent2L_56x5(weights_file='{}/dqn/dqn_ismcts.h5f'.format(_this_folder)),
+            DQNAgent2L_56x5(),
+            DQNAgent2L_56x5_2_sep(),
+            DQNAgent2L_17x5_2(),
+            DQNAgent2L_17x5_2_sep(),
     ),
 
     'epic_tournament': Tournament(
@@ -561,7 +530,7 @@ experiments = {
 
     'nn_rollout_tournament': Tournament(
             BaseMonteCarloAgent(
-                    make_default_ismctsearch(name='2L_ismcts', rolloutpolicy=DQNAgent2L56x5RolloutPolicy),
+                    make_default_ismctsearch(name='2L_ismcts', rolloutpolicy=DQNAgent2L_56x5_2_sepRolloutPolicy),
                     iterations=100, cheat=False
             ),
             BaseMonteCarloAgent(DefaultIsmcts(), iterations=100, cheat=False),
@@ -574,9 +543,19 @@ experiments = {
                     make_best_ismctsearch(name='Best'),
                     iterations=100, cheat=False
             ),
+            BaseMonteCarloAgent(
+                    make_best_ismctsearch(name='Best_randomRollout', rolloutpolicy=RandomRolloutPolicy),
+                    iterations=100, cheat=False
+            ),
+            BaseMonteCarloAgent(
+                    make_best_ismctsearch(name='Best_randomRollout', determinizationpolicy=RandomDeterminePolicy),
+                    iterations=100, cheat=False
+            ),
+            BaseMonteCarloAgent(
+                    make_best_ismctsearch(name='Best_movegroups', treepolicy=MoveGroupsTreeSelectionPolicy),
+                    iterations=100, cheat=False
+            ),
             BaseMonteCarloAgent(DefaultIsmcts(), iterations=100, cheat=False),
-            BalancedRandomAgent(),
-            # TODO add more agents
     ),
 
 
@@ -618,14 +597,6 @@ experiments = {
     'epic_norollout_vs_ismcts': EpicNoRolloutVsIsmcts,
 
     'ismcts_best_action_maxucb_vs_most_visited': BestAction_MaxUcb_Vs_MostVisited,
-
-    'all_best_vs': MultipleExperiments([BestVsRandom, BestVsIsmcts, BestVsRandomDet, BestVsRandomRollout, BestVsEpic, BestVsEpicNoRollout], nbr_to_run_each=10, parallel=True),
-    'best_vs_random': BestVsRandom,
-    'best_vs_plain_ismcts': BestVsIsmcts,
-    'best_vs_random_det': BestVsRandomDet,
-    'best_vs_random_rollout': BestVsRandomRollout,
-    'best_vs_epic': BestVsEpic,
-    'best_vs_epic_no_rollout': BestVsEpicNoRollout,
 
     'move_groups_vs_none': MoveGroups_With_Vs_No,
 
