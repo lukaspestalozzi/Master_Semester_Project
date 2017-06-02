@@ -21,7 +21,7 @@ from profilehooks import timecall, profile
 
 from gym_tichu.envs.internals import (TichuState, PlayerAction, PassAction, Trick, CardSet, HandCards, Card, CardRank,
                                       GeneralCombination, Combination, all_general_combinations_gen, InitialState,
-                                      RolloutTichuState, Single)
+                                      RolloutTichuState, Single, PlayCombination)
 from gym_tichu.envs.internals.error import LogicError
 from gym_tichu.envs.internals.utils import check_param, flatten
 
@@ -632,11 +632,11 @@ class NNRolloutPolicy(RolloutPolicy, metaclass=abc.ABCMeta):
         return self.evaluate_state(final_state)
 
 
-class DQNAgent2L56x5RolloutPolicy(NNRolloutPolicy, metaclass=abc.ABCMeta):
+class DQNAgent2L_56x5_2_sepRolloutPolicy(NNRolloutPolicy, metaclass=abc.ABCMeta):
 
     def make_rollout_agent(self):
-        from .agents import DQNAgent2L_56x5
-        return DQNAgent2L_56x5()
+        from .agents import DQNAgent2L_56x5_2_sep
+        return DQNAgent2L_56x5_2_sep()
 
 
 # ### EVALUATION ###
@@ -723,12 +723,22 @@ class BestActionPolicy(Ismcts, metaclass=abc.ABCMeta):
 
 class MostVisitedBestActionPolicy(BestActionPolicy, metaclass=abc.ABCMeta):
     def action_val(self, state: TichuState, action: PlayerAction, record: UCB1Record):
-        return record.visit_count
+        # check whether this is a 'winning' action
+        if (isinstance(action, PlayCombination) and len(action.combination) == len(state.handcards[action.player_pos])
+                and (action.player_pos + 2) % 4 not in state.announced_grand_tichu.union(state.announced_tichu)):
+            return float('inf')
+        else:
+            return record.visit_count
 
 
 class HighestUCBBestActionPolicy(BestActionPolicy, metaclass=abc.ABCMeta):
     def action_val(self, state: TichuState, action: PlayerAction, record: UCB1Record):
-        return record.ucb(p=state.player_pos)
+        # check whether this is a 'winning' action
+        if (isinstance(action, PlayCombination) and len(action.combination) == len(state.handcards[action.player_pos])
+                and (action.player_pos + 2) % 4 not in state.announced_grand_tichu.union(state.announced_tichu)):
+            return float('inf')
+        else:
+            return record.ucb(p=state.player_pos)
 
 
 # ##### Different Search Strategies
@@ -747,7 +757,7 @@ def make_default_ismctsearch(name: str, nodeidpolicy=DefaultNodeIdPolicy, determ
 
 
 def make_best_ismctsearch(name: str, nodeidpolicy=DefaultNodeIdPolicy, determinizationpolicy=SingleDeterminePolicy, treepolicy=UCBTreePolicy,
-                          rolloutpolicy=RandomRolloutPolicy, evaluationpolicy=RankingEvaluationPolicy, bestactionpolicy=MostVisitedBestActionPolicy, ret_class: bool=False):
+                          rolloutpolicy=DQNAgent2L_56x5_2_sepRolloutPolicy, evaluationpolicy=RankingEvaluationPolicy, bestactionpolicy=MostVisitedBestActionPolicy, ret_class: bool=False):
 
     return make_ismctsearch(name=name, nodeidpolicy=nodeidpolicy, determinizationpolicy=determinizationpolicy, treepolicy=treepolicy,
                             rolloutpolicy=rolloutpolicy, evaluationpolicy=evaluationpolicy, bestactionpolicy=bestactionpolicy, ret_class=ret_class)

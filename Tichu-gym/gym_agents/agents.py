@@ -349,6 +349,7 @@ class RLAgent(BalancedRandomAgent):
             except OSError as oserr:
                 logger.exception(oserr)
                 logger.error("Could not load file. Continuing with previous weights.")
+                self._weights_file = None
 
     @property
     def processor(self):
@@ -407,8 +408,8 @@ class RLAgent(BalancedRandomAgent):
         callbacks += [FileLogger(log_file, interval=ceil(nbr_steps//100))]  # update 100 times
 
         # set LinearAnnealedPolicy policy such that tau reaches min value at 75% of nbr_steps
-        self.agent.policy = LinearAnnealedPolicy(BoltzmannQPolicy(clip=(-500, 300)), attr='tau', value_max=1.0,
-                                                 value_min=0.1, value_test=0.01, nb_steps=ceil(nbr_steps*0.75))
+        self.agent.policy = LinearAnnealedPolicy(BoltzmannQPolicy(clip=(-500, 300)), attr='tau', value_max=0.4,
+                                                 value_min=0.2, value_test=0.01, nb_steps=ceil(nbr_steps*0.75))
 
         self.agent.fit(env, nb_steps=nbr_steps, visualize=False, verbose=0, nb_max_start_steps=0, callbacks=callbacks)
 

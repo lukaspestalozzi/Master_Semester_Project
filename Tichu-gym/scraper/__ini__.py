@@ -1,2 +1,3 @@
 
 from .tichumania_game_scraper import GenCombWeights
+from .tichumania_game_scraper import TichumaniaScraper
