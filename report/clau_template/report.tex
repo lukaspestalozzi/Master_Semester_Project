@@ -1,0 +1,182 @@
+% Set up the document
+\documentclass[a4paper, 11pt] {article}
+
+\usepackage{bold-extra}	% bold und sc kombinieren
+\usepackage{geometry}
+\geometry{a4paper, top=25mm, left=23mm, right=23mm, bottom=20mm}
+\usepackage{tocloft}	% für Inhaltsverzeichnis-Optionen
+\usepackage[utf8]{inputenc}	% Umlaute direkt eintippen
+
+\usepackage{graphicx}
+
+\usepackage{scrpage2}
+\pagestyle{scrheadings}
+\clearscrheadfoot     %Kopf- und Fußzeile werden gelöscht
+\ofoot{\pagemark}     %Seitenzahl wird in die Fußzeile außen geschrieben
+
+\usepackage{hyperref}
+
+\begin{document}
+
+\pagenumbering{roman}
+
+% title page
+\thispagestyle{empty}	%remove page numbering
+
+\begin{center}
+\vspace*{1.5cm}
+\huge\textsc{\textbf{Title}}
+
+\vspace*{1.5cm}
+\LARGE\textsc{Pestalozzi Lukas} \\[3cm]
+
+\includegraphics[scale=0.6]{images/EPFL-Logo.jpg} \\[3cm]
+
+
+\Large
+Projet Semestre, $1^{\grave{e}re}$ Master
+
+\vspace*{1cm}
+Encadré par
+
+\vspace*{1cm}
+\textbf{Igor Kulev}
+
+\vspace*{1cm}
+Année 2016-2017
+
+\end{center}
+
+% Vorwort, römische Zahlen
+\newpage
+
+\phantomsection
+\addcontentsline{toc}{section}{Abstract}
+\section*{Abstract}
+
+\input{abstract}
+
+\newpage
+\pagenumbering{arabic}
+
+% Inhaltsverzeichnis
+%\renewcommand{\contentsname}{Inhaltsverzeichnis}
+%\renewcommand\cftsecfont{\normalfont}
+%\renewcommand\cftsecpagefont{\normalfont}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftsecdotsep}}
+\renewcommand\cftsecdotsep{\cftdot}
+\renewcommand\cftsubsecdotsep{\cftdot}
+\tableofcontents
+\newpage
+
+\phantomsection
+\addcontentsline{toc}{section}{Einleitung}	% nur nummerierte sections kommen automatisch ins verzeichnis
+\section*{Einleitung}
+
+\input{Einleitung}
+
+\newpage
+
+\section{Grundlagen}
+
+\subsection{Ehrverletzungen}
+
+\input{Ehrverletzungen.tex}
+
+\subsection{Verleumdung}
+
+\input{Verleumdung.tex}
+
+\subsection{Strafbarkeit der Medien}
+\input{StrafbarkeitMedien.tex}
+
+
+%\noindent \\
+%eventuell: \\
+%Quellenschutz (CP 28a), Kriterien für Anwendbarkeit (berufliche Beschäftigung mit Veröffentlichungen), vs. Transparenzgebot, Ausnahmen (Quellenschutz nicht anwendbar): %gefährdete Personen, Aufklärung einer Straftat, Quellenschutz $\rightarrow$ Verantwortung des Redaktors bei Nichtverhinderung einer strafbaren Veröffentlichung
+
+
+\newpage
+
+\section{Fallstudie}
+
+\subsection{Ausgangslage}
+
+\input{Ausgangslage.tex}
+
+\subsection{Primäre Straftat}
+
+% dupuis anayse objective de l'allegation
+\input{PrimaereStraftat.tex}
+
+\subsection{Verbindung zum Betreiber des Blogs}
+
+\input{AutorAussage}
+
+\subsection{Verantwortung des Betreibers des Blogs}
+\input{VerantwortungBetreiber.tex}
+
+\subsection{Empfehlungen für Betreiber eines Blogs}
+
+\input{Empfehlungen.tex}
+
+\newpage
+
+\section{Schlussfolgerung}
+
+\input{Schlussfolgerung.tex}
+
+\newpage
+\phantomsection
+\addcontentsline{toc}{section}{Danksagung}
+\section*{Danksagung}
+\noindent
+Ich danke Professorin Anouk Neuenschwander und Herrn Manuel Tarabay herzlich für Ihre Unterstützung beim Verfassen dieser Arbeit. Weiter danke ich allen Professoren des SHS Kurses "Droit et technique 1" für die guten Einführungen in einzelne Themen des schweizerischen Rechts.
+
+\newpage
+\phantomsection
+\addcontentsline{toc}{section}{Literaturverzeichnis}
+\section*{Literaturverzeichnis}
+
+\noindent
+Arrêt du tribunal fédéral 6B\_645/2007 du 2. mai 2008, considérant 7.3.4.4.2 et 7.3.4.5 \\
+
+\noindent
+\textsc{Bianchi della Porta Manuel}, Responsabilité pénale de l'éditeur de médias en ligne participatifs - Comment se prémunir des contenus illicites "postés" par des tiers?, Medialex 2009, p. 19 ss. (zit.: Bianchi della Porta, S. \textsc{Seitenangaben})) \\
+
+\noindent
+Bundesverfassung der Schweizerischen Eidgenossenschaft (BV) vom 18. April 1999 (Stand am 1. Januar 2016), SR 101 \\
+
+\noindent
+BSK StGB, \textsc{Niggli Marcel Alexander/ Wiprächtiger Hans} (Hrsg.), Basler Kommentar Strafrecht 1 (Art. 1-110 StGB und Jugendstrafgesetz), 3.Auflage, Basel 2013, ad Artikel 28 (zit.: BSK StGB-\textsc{BearbeiterIn}) \\
+
+\noindent
+\textsc{Dupuis Michel et al.}, Petit commentaire du Code pénal, Bâle 2012, ad article 28, 173, 174, et 322bis CP (zit.: Dupuis, ad art. \textsc{Artikelnummer} CP, S. \textsc{Seitenangaben}) \\
+
+
+\noindent
+Schweizerisches Strafgesetzbuches (StGB) vom 21. Dezember 1937 (Stand am 1. Januar 2017), SR 311.0 \\
+
+
+%\addcontentsline{toc}{section}{Abbildungsverzeichnis}
+%\section*{Abbildungsverzeichnis}
+
+% abkürzungsverzeichnis
+
+\newpage
+\phantomsection
+\addcontentsline{toc}{section}{Selbständigkeitserklärung}
+\section*{Selbständigkeitserklärung}
+
+\noindent
+Ich erkläre hiermit, dass ich diese Arbeit selbständig verfasst und keine anderen als die angegebenen Quellen benutzt habe. Alle Stellen, die wörtlich oder sinngemäss aus Quellen entnommen wurden, habe ich als solche kenntlich gemacht. \\[1cm]
+
+\noindent
+Renens, 05.05.2017 \\[1.5cm]
+
+\noindent
+Claudia Sauter
+
+
+
+\end{document}

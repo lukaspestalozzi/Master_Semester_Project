@@ -1,0 +1,13 @@
+# Fdb version 3
+["pdflatex"] 1496406895 "settings_epfl_template.tex" "./latex_output/settings_epfl_template.pdf" "settings_epfl_template" 1496406896
+  "./latex_output/settings_epfl_template.aux" 1496406794 8 a94a2480d3289e625eea47cd1b285758 ""
+  "/etc/texmf/web2c/texmf.cnf" 1454332835 33091 134486ebfd2513eda4f54f284cf3e842 ""
+  "/usr/share/texmf/fonts/map/fontname/texfonts.map" 1272929888 3287 e6b82fe08f5336d4d5ebc73fb1152e87 ""
+  "/usr/share/texmf/fonts/tfm/public/cm/cmbx10.tfm" 1136768653 1328 c834bbb027764024c09d3d2bf908b5f0 ""
+  "/usr/share/texmf/fonts/tfm/public/cm/cmtt10.tfm" 1136768653 768 1321e9409b4137d6fb428ac9dc956269 ""
+  "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1493216215 1778966 b80fbd8830c226943f0001a6d038fc90 ""
+  "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1487863667 3841925 960f0c8e7d6ad4a1bd4d96eb0b9f8a48 ""
+  "settings_epfl_template.tex" 1496406895 6129 c5985b7de357d64f4bc127cdad671cbd ""
+  (generated)
+  "./latex_output/settings_epfl_template.pdf"
+  "./latex_output/settings_epfl_template.log"

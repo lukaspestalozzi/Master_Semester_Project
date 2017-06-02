@@ -1,0 +1,9 @@
+# Fdb version 3
+["pdflatex"] 1496422843 "main_parts.tex" "./latex_output/main_parts.pdf" "main_parts" 1496422844
+  "./latex_output/main_parts.aux" 1496422843 8 a94a2480d3289e625eea47cd1b285758 ""
+  "/etc/texmf/web2c/texmf.cnf" 1454332835 33091 134486ebfd2513eda4f54f284cf3e842 ""
+  "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1487863667 3841925 960f0c8e7d6ad4a1bd4d96eb0b9f8a48 ""
+  "main_parts.tex" 1496422843 770 1efcb5d3b15fe2be0ea127295cfc630f ""
+  (generated)
+  "./latex_output/main_parts.log"
+  "./latex_output/main_parts.pdf"

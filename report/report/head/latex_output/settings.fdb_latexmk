@@ -1,0 +1,9 @@
+# Fdb version 3
+["pdflatex"] 1496415585 "settings.tex" "./latex_output/settings.pdf" "settings" 1496415585
+  "./latex_output/settings.aux" 1496415394 8 a94a2480d3289e625eea47cd1b285758 ""
+  "/etc/texmf/web2c/texmf.cnf" 1454332835 33091 134486ebfd2513eda4f54f284cf3e842 ""
+  "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1487863667 3841925 960f0c8e7d6ad4a1bd4d96eb0b9f8a48 ""
+  "settings.tex" 1496415585 498 0abcb41612932e465a293543ad9ca658 ""
+  (generated)
+  "./latex_output/settings.pdf"
+  "./latex_output/settings.log"

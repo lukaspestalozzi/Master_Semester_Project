@@ -1,0 +1,9 @@
+# Fdb version 3
+["pdflatex"] 1496410920 "abstracts.tex" "./latex_output/abstracts.pdf" "abstracts" 1496410921
+  "./latex_output/abstracts.aux" 1496410707 8 a94a2480d3289e625eea47cd1b285758 ""
+  "/etc/texmf/web2c/texmf.cnf" 1454332835 33091 134486ebfd2513eda4f54f284cf3e842 ""
+  "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1487863667 3841925 960f0c8e7d6ad4a1bd4d96eb0b9f8a48 ""
+  "abstracts.tex" 1496410920 240 c171304066b3d602722af8736376e0ba ""
+  (generated)
+  "./latex_output/abstracts.pdf"
+  "./latex_output/abstracts.log"

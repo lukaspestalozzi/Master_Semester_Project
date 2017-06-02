@@ -1,0 +1,75 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%		My Thesis
+%
+%		EDOC Template
+%		2011
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\documentclass[a4paper,11pt,fleqn]{book}
+\documentclass[a4paper, 11pt] {article}
+
+\input{head/settings.tex}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%% HEAD: Book-Begin
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+\pagenumbering{roman}
+
+\input{head/titlepage.tex}
+\cleardoublepage
+\input{head/abstract.tex}
+\cleardoublepage
+
+\phantomsection
+\addcontentsline{toc}{section}{Contents}
+\tableofcontents
+\cleardoublepage
+
+\phantomsection
+\addcontentsline{toc}{section}{List of figures} % adds an entry to the table of contents
+\listoffigures
+\cleardoublepage
+
+\phantomsection
+\addcontentsline{toc}{section}{List of tables} % adds an entry to the table of contents
+\listoftables
+
+
+
+
+% space before each new paragraph according to the template guidelines.
+%(needs to be after titlepage and frontmatter to keep the table of contents lists short)
+\setlength{\parskip}{1em}
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%% MAIN: The chapters of the thesis
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\cleardoublepage
+\pagenumbering{arabic}
+
+\input{main/introduction}
+\input{main/tichu}
+\input{main/literature_review}
+\input{main/agents}
+\input{main/experiments}
+\input{main/end}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%% TAIL: Bibliography, Appendix, CV
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\cleardoublepage
+\input{tail/acknowledgements}
+\input{tail/authors_decleration}
+\input{tail/appendix}
+\input{tail/biblio}
+% Add your glossary here
+% Add your index here
+% Photographic credits (list of pictures&images that have been used with names of the person holding the copyright for them)
+
+\end{document}

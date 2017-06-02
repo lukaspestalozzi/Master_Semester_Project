@@ -1,0 +1,8 @@
+PWD /mnt/Data/Dropbox/Studium/EPFL/MA4/sem_project/report/report/head
+INPUT /etc/texmf/web2c/texmf.cnf
+INPUT /var/lib/texmf/web2c/pdftex/pdflatex.fmt
+INPUT titlepage.tex
+OUTPUT ./latex_output/titlepage.log
+INPUT /usr/share/texmf/fonts/map/fontname/texfonts.map
+INPUT /usr/share/texmf/fonts/tfm/public/cm/cmcsc10.tfm
+INPUT /usr/share/texmf/fonts/tfm/public/cm/cmbx10.tfm

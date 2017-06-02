@@ -1,0 +1,5 @@
+PWD /mnt/Data/Dropbox/Studium/EPFL/MA4/sem_project/report/report/head
+INPUT /etc/texmf/web2c/texmf.cnf
+INPUT /var/lib/texmf/web2c/pdftex/pdflatex.fmt
+INPUT settings.tex
+OUTPUT ./latex_output/settings.log
