@@ -24,7 +24,7 @@
 \BOOKMARK [1][-]{section.4.3}{Minimax Agent}{chapter.4}% 24
 \BOOKMARK [1][-]{section.4.4}{Monte Carlo Tree Search Agents}{chapter.4}% 25
 \BOOKMARK [2][-]{subsection.4.4.1}{Default ISMCTS Agent}{section.4.4}% 26
-\BOOKMARK [2][-]{subsection.4.4.2}{Managing branching factor}{section.4.4}% 27
+\BOOKMARK [2][-]{subsection.4.4.2}{Managing the branching factor}{section.4.4}% 27
 \BOOKMARK [2][-]{subsection.4.4.3}{Determinization}{section.4.4}% 28
 \BOOKMARK [2][-]{subsection.4.4.4}{Rollout}{section.4.4}% 29
 \BOOKMARK [1][-]{section.4.5}{NN Agents}{chapter.4}% 30
@@ -41,12 +41,13 @@
 \BOOKMARK [1][-]{section.5.8}{best vs best without some enhancement}{chapter.5}% 41
 \BOOKMARK [1][-]{section.5.9}{state evaluation}{chapter.5}% 42
 \BOOKMARK [2][-]{subsection.5.9.1}{discussion of results}{section.5.9}% 43
-\BOOKMARK [1][-]{section.5.10}{against human / overall playingstrength}{chapter.5}% 44
-\BOOKMARK [0][-]{chapter.6}{Summary}{}% 45
-\BOOKMARK [1][-]{section.6.1}{Results}{chapter.6}% 46
-\BOOKMARK [1][-]{section.6.2}{Future work}{chapter.6}% 47
-\BOOKMARK [1][-]{section.6.3}{Lessons Learned}{chapter.6}% 48
-\BOOKMARK [0][-]{chapter*.7}{Acknowledgements}{}% 49
-\BOOKMARK [0][-]{chapter*.8}{Author's Decleration}{}% 50
-\BOOKMARK [0][-]{chapter*.9}{Appendix}{}% 51
-\BOOKMARK [0][-]{chapter*.10}{Bibliography}{}% 52
+\BOOKMARK [2][-]{subsection.5.9.2}{best action}{section.5.9}% 44
+\BOOKMARK [1][-]{section.5.10}{against human / overall playingstrength}{chapter.5}% 45
+\BOOKMARK [0][-]{chapter.6}{Summary}{}% 46
+\BOOKMARK [1][-]{section.6.1}{Results}{chapter.6}% 47
+\BOOKMARK [1][-]{section.6.2}{Future work}{chapter.6}% 48
+\BOOKMARK [1][-]{section.6.3}{Lessons Learned}{chapter.6}% 49
+\BOOKMARK [0][-]{chapter*.10}{Acknowledgements}{}% 50
+\BOOKMARK [0][-]{chapter*.11}{Author's Decleration}{}% 51
+\BOOKMARK [0][-]{chapter*.12}{Appendix}{}% 52
+\BOOKMARK [0][-]{chapter*.13}{Bibliography}{}% 53

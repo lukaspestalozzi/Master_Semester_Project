@@ -1,4 +1,5 @@
 \chapter{Implementation}
+\label{ch:impl}
 Because there is no (to my knowledge) open framework for tichu and AI, I had to implement my own.
 python, whole framework, compatible with OpenAIgym to be able to use RL libraries
 
@@ -7,6 +8,11 @@ python, whole framework, compatible with OpenAIgym to be able to use RL librarie
 gamemanager, gamestate, cardset, combination, player, agent interface, environment interface
 agent gets gamestate and returns action. gamestate contains handcards of all players, so the agent can cheat if so desired.
 note that agents are "stateless" but could easily be expanded with methos such as "gamestarts" or "newround" etc...
+\todo{mention not repeating same actions drops branching factor}
+
+For example in a Hand with the three kings $K\heartsuit, K\diamondsuit, K\clubsuit$ it is possible to play three different pairs of kings. However, it does not matter at all which two kings are played since the suit has no relevance. In this case only one out of the three possible pairs has to be considered as a possible action.\newline
+The only exception to this observation is when the hand contains a \textit{straight-flush} containing a king. Then it does matter which king(suit) is played in order to not 'destroy' the \textit{straight-flush}.
+
 
 \section{difficulties}
 finding architecture, determine all possible DIFFERENT combinations in a set of cards, performance (especially mcts),

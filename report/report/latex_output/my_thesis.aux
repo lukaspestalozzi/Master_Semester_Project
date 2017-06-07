@@ -50,7 +50,12 @@
 \@writefile{toc}{\contentsline {chapter}{\numberline {3}Implementation}{6}{chapter.3}}
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
+\newlabel{ch:impl}{{3}{6}{Implementation}{chapter.3}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {3.1}architecture}{6}{section.3.1}}
+\@writefile{tdo}{\contentsline {todo}{\color@fb@x {}{black}{}{orange}{\leavevmode {\color  {orange}o}}\ mention not repeating same actions drops branching factor}{6}{section*.5}}
+\pgfsyspdfmark {pgfid6}{17885665}{31139012}
+\pgfsyspdfmark {pgfid9}{37146889}{31152468}
+\pgfsyspdfmark {pgfid10}{38768905}{30907282}
 \@writefile{toc}{\contentsline {section}{\numberline {3.2}difficulties}{6}{section.3.2}}
 \@writefile{toc}{\contentsline {chapter}{\numberline {4}Agents}{7}{chapter.4}}
 \@writefile{lof}{\addvspace {10\p@ }}
@@ -61,6 +66,7 @@
 \citation{russel14}
 \citation{uct}
 \citation{perez13}
+\citation{perez13}
 \citation{bridge}
 \citation{bridge}
 \citation{pimcts}
@@ -68,8 +74,9 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.1.2}Monte Carlo Tree Search (MCTS)}{8}{subsection.4.1.2}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.1.3}Determinization and Perfect Information MCTS (PIMCTS)}{8}{subsection.4.1.3}}
 \citation{ismcts}
-\@writefile{lof}{\contentsline {figure}{\numberline {4.1}{\ignorespaces Basic MCTS process}}{9}{figure.4.1}}
-\newlabel{fig:mcts_phases}{{4.1}{9}{Basic MCTS process}{figure.4.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.1}{\ignorespaces Basic MCTS process}}{9}{figure.caption.6}}
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:mcts_phases}{{4.1}{9}{Basic MCTS process}{figure.caption.6}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.1.4}Information Set MCTS (ISMCTS)}{9}{subsection.4.1.4}}
 \@writefile{toc}{\contentsline {section}{\numberline {4.2}Stupid and Random Agent}{9}{section.4.2}}
 \citation{david12}
@@ -78,73 +85,82 @@
 \citation{whitehouse14}
 \citation{uct}
 \@writefile{toc}{\contentsline {section}{\numberline {4.3}Minimax Agent}{10}{section.4.3}}
-\@writefile{tdo}{\contentsline {todo}{\color@fb@x {}{black}{}{orange}{\leavevmode {\color  {orange}o}}\ run minimax vs random}{10}{section*.5}}
-\pgfsyspdfmark {pgfid6}{24760863}{40849068}
-\@writefile{tdo}{\contentsline {todo}{\color@fb@x {}{black}{}{orange}{\leavevmode {\color  {orange}o}}\ when doing experiments with utility of minimax, add them here}{10}{section*.6}}
+\@writefile{tdo}{\contentsline {todo}{\color@fb@x {}{black}{}{orange}{\leavevmode {\color  {orange}o}}\ run minimax vs random}{10}{section*.7}}
 \pgfsyspdfmark {pgfid11}{24760863}{40849068}
-\pgfsyspdfmark {pgfid9}{37146889}{40862524}
-\pgfsyspdfmark {pgfid10}{38768905}{40617338}
-\pgfsyspdfmark {pgfid14}{37146889}{39283440}
-\pgfsyspdfmark {pgfid15}{38768905}{39038254}
+\@writefile{tdo}{\contentsline {todo}{\color@fb@x {}{black}{}{orange}{\leavevmode {\color  {orange}o}}\ when doing experiments with utility of minimax, add them here}{10}{section*.8}}
+\pgfsyspdfmark {pgfid16}{24760863}{40849068}
+\pgfsyspdfmark {pgfid14}{37146889}{40862524}
+\pgfsyspdfmark {pgfid15}{38768905}{40617338}
+\pgfsyspdfmark {pgfid19}{37146889}{39283440}
+\pgfsyspdfmark {pgfid20}{38768905}{39038254}
 \@writefile{toc}{\contentsline {section}{\numberline {4.4}Monte Carlo Tree Search Agents}{10}{section.4.4}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.4.1}Default ISMCTS Agent}{10}{subsection.4.4.1}}
 \@writefile{toc}{\contentsline {subsubsection}{Tree selection}{10}{subsection.4.4.1}}
 \newlabel{sec:uct}{{4.4.1}{10}{Tree selection}{subsection.4.4.1}{}}
 \citation{ismcts}
-\citation{ismcts}
 \@writefile{toc}{\contentsline {subsubsection}{Evaluation}{11}{subsection.4.4.1}}
 \newlabel{sssec:evaluation}{{4.4.1}{11}{Evaluation}{subsection.4.4.1}{}}
+\citation{ismcts}
+\citation{whitehouse14}
+\@writefile{toc}{\contentsline {subsubsection}{Selecting the best action at the end}{12}{subsection.4.4.1}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.2}Managing the branching factor}{12}{subsection.4.4.2}}
+\@writefile{toc}{\contentsline {subsubsection}{Episodic Information Capture and Reuse (EPIC)}{12}{subsection.4.4.2}}
+\newlabel{fig:piepic}{{4.2a}{12}{An example of the \textit {position in epic}. The two circled states have the same \textit {position in epic} but are in a different part of the gametree. Both are reached by action $a$ followed by $b$ from a state where player 2 can play first. However state $AD$ and $AC$ have different \textit {position in epic}. The nodes labeled with $A$ and \textit {P2 first play} also have the same \textit {position in epic}\relax }{figure.caption.9}{}}
+\newlabel{sub@fig:piepic}{{a}{12}{An example of the \textit {position in epic}. The two circled states have the same \textit {position in epic} but are in a different part of the gametree. Both are reached by action $a$ followed by $b$ from a state where player 2 can play first. However state $AD$ and $AC$ have different \textit {position in epic}. The nodes labeled with $A$ and \textit {P2 first play} also have the same \textit {position in epic}\relax }{figure.caption.9}{}}
+\newlabel{fig:epicgg}{{4.2b}{12}{The EPIC-gamegraph corresponding to (a). The two nodes labeled $AB$ are merged as well as the states labeled $A$ and the state where Player 2 can play first.\relax }{figure.caption.9}{}}
+\newlabel{sub@fig:epicgg}{{b}{12}{The EPIC-gamegraph corresponding to (a). The two nodes labeled $AB$ are merged as well as the states labeled $A$ and the state where Player 2 can play first.\relax }{figure.caption.9}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.2}{\ignorespaces Epic example}}{12}{figure.caption.9}}
+\newlabel{fig:epicex}{{4.2}{12}{Epic example}{figure.caption.9}{}}
 \citation{whitehouse14}
 \citation{movegroups}
 \citation{whitehouse14}
-\@writefile{toc}{\contentsline {subsubsection}{Selecting the best action at the end}{12}{subsection.4.4.1}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.2}Managing branching factor}{12}{subsection.4.4.2}}
-\@writefile{toc}{\contentsline {subsubsection}{Epic}{12}{subsection.4.4.2}}
-\@writefile{toc}{\contentsline {subsubsection}{Move groups}{12}{subsection.4.4.2}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.3}Determinization}{12}{subsection.4.4.3}}
-\newlabel{sec:determinization}{{4.4.3}{12}{Determinization}{subsection.4.4.3}{}}
-\@writefile{toc}{\contentsline {subsubsection}{Random}{12}{subsection.4.4.3}}
-\@writefile{toc}{\contentsline {subsubsection}{Probabilities}{12}{subsection.4.4.3}}
-\@writefile{toc}{\contentsline {subsubsection}{Data analysis}{12}{subsection.4.4.3}}
-\@writefile{toc}{\contentsline {subsubsection}{Pool det}{13}{subsection.4.4.3}}
-\@writefile{toc}{\contentsline {subsubsection}{Single det}{13}{subsection.4.4.3}}
-\@writefile{toc}{\contentsline {subsubsection}{NN det}{13}{subsection.4.4.3}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.4}Rollout}{13}{subsection.4.4.4}}
-\newlabel{sec:rollout}{{4.4.4}{13}{Rollout}{subsection.4.4.4}{}}
-\@writefile{toc}{\contentsline {subsubsection}{random}{13}{subsection.4.4.4}}
-\@writefile{toc}{\contentsline {subsubsection}{Last Good Response With Forgetting (LGRF)}{13}{subsection.4.4.4}}
-\@writefile{toc}{\contentsline {subsubsection}{no rollout}{13}{subsection.4.4.4}}
-\@writefile{toc}{\contentsline {subsubsection}{dqn-nn}{13}{subsection.4.4.4}}
-\@writefile{toc}{\contentsline {section}{\numberline {4.5}NN Agents}{14}{section.4.5}}
-\newlabel{sec:nn_agents}{{4.5}{14}{NN Agents}{section.4.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.1}Architectures}{14}{subsection.4.5.1}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.2}Training}{14}{subsection.4.5.2}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {5}Experiments / Tournaments}{15}{chapter.5}}
+\@writefile{toc}{\contentsline {subsubsection}{Move groups}{13}{figure.caption.9}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.3}Determinization}{13}{subsection.4.4.3}}
+\newlabel{sec:determinization}{{4.4.3}{13}{Determinization}{subsection.4.4.3}{}}
+\@writefile{toc}{\contentsline {subsubsection}{Random}{13}{subsection.4.4.3}}
+\@writefile{toc}{\contentsline {subsubsection}{Probabilities}{13}{subsection.4.4.3}}
+\@writefile{toc}{\contentsline {subsubsection}{Data analysis}{13}{subsection.4.4.3}}
+\@writefile{toc}{\contentsline {subsubsection}{Pool det}{14}{subsection.4.4.3}}
+\@writefile{toc}{\contentsline {subsubsection}{Single det}{14}{subsection.4.4.3}}
+\@writefile{toc}{\contentsline {subsubsection}{NN det}{14}{subsection.4.4.3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.4}Rollout}{14}{subsection.4.4.4}}
+\newlabel{sec:rollout}{{4.4.4}{14}{Rollout}{subsection.4.4.4}{}}
+\@writefile{toc}{\contentsline {subsubsection}{random}{14}{subsection.4.4.4}}
+\@writefile{toc}{\contentsline {subsubsection}{Last Good Response With Forgetting (LGRF)}{14}{subsection.4.4.4}}
+\@writefile{toc}{\contentsline {subsubsection}{no rollout}{14}{subsection.4.4.4}}
+\@writefile{toc}{\contentsline {subsubsection}{dqn-nn}{14}{subsection.4.4.4}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.5}NN Agents}{15}{section.4.5}}
+\newlabel{sec:nn_agents}{{4.5}{15}{NN Agents}{section.4.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.1}Architectures}{15}{subsection.4.5.1}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.2}Training}{15}{subsection.4.5.2}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {5}Experiments / Tournaments}{16}{chapter.5}}
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:experiments}{{5}{15}{Experiments / Tournaments}{chapter.5}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.1}minimax, random, mcts tournament}{15}{section.5.1}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.2}cheat vs noncheat}{15}{section.5.2}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.3}reward tournament}{15}{section.5.3}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.4}random vs pool vs single determinization}{16}{section.5.4}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.5}rollout tournament}{16}{section.5.5}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.6}split tournament}{16}{section.5.6}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.7}dqn tournament}{16}{section.5.7}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.8}best vs best without some enhancement}{16}{section.5.8}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.9}state evaluation}{16}{section.5.9}}
-\newlabel{sec:evaluationexp}{{5.9}{16}{state evaluation}{section.5.9}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.9.1}discussion of results}{16}{subsection.5.9.1}}
-\@writefile{toc}{\contentsline {section}{\numberline {5.10}against human / overall playingstrength}{16}{section.5.10}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {6}Summary}{17}{chapter.6}}
+\newlabel{ch:experiments}{{5}{16}{Experiments / Tournaments}{chapter.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.1}minimax, random, mcts tournament}{16}{section.5.1}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.2}cheat vs noncheat}{16}{section.5.2}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.3}reward tournament}{16}{section.5.3}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.4}random vs pool vs single determinization}{17}{section.5.4}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.5}rollout tournament}{17}{section.5.5}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.6}split tournament}{17}{section.5.6}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.7}dqn tournament}{17}{section.5.7}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.8}best vs best without some enhancement}{17}{section.5.8}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.9}state evaluation}{17}{section.5.9}}
+\newlabel{sec:evaluationexp}{{5.9}{17}{state evaluation}{section.5.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.9.1}discussion of results}{17}{subsection.5.9.1}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.9.2}best action}{17}{subsection.5.9.2}}
+\newlabel{sec:bestactionexp}{{5.9.2}{17}{best action}{subsection.5.9.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.10}against human / overall playingstrength}{17}{section.5.10}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {6}Summary}{18}{chapter.6}}
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\@writefile{toc}{\contentsline {section}{\numberline {6.1}Results}{17}{section.6.1}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.2}Future work}{17}{section.6.2}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.3}Lessons Learned}{17}{section.6.3}}
-\@writefile{toc}{\contentsline {chapter}{Acknowledgements}{18}{chapter*.7}}
-\@writefile{toc}{\contentsline {chapter}{Author's Decleration}{19}{chapter*.8}}
-\@writefile{toc}{\contentsline {chapter}{Appendix}{20}{chapter*.9}}
-\@writefile{toc}{\contentsline {chapter}{Bibliography}{21}{chapter*.10}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.1}Results}{18}{section.6.1}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.2}Future work}{18}{section.6.2}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.3}Lessons Learned}{18}{section.6.3}}
+\@writefile{toc}{\contentsline {chapter}{Acknowledgements}{19}{chapter*.10}}
+\@writefile{toc}{\contentsline {chapter}{Author's Decleration}{20}{chapter*.11}}
+\@writefile{toc}{\contentsline {chapter}{Appendix}{21}{chapter*.12}}
+\@writefile{toc}{\contentsline {chapter}{Bibliography}{22}{chapter*.13}}
 \bibcite{fatamorgana}{1}
 \bibcite{rules}{2}
 \bibcite{pimcts}{3}

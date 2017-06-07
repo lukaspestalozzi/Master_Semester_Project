@@ -38,3 +38,14 @@
 \usepackage{amsmath}
 
 \setlength\parindent{0pt} % noindent everywhere
+
+% cardsuits unicode
+\DeclareSymbolFont{extraup}{U}{zavm}{m}{n}
+\DeclareMathSymbol{\varheart}{\mathalpha}{extraup}{86}
+\DeclareMathSymbol{\vardiamond}{\mathalpha}{extraup}{87}
+% usage: $\heartsuit\varheart\diamondsuit\vardiamond\clubsuit\spadesuit$
+
+
+\usepackage{tikz}  % paint gametree
+
+\usepackage{subcaption}

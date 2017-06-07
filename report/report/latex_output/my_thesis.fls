@@ -197,6 +197,12 @@ INPUT /usr/share/texmf/tex/latex/amsmath/amsbsy.sty
 INPUT /usr/share/texmf/tex/latex/amsmath/amsbsy.sty
 INPUT /usr/share/texmf/tex/latex/amsmath/amsopn.sty
 INPUT /usr/share/texmf/tex/latex/amsmath/amsopn.sty
+INPUT /usr/share/texmf/tex/latex/caption/subcaption.sty
+INPUT /usr/share/texmf/tex/latex/caption/subcaption.sty
+INPUT /usr/share/texmf/tex/latex/caption/caption.sty
+INPUT /usr/share/texmf/tex/latex/caption/caption.sty
+INPUT /usr/share/texmf/tex/latex/caption/caption3.sty
+INPUT /usr/share/texmf/tex/latex/caption/caption3.sty
 INPUT ./latex_output/my_thesis.aux
 INPUT ./latex_output/my_thesis.aux
 OUTPUT ./latex_output/my_thesis.aux
@@ -231,6 +237,11 @@ INPUT /usr/share/texmf/fonts/tfm/public/cm/cmmi12.tfm
 INPUT /usr/share/texmf/fonts/tfm/public/cm/cmsy10.tfm
 INPUT /usr/share/texmf/fonts/tfm/public/cm/cmex10.tfm
 INPUT /usr/share/texmf/fonts/tfm/public/amsfonts/cmextra/cmex7.tfm
+INPUT /usr/share/texmf/tex/latex/arev/uzavm.fd
+INPUT /usr/share/texmf/tex/latex/arev/uzavm.fd
+INPUT /usr/share/texmf/fonts/tfm/public/arev/favmr7y.tfm
+INPUT /usr/share/texmf/fonts/tfm/public/arev/favmr7y.tfm
+INPUT /usr/share/texmf/fonts/tfm/public/arev/favmr7y.tfm
 INPUT /usr/share/texmf/fonts/tfm/public/cm/cmbx12.tfm
 INPUT /var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map
 INPUT head/abstract.tex
@@ -247,6 +258,9 @@ INPUT /usr/share/texmf/fonts/tfm/public/cm/cmsy6.tfm
 INPUT /usr/share/texmf/fonts/tfm/public/cm/cmex10.tfm
 INPUT /usr/share/texmf/fonts/tfm/public/amsfonts/cmextra/cmex8.tfm
 INPUT /usr/share/texmf/fonts/tfm/public/amsfonts/cmextra/cmex7.tfm
+INPUT /usr/share/texmf/fonts/tfm/public/arev/favmr7y.tfm
+INPUT /usr/share/texmf/fonts/tfm/public/arev/favmr7y.tfm
+INPUT /usr/share/texmf/fonts/tfm/public/arev/favmr7y.tfm
 INPUT /usr/share/texmf/fonts/tfm/public/cm/cmr17.tfm
 INPUT /usr/share/texmf/fonts/tfm/public/cm/cmbx12.tfm
 INPUT ./latex_output/my_thesis.toc
@@ -276,6 +290,11 @@ INPUT main/agents.tex
 INPUT images/basic_mcts_process.png
 INPUT ./images/basic_mcts_process.png
 INPUT ./images/basic_mcts_process.png
+INPUT images/epic_example1.tex
+INPUT images/epic_example1.tex
+INPUT /usr/share/texmf/fonts/tfm/public/cm/cmti10.tfm
+INPUT /usr/share/texmf/fonts/tfm/public/amsfonts/cmextra/cmex7.tfm
+INPUT /usr/share/texmf/fonts/tfm/public/arev/favmr7y.tfm
 INPUT main/experiments.tex
 INPUT main/experiments.tex
 INPUT main/end.tex

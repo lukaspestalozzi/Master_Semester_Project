@@ -30,41 +30,42 @@
 \contentsline {subsubsection}{Tree selection}{10}{subsection.4.4.1}
 \contentsline {subsubsection}{Evaluation}{11}{subsection.4.4.1}
 \contentsline {subsubsection}{Selecting the best action at the end}{12}{subsection.4.4.1}
-\contentsline {subsection}{\numberline {4.4.2}Managing branching factor}{12}{subsection.4.4.2}
-\contentsline {subsubsection}{Epic}{12}{subsection.4.4.2}
-\contentsline {subsubsection}{Move groups}{12}{subsection.4.4.2}
-\contentsline {subsection}{\numberline {4.4.3}Determinization}{12}{subsection.4.4.3}
-\contentsline {subsubsection}{Random}{12}{subsection.4.4.3}
-\contentsline {subsubsection}{Probabilities}{12}{subsection.4.4.3}
-\contentsline {subsubsection}{Data analysis}{12}{subsection.4.4.3}
-\contentsline {subsubsection}{Pool det}{13}{subsection.4.4.3}
-\contentsline {subsubsection}{Single det}{13}{subsection.4.4.3}
-\contentsline {subsubsection}{NN det}{13}{subsection.4.4.3}
-\contentsline {subsection}{\numberline {4.4.4}Rollout}{13}{subsection.4.4.4}
-\contentsline {subsubsection}{random}{13}{subsection.4.4.4}
-\contentsline {subsubsection}{Last Good Response With Forgetting (LGRF)}{13}{subsection.4.4.4}
-\contentsline {subsubsection}{no rollout}{13}{subsection.4.4.4}
-\contentsline {subsubsection}{dqn-nn}{13}{subsection.4.4.4}
-\contentsline {section}{\numberline {4.5}NN Agents}{14}{section.4.5}
-\contentsline {subsection}{\numberline {4.5.1}Architectures}{14}{subsection.4.5.1}
-\contentsline {subsection}{\numberline {4.5.2}Training}{14}{subsection.4.5.2}
-\contentsline {chapter}{\numberline {5}Experiments / Tournaments}{15}{chapter.5}
-\contentsline {section}{\numberline {5.1}minimax, random, mcts tournament}{15}{section.5.1}
-\contentsline {section}{\numberline {5.2}cheat vs noncheat}{15}{section.5.2}
-\contentsline {section}{\numberline {5.3}reward tournament}{15}{section.5.3}
-\contentsline {section}{\numberline {5.4}random vs pool vs single determinization}{16}{section.5.4}
-\contentsline {section}{\numberline {5.5}rollout tournament}{16}{section.5.5}
-\contentsline {section}{\numberline {5.6}split tournament}{16}{section.5.6}
-\contentsline {section}{\numberline {5.7}dqn tournament}{16}{section.5.7}
-\contentsline {section}{\numberline {5.8}best vs best without some enhancement}{16}{section.5.8}
-\contentsline {section}{\numberline {5.9}state evaluation}{16}{section.5.9}
-\contentsline {subsection}{\numberline {5.9.1}discussion of results}{16}{subsection.5.9.1}
-\contentsline {section}{\numberline {5.10}against human / overall playingstrength}{16}{section.5.10}
-\contentsline {chapter}{\numberline {6}Summary}{17}{chapter.6}
-\contentsline {section}{\numberline {6.1}Results}{17}{section.6.1}
-\contentsline {section}{\numberline {6.2}Future work}{17}{section.6.2}
-\contentsline {section}{\numberline {6.3}Lessons Learned}{17}{section.6.3}
-\contentsline {chapter}{Acknowledgements}{18}{chapter*.7}
-\contentsline {chapter}{Author's Decleration}{19}{chapter*.8}
-\contentsline {chapter}{Appendix}{20}{chapter*.9}
-\contentsline {chapter}{Bibliography}{21}{chapter*.10}
+\contentsline {subsection}{\numberline {4.4.2}Managing the branching factor}{12}{subsection.4.4.2}
+\contentsline {subsubsection}{Episodic Information Capture and Reuse (EPIC)}{12}{subsection.4.4.2}
+\contentsline {subsubsection}{Move groups}{13}{figure.caption.9}
+\contentsline {subsection}{\numberline {4.4.3}Determinization}{13}{subsection.4.4.3}
+\contentsline {subsubsection}{Random}{13}{subsection.4.4.3}
+\contentsline {subsubsection}{Probabilities}{13}{subsection.4.4.3}
+\contentsline {subsubsection}{Data analysis}{13}{subsection.4.4.3}
+\contentsline {subsubsection}{Pool det}{14}{subsection.4.4.3}
+\contentsline {subsubsection}{Single det}{14}{subsection.4.4.3}
+\contentsline {subsubsection}{NN det}{14}{subsection.4.4.3}
+\contentsline {subsection}{\numberline {4.4.4}Rollout}{14}{subsection.4.4.4}
+\contentsline {subsubsection}{random}{14}{subsection.4.4.4}
+\contentsline {subsubsection}{Last Good Response With Forgetting (LGRF)}{14}{subsection.4.4.4}
+\contentsline {subsubsection}{no rollout}{14}{subsection.4.4.4}
+\contentsline {subsubsection}{dqn-nn}{14}{subsection.4.4.4}
+\contentsline {section}{\numberline {4.5}NN Agents}{15}{section.4.5}
+\contentsline {subsection}{\numberline {4.5.1}Architectures}{15}{subsection.4.5.1}
+\contentsline {subsection}{\numberline {4.5.2}Training}{15}{subsection.4.5.2}
+\contentsline {chapter}{\numberline {5}Experiments / Tournaments}{16}{chapter.5}
+\contentsline {section}{\numberline {5.1}minimax, random, mcts tournament}{16}{section.5.1}
+\contentsline {section}{\numberline {5.2}cheat vs noncheat}{16}{section.5.2}
+\contentsline {section}{\numberline {5.3}reward tournament}{16}{section.5.3}
+\contentsline {section}{\numberline {5.4}random vs pool vs single determinization}{17}{section.5.4}
+\contentsline {section}{\numberline {5.5}rollout tournament}{17}{section.5.5}
+\contentsline {section}{\numberline {5.6}split tournament}{17}{section.5.6}
+\contentsline {section}{\numberline {5.7}dqn tournament}{17}{section.5.7}
+\contentsline {section}{\numberline {5.8}best vs best without some enhancement}{17}{section.5.8}
+\contentsline {section}{\numberline {5.9}state evaluation}{17}{section.5.9}
+\contentsline {subsection}{\numberline {5.9.1}discussion of results}{17}{subsection.5.9.1}
+\contentsline {subsection}{\numberline {5.9.2}best action}{17}{subsection.5.9.2}
+\contentsline {section}{\numberline {5.10}against human / overall playingstrength}{17}{section.5.10}
+\contentsline {chapter}{\numberline {6}Summary}{18}{chapter.6}
+\contentsline {section}{\numberline {6.1}Results}{18}{section.6.1}
+\contentsline {section}{\numberline {6.2}Future work}{18}{section.6.2}
+\contentsline {section}{\numberline {6.3}Lessons Learned}{18}{section.6.3}
+\contentsline {chapter}{Acknowledgements}{19}{chapter*.10}
+\contentsline {chapter}{Author's Decleration}{20}{chapter*.11}
+\contentsline {chapter}{Appendix}{21}{chapter*.12}
+\contentsline {chapter}{Bibliography}{22}{chapter*.13}

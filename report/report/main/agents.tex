@@ -105,7 +105,7 @@ In particular on following parts of ISMCTS:
 In the remainder of this section, I discuss different improvements for the ISMCTS-Tichu agents related to one of the 4 parts. Each of those improvements then is evaluated in the chapter \nameref{ch:experiments}.
 
 \subsection{Default ISMCTS Agent}
-The \textit{default ISMCTS agent} builds the basis for the agents improving on the various parts of the algorithm. In this section the \textit{tree policy} and the \textit{state evaluation} are determined and used for all other ISMCTS agents, except when stated otherwise.
+The \textit{default ISMCTS agent} builds the basis for the agents improving on the various parts of the algorithm. In this section the \textit{tree policy}, the \textit{state evaluation} and the \textit{selecting of the best action} are determined and used for all other ISMCTS agents, except when stated otherwise.
 
 \subsubsection{Tree selection}
 \label{sec:uct}
@@ -137,11 +137,11 @@ At the end of a rollout, the final state has to be evaluated and the reward is b
 I considered following different evaluation strategies (remember that the players from the same team get the same amount of points at the end of a round):
 \begin{description}
     \vspace{-10px}
-    \item[Absolute Points], Each team gets the unaltered points as reward.
-    \item[Absolute Normalized Points], The absolute points normalized between -1 and 1
-    \item[Relative Points], Each team gets the difference of points to the other team as the reward. For example, the round ended $70:30$, then the first team gets $70 - 30 = 40$ reward, the second $30 - 70 = -40$ reward.
-    \item[Relative Normalized Points], The relative points normalized between -1 and 1
-    \item[Ranking Based] This evaluation rewards the teams based on the ranking at the end of the round:
+    \item[Absolute Points,] Each team gets the unaltered points as reward.
+    \item[Absolute Normalized Points,] The absolute points normalized between -1 and 1
+    \item[Relative Points,] Each team gets the difference of points to the other team as the reward. For example, the round ended $70:30$, then the first team gets $70 - 30 = 40$ reward, the second $30 - 70 = -40$ reward.
+    \item[Relative Normalized Points,] The relative points normalized between -1 and 1
+    \item[Ranking Based,] This evaluation rewards the teams based on the ranking at the end of the round:
         \begin{itemize}
             \vspace{-10px}
             \item $+1$ for a doublewin
@@ -151,30 +151,54 @@ I considered following different evaluation strategies (remember that the player
         \end{itemize}
 \end{description}
 
-It turns out that the \textit{ranking based} evaluation produces better results than any of the other strategies (more in \ref{sec:evaluationexp}). Therefore this evaluation was used for all agents.
+It turns out that the \textit{ranking based} evaluation produces better results than any of the other strategies (experiments in section~\ref{sec:evaluationexp}). Therefore this evaluation was used for all agents.
 
 \subsubsection{Selecting the best action at the end}
+After the search completed, the best action from the initial search-state has to be determined.
+The recommended strategy is to select the action corresponding to the most visited node. And indeed that is what I ended up implementing after trying out the two other obvious strategies: taking the node with \textit{highest UCB value} and taking the node with \textit{highest average reward}.
+
+The experiments confirming the recommendation can be found in section~\ref{sec:bestactionexp}.
 
 
-\subsection{Managing branching factor}
-In \cite{ismcts} it is shown that ISMCTS does not perform significantly better than PIMCTS in \textit{Dou Di Zhu}, however, they suggest this is due to the high branching factor of the game and that in each determinization new possible actions are discovered. Reducing those two factors would increase the advantages of ISMCTS over PIMCTS.
+\subsection{Managing the branching factor}
+In \cite{ismcts} it is shown that ISMCTS does not perform significantly better than PIMCTS in \textit{Dou Di Zhu}. However, they suggest this is due to the high branching factor of the game and that in each determinization new possible actions are discovered. Reducing those two factors would increase the advantages of ISMCTS over PIMCTS.
 
-\subsubsection{Epic}
-improvement proposed by \cite{whitehouse14}. Yielded good improvements in Dou Di Zhu.
-Basically 4 trees (one per player). The root is the set of all game-states where the player can play first.
+A big reduction of the branching factor comes from the observation that many possible combinations in a given hand are logically identical and thus only one of them has to be considered (see the \textit{\nameref{ch:impl}} section).
 
+Other reductions are achieved by the following two enhancements to ISMCTS.
+
+\subsubsection{Episodic Information Capture and Reuse (EPIC)}
+\input{images/epic_example1}
+EPIC is an enhancement proposed by \cite{whitehouse14} and aims to take advantage of the episodic nature of certain games. The idea is that instead of discovering the same strategy for very similar situations (episodes) in different parts of the game tree, EPIC puts them together such that those similar situations are the same and thus only have to be discovered once. \newline
+It yielded good improvements in \textit{Dou Di Zhu} and it stands to reason that it does also help in Tichu.
+\textit{Dou Di Zhu} has the same trick system as Tichu, but it is played with only 3 players and the playable combinations are slightly different. But overall the two games are very close.
+
+In \textit{Dou Di Zhu} and Tichu, an episode is naturally defined by a trick (from first play until all players pass consecutively). The \textit{position in episode} of a node is the path from the node upwards until the beginning of the trick is reached. An example is shown in Fig.~\ref{fig:piepic}
+Similar on how all nodes belonging to the same \textit{information set} were put together for ISMCTS, for EPIC, all states with the same \textit{position in epic} are merged into one node creating an EPIC-gamegraph. The result for the example is shown in Fig.~\ref{fig:epicgg}.
+For Tichu, the gamegraph contains 4 "root nodes" corresponding to the 4 states where a particular player can play first. \todo{improve example and description}
+
+The search is then performed on this gamegraph according to ISMCTS. To implement EPIC very little change to ISMCT is required. Only the way how gamestates are mapped to nodes has to be modified. The rest of the algorithm is identical.
+
+EPIC reduces the branching factor dramatically since many different nodes are merged. The ordering of different tricks in the game is basically removed, which, of course, introduces some new difficulties and is probably the main reason why it did not perform well on Tichu.
 
 \subsubsection{Move groups}
-improvement described in \cite{movegroups}. The idea is to group actions into "move groups" and then in tree selection first select a group (with ucb) and then an action in that group (again with ucb).
-- Reduces branching factor
-- sometimes helps to select better actions with fewer iterations
-- not trivial to find good groups (I just put the same combination-type into the same groups with the idea that they most of the time lead to similar results.) % TODO NOTE: maybe hight/rank and "probability" are better groups.
+Another way to reduce the branching factor and possibly improve UCT decisions are \textit{move-grous}.
+The idea is to divide the actions into (not necessarily disjoint) groups. Those groups are then inserted as an additional layer after each node in the gametree.
+The decision in the \textit{tree policy} then becomes a two-step process. First select a group and then an action belonging to that group (UCT can be used in both phases).
+Move groups are introduced in \cite{movegroups} and further examined in \cite{movegroups2}.
+
+This enhancement reduces the effective branching factor and has been shown to help with move selection when similar valued moves appear. However, it is not trivial to find good groups. \cite{movegroups2} found that random groups did neither improve nor worsen the simulation efficiency. Grouping the best nodes together seems to yield the best result, but finding the best nodes is exactly the problem.
+
+The groups I used is to put the actions of the same combination-type into the same group with the idea that they most of the time lead to similar results and thus the chance that the best actions are in the same group are increased.
+% TODO NOTE: maybe hight/rank and "probability" are better groups.
+
+Surprisingly, ISMCTS with \textit{move-grous} performed very poorly against the default ISMCTS agent (more in section \ref{sec:movegroupsexp}).
 
 
 \subsection{Determinization}
-\label{sec:determinization}
-- determinization takes a gamestate with hidden information and creates a perfect information gamestate that is consitent with the 'hidden info' gamestate.
-in \cite[p.~54+]{whitehouse14} it is shown that for the game \textit{Dou Di Zhu}, more than 20 determinizations per search yield diminishing returns, and the more simulations are made, the better the agent plays.
+\textit{Whitehouse} shows in \cite[p.~54+]{whitehouse14} that for the game \textit{Dou Di Zhu}, more than 20 determinizations per search yield diminishing returns, and the more simulations per determinization are made, the better the agent plays.
+Assuming this is value is similar in Tichu I decided to generate 30 different determinizations per search, just to be on the save side (Tichu has one player more).
+
 
 \subsubsection{Random}
 - just randomly assigns the unknown cards to the other players.
