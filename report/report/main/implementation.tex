@@ -1,0 +1,12 @@
+\chapter{Implementation}
+Because there is no (to my knowledge) open framework for tichu and AI, I had to implement my own.
+python, whole framework, compatible with OpenAIgym to be able to use RL libraries
+
+
+\section{architecture}
+gamemanager, gamestate, cardset, combination, player, agent interface, environment interface
+agent gets gamestate and returns action. gamestate contains handcards of all players, so the agent can cheat if so desired.
+note that agents are "stateless" but could easily be expanded with methos such as "gamestarts" or "newround" etc...
+
+\section{difficulties}
+finding architecture, determine all possible DIFFERENT combinations in a set of cards, performance (especially mcts),

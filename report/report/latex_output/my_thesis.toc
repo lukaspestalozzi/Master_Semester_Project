@@ -1,49 +1,70 @@
-\contentsline {section}{Abstract}{i}{section*.1}
-\contentsline {section}{Contents}{ii}{section*.2}
-\contentsline {section}{List of figures}{iv}{section*.3}
-\contentsline {section}{List of tables}{v}{section*.4}
-\contentsline {section}{\numberline {1}Introduction}{1}{section.1}
-\contentsline {subsection}{\numberline {1.1}"Research Question"}{1}{subsection.1.1}
-\contentsline {subsection}{\numberline {1.2}Project Outcomes / Results}{1}{subsection.1.2}
-\contentsline {subsection}{\numberline {1.3}Project Overview}{1}{subsection.1.3}
-\contentsline {section}{\numberline {2}Tichu}{3}{section.2}
-\contentsline {subsection}{\numberline {2.1}Rules}{3}{subsection.2.1}
-\contentsline {subsection}{\numberline {2.2}Tactics}{3}{subsection.2.2}
-\contentsline {subsection}{\numberline {2.3}Tichu and AI}{3}{subsection.2.3}
-\contentsline {section}{\numberline {3}Literature Review}{3}{section.3}
-\contentsline {subsection}{\numberline {3.1}Similar Projects}{3}{subsection.3.1}
-\contentsline {subsubsection}{\numberline {3.1.1}Tichu}{3}{subsubsection.3.1.1}
-\contentsline {subsubsection}{\numberline {3.1.2}Dou di Zhu (Fight the Landlord)}{3}{subsubsection.3.1.2}
-\contentsline {subsection}{\numberline {3.2}Minimax}{3}{subsection.3.2}
-\contentsline {subsection}{\numberline {3.3}Monte Carlo Tree Search}{3}{subsection.3.3}
-\contentsline {subsubsection}{\numberline {3.3.1}Information Set MCTS}{3}{subsubsection.3.3.1}
-\contentsline {subsubsection}{\numberline {3.3.2}Epic}{3}{subsubsection.3.3.2}
-\contentsline {subsubsection}{\numberline {3.3.3}Move Groups}{3}{subsubsection.3.3.3}
-\contentsline {subsubsection}{\numberline {3.3.4}LGRF}{3}{subsubsection.3.3.4}
-\contentsline {subsubsection}{\numberline {3.3.5}etc...}{3}{subsubsection.3.3.5}
-\contentsline {section}{\numberline {4}Agents}{3}{section.4}
-\contentsline {subsection}{\numberline {4.1}Monte Carlo Tree Search}{3}{subsection.4.1}
-\contentsline {subsubsection}{\numberline {4.1.1}ISmcts}{3}{subsubsection.4.1.1}
-\contentsline {subsubsection}{\numberline {4.1.2}Epic}{3}{subsubsection.4.1.2}
-\contentsline {subsubsection}{\numberline {4.1.3}Move groups}{3}{subsubsection.4.1.3}
-\contentsline {subsubsection}{\numberline {4.1.4}rollout}{3}{subsubsection.4.1.4}
-\contentsline {subsubsection}{\numberline {4.1.5}Results}{3}{subsubsection.4.1.5}
-\contentsline {subsection}{\numberline {4.2}Determinisation}{3}{subsection.4.2}
-\contentsline {subsubsection}{\numberline {4.2.1}Random}{3}{subsubsection.4.2.1}
-\contentsline {subsubsection}{\numberline {4.2.2}Probabilities}{3}{subsubsection.4.2.2}
-\contentsline {subsubsection}{\numberline {4.2.3}Data analysis}{3}{subsubsection.4.2.3}
-\contentsline {subsubsection}{\numberline {4.2.4}Pool det}{3}{subsubsection.4.2.4}
-\contentsline {subsubsection}{\numberline {4.2.5}Single det}{3}{subsubsection.4.2.5}
-\contentsline {subsubsection}{\numberline {4.2.6}NN det}{3}{subsubsection.4.2.6}
-\contentsline {subsubsection}{\numberline {4.2.7}Results}{3}{subsubsection.4.2.7}
-\contentsline {subsection}{\numberline {4.3}NN}{3}{subsection.4.3}
-\contentsline {subsubsection}{\numberline {4.3.1}Architectures}{4}{subsubsection.4.3.1}
-\contentsline {subsubsection}{\numberline {4.3.2}Training}{4}{subsubsection.4.3.2}
-\contentsline {subsubsection}{\numberline {4.3.3}Results}{4}{subsubsection.4.3.3}
-\contentsline {section}{\numberline {5}Experiments / Tournaments}{4}{section.5}
-\contentsline {section}{\numberline {6}Summary}{4}{section.6}
-\contentsline {subsection}{\numberline {6.1}Lessons Learned}{5}{subsection.6.1}
-\contentsline {section}{Acknowledgements}{6}{section*.5}
-\contentsline {section}{Author's Decleration}{6}{section*.6}
-\contentsline {section}{Appendix}{6}{section*.7}
-\contentsline {section}{Bibliography}{6}{section*.8}
+\contentsline {section}{Abstract}{i}{Doc-Start}
+\contentsline {section}{Contents}{ii}{section*.1}
+\contentsline {section}{List of figures}{iv}{section*.2}
+\contentsline {section}{List of tables}{v}{section*.3}
+\contentsline {chapter}{\numberline {1}Introduction}{1}{chapter.1}
+\contentsline {section}{\numberline {1.1}"Research Question"}{1}{section.1.1}
+\contentsline {section}{\numberline {1.2}Project Outcomes / Results}{1}{section.1.2}
+\contentsline {section}{\numberline {1.3}Project Overview}{1}{section.1.3}
+\contentsline {chapter}{\numberline {2}The game Tichu}{2}{chapter.2}
+\contentsline {section}{\numberline {2.1}Rules}{2}{section.2.1}
+\contentsline {section}{\numberline {2.2}Tactics}{4}{section.2.2}
+\contentsline {section}{\numberline {2.3}Tichu and Artificial Intelligence}{4}{section.2.3}
+\contentsline {subsection}{\numberline {2.3.1}Difficulties / herausforderungen}{4}{subsection.2.3.1}
+\contentsline {paragraph}{Hidden Information}{4}{subsection.2.3.1}
+\contentsline {paragraph}{Big branching factor}{5}{subsection.2.3.1}
+\contentsline {paragraph}{Multiagent, cooperative and competitive}{5}{subsection.2.3.1}
+\contentsline {chapter}{\numberline {3}Implementation}{6}{chapter.3}
+\contentsline {section}{\numberline {3.1}architecture}{6}{section.3.1}
+\contentsline {section}{\numberline {3.2}difficulties}{6}{section.3.2}
+\contentsline {chapter}{\numberline {4}Agents}{7}{chapter.4}
+\contentsline {section}{\numberline {4.1}Background}{7}{section.4.1}
+\contentsline {subsection}{\numberline {4.1.1}Minimax Search}{7}{subsection.4.1.1}
+\contentsline {subsection}{\numberline {4.1.2}Monte Carlo Tree Search (MCTS)}{8}{subsection.4.1.2}
+\contentsline {subsection}{\numberline {4.1.3}Determinization and Perfect Information MCTS (PIMCTS)}{8}{subsection.4.1.3}
+\contentsline {subsection}{\numberline {4.1.4}Information Set MCTS (ISMCTS)}{9}{subsection.4.1.4}
+\contentsline {section}{\numberline {4.2}Stupid and Random Agent}{9}{section.4.2}
+\contentsline {section}{\numberline {4.3}Minimax Agent}{10}{section.4.3}
+\contentsline {section}{\numberline {4.4}Monte Carlo Tree Search Agents}{10}{section.4.4}
+\contentsline {subsection}{\numberline {4.4.1}Default ISMCTS Agent}{10}{subsection.4.4.1}
+\contentsline {subsubsection}{Tree selection}{10}{subsection.4.4.1}
+\contentsline {subsubsection}{Evaluation}{11}{subsection.4.4.1}
+\contentsline {subsubsection}{Selecting the best action at the end}{12}{subsection.4.4.1}
+\contentsline {subsection}{\numberline {4.4.2}Managing branching factor}{12}{subsection.4.4.2}
+\contentsline {subsubsection}{Epic}{12}{subsection.4.4.2}
+\contentsline {subsubsection}{Move groups}{12}{subsection.4.4.2}
+\contentsline {subsection}{\numberline {4.4.3}Determinization}{12}{subsection.4.4.3}
+\contentsline {subsubsection}{Random}{12}{subsection.4.4.3}
+\contentsline {subsubsection}{Probabilities}{12}{subsection.4.4.3}
+\contentsline {subsubsection}{Data analysis}{12}{subsection.4.4.3}
+\contentsline {subsubsection}{Pool det}{13}{subsection.4.4.3}
+\contentsline {subsubsection}{Single det}{13}{subsection.4.4.3}
+\contentsline {subsubsection}{NN det}{13}{subsection.4.4.3}
+\contentsline {subsection}{\numberline {4.4.4}Rollout}{13}{subsection.4.4.4}
+\contentsline {subsubsection}{random}{13}{subsection.4.4.4}
+\contentsline {subsubsection}{Last Good Response With Forgetting (LGRF)}{13}{subsection.4.4.4}
+\contentsline {subsubsection}{no rollout}{13}{subsection.4.4.4}
+\contentsline {subsubsection}{dqn-nn}{13}{subsection.4.4.4}
+\contentsline {section}{\numberline {4.5}NN Agents}{14}{section.4.5}
+\contentsline {subsection}{\numberline {4.5.1}Architectures}{14}{subsection.4.5.1}
+\contentsline {subsection}{\numberline {4.5.2}Training}{14}{subsection.4.5.2}
+\contentsline {chapter}{\numberline {5}Experiments / Tournaments}{15}{chapter.5}
+\contentsline {section}{\numberline {5.1}minimax, random, mcts tournament}{15}{section.5.1}
+\contentsline {section}{\numberline {5.2}cheat vs noncheat}{15}{section.5.2}
+\contentsline {section}{\numberline {5.3}reward tournament}{15}{section.5.3}
+\contentsline {section}{\numberline {5.4}random vs pool vs single determinization}{16}{section.5.4}
+\contentsline {section}{\numberline {5.5}rollout tournament}{16}{section.5.5}
+\contentsline {section}{\numberline {5.6}split tournament}{16}{section.5.6}
+\contentsline {section}{\numberline {5.7}dqn tournament}{16}{section.5.7}
+\contentsline {section}{\numberline {5.8}best vs best without some enhancement}{16}{section.5.8}
+\contentsline {section}{\numberline {5.9}state evaluation}{16}{section.5.9}
+\contentsline {subsection}{\numberline {5.9.1}discussion of results}{16}{subsection.5.9.1}
+\contentsline {section}{\numberline {5.10}against human / overall playingstrength}{16}{section.5.10}
+\contentsline {chapter}{\numberline {6}Summary}{17}{chapter.6}
+\contentsline {section}{\numberline {6.1}Results}{17}{section.6.1}
+\contentsline {section}{\numberline {6.2}Future work}{17}{section.6.2}
+\contentsline {section}{\numberline {6.3}Lessons Learned}{17}{section.6.3}
+\contentsline {chapter}{Acknowledgements}{18}{chapter*.7}
+\contentsline {chapter}{Author's Decleration}{19}{chapter*.8}
+\contentsline {chapter}{Appendix}{20}{chapter*.9}
+\contentsline {chapter}{Bibliography}{21}{chapter*.10}

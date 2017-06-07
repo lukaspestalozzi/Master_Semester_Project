@@ -1,49 +1,52 @@
-\BOOKMARK [1][-]{section*.1}{Abstract}{}% 1
-\BOOKMARK [1][-]{section*.2}{Contents}{}% 2
-\BOOKMARK [1][-]{section*.3}{List of figures}{}% 3
-\BOOKMARK [1][-]{section*.4}{List of tables}{}% 4
-\BOOKMARK [1][-]{section.1}{Introduction}{}% 5
-\BOOKMARK [2][-]{subsection.1.1}{"Research Question"}{section.1}% 6
-\BOOKMARK [2][-]{subsection.1.2}{Project Outcomes / Results}{section.1}% 7
-\BOOKMARK [2][-]{subsection.1.3}{Project Overview}{section.1}% 8
-\BOOKMARK [1][-]{section.2}{Tichu}{}% 9
-\BOOKMARK [2][-]{subsection.2.1}{Rules}{section.2}% 10
-\BOOKMARK [2][-]{subsection.2.2}{Tactics}{section.2}% 11
-\BOOKMARK [2][-]{subsection.2.3}{Tichu and AI}{section.2}% 12
-\BOOKMARK [1][-]{section.3}{Literature Review}{}% 13
-\BOOKMARK [2][-]{subsection.3.1}{Similar Projects}{section.3}% 14
-\BOOKMARK [3][-]{subsubsection.3.1.1}{Tichu}{subsection.3.1}% 15
-\BOOKMARK [3][-]{subsubsection.3.1.2}{Dou di Zhu \(Fight the Landlord\)}{subsection.3.1}% 16
-\BOOKMARK [2][-]{subsection.3.2}{Minimax}{section.3}% 17
-\BOOKMARK [2][-]{subsection.3.3}{Monte Carlo Tree Search}{section.3}% 18
-\BOOKMARK [3][-]{subsubsection.3.3.1}{Information Set MCTS}{subsection.3.3}% 19
-\BOOKMARK [3][-]{subsubsection.3.3.2}{Epic}{subsection.3.3}% 20
-\BOOKMARK [3][-]{subsubsection.3.3.3}{Move Groups}{subsection.3.3}% 21
-\BOOKMARK [3][-]{subsubsection.3.3.4}{LGRF}{subsection.3.3}% 22
-\BOOKMARK [3][-]{subsubsection.3.3.5}{etc...}{subsection.3.3}% 23
-\BOOKMARK [1][-]{section.4}{Agents}{}% 24
-\BOOKMARK [2][-]{subsection.4.1}{Monte Carlo Tree Search}{section.4}% 25
-\BOOKMARK [3][-]{subsubsection.4.1.1}{ISmcts}{subsection.4.1}% 26
-\BOOKMARK [3][-]{subsubsection.4.1.2}{Epic}{subsection.4.1}% 27
-\BOOKMARK [3][-]{subsubsection.4.1.3}{Move groups}{subsection.4.1}% 28
-\BOOKMARK [3][-]{subsubsection.4.1.4}{rollout}{subsection.4.1}% 29
-\BOOKMARK [3][-]{subsubsection.4.1.5}{Results}{subsection.4.1}% 30
-\BOOKMARK [2][-]{subsection.4.2}{Determinisation}{section.4}% 31
-\BOOKMARK [3][-]{subsubsection.4.2.1}{Random}{subsection.4.2}% 32
-\BOOKMARK [3][-]{subsubsection.4.2.2}{Probabilities}{subsection.4.2}% 33
-\BOOKMARK [3][-]{subsubsection.4.2.3}{Data analysis}{subsection.4.2}% 34
-\BOOKMARK [3][-]{subsubsection.4.2.4}{Pool det}{subsection.4.2}% 35
-\BOOKMARK [3][-]{subsubsection.4.2.5}{Single det}{subsection.4.2}% 36
-\BOOKMARK [3][-]{subsubsection.4.2.6}{NN det}{subsection.4.2}% 37
-\BOOKMARK [3][-]{subsubsection.4.2.7}{Results}{subsection.4.2}% 38
-\BOOKMARK [2][-]{subsection.4.3}{NN}{section.4}% 39
-\BOOKMARK [3][-]{subsubsection.4.3.1}{Architectures}{subsection.4.3}% 40
-\BOOKMARK [3][-]{subsubsection.4.3.2}{Training}{subsection.4.3}% 41
-\BOOKMARK [3][-]{subsubsection.4.3.3}{Results}{subsection.4.3}% 42
-\BOOKMARK [1][-]{section.5}{Experiments / Tournaments}{}% 43
-\BOOKMARK [1][-]{section.6}{Summary}{}% 44
-\BOOKMARK [2][-]{subsection.6.1}{Lessons Learned}{section.6}% 45
-\BOOKMARK [1][-]{section*.5}{Acknowledgements}{}% 46
-\BOOKMARK [1][-]{section*.6}{Author's Decleration}{}% 47
-\BOOKMARK [1][-]{section*.7}{Appendix}{}% 48
-\BOOKMARK [1][-]{section*.8}{Bibliography}{}% 49
+\BOOKMARK [1][-]{Doc-Start}{Abstract}{}% 1
+\BOOKMARK [1][-]{section*.1}{Contents}{}% 2
+\BOOKMARK [1][-]{section*.2}{List of figures}{}% 3
+\BOOKMARK [1][-]{section*.3}{List of tables}{}% 4
+\BOOKMARK [0][-]{chapter.1}{Introduction}{}% 5
+\BOOKMARK [1][-]{section.1.1}{"Research Question"}{chapter.1}% 6
+\BOOKMARK [1][-]{section.1.2}{Project Outcomes / Results}{chapter.1}% 7
+\BOOKMARK [1][-]{section.1.3}{Project Overview}{chapter.1}% 8
+\BOOKMARK [0][-]{chapter.2}{The game Tichu}{}% 9
+\BOOKMARK [1][-]{section.2.1}{Rules}{chapter.2}% 10
+\BOOKMARK [1][-]{section.2.2}{Tactics}{chapter.2}% 11
+\BOOKMARK [1][-]{section.2.3}{Tichu and Artificial Intelligence}{chapter.2}% 12
+\BOOKMARK [2][-]{subsection.2.3.1}{Difficulties / herausforderungen}{section.2.3}% 13
+\BOOKMARK [0][-]{chapter.3}{Implementation}{}% 14
+\BOOKMARK [1][-]{section.3.1}{architecture}{chapter.3}% 15
+\BOOKMARK [1][-]{section.3.2}{difficulties}{chapter.3}% 16
+\BOOKMARK [0][-]{chapter.4}{Agents}{}% 17
+\BOOKMARK [1][-]{section.4.1}{Background}{chapter.4}% 18
+\BOOKMARK [2][-]{subsection.4.1.1}{Minimax Search}{section.4.1}% 19
+\BOOKMARK [2][-]{subsection.4.1.2}{Monte Carlo Tree Search \(MCTS\)}{section.4.1}% 20
+\BOOKMARK [2][-]{subsection.4.1.3}{Determinization and Perfect Information MCTS \(PIMCTS\)}{section.4.1}% 21
+\BOOKMARK [2][-]{subsection.4.1.4}{Information Set MCTS \(ISMCTS\)}{section.4.1}% 22
+\BOOKMARK [1][-]{section.4.2}{Stupid and Random Agent}{chapter.4}% 23
+\BOOKMARK [1][-]{section.4.3}{Minimax Agent}{chapter.4}% 24
+\BOOKMARK [1][-]{section.4.4}{Monte Carlo Tree Search Agents}{chapter.4}% 25
+\BOOKMARK [2][-]{subsection.4.4.1}{Default ISMCTS Agent}{section.4.4}% 26
+\BOOKMARK [2][-]{subsection.4.4.2}{Managing branching factor}{section.4.4}% 27
+\BOOKMARK [2][-]{subsection.4.4.3}{Determinization}{section.4.4}% 28
+\BOOKMARK [2][-]{subsection.4.4.4}{Rollout}{section.4.4}% 29
+\BOOKMARK [1][-]{section.4.5}{NN Agents}{chapter.4}% 30
+\BOOKMARK [2][-]{subsection.4.5.1}{Architectures}{section.4.5}% 31
+\BOOKMARK [2][-]{subsection.4.5.2}{Training}{section.4.5}% 32
+\BOOKMARK [0][-]{chapter.5}{Experiments / Tournaments}{}% 33
+\BOOKMARK [1][-]{section.5.1}{minimax, random, mcts tournament}{chapter.5}% 34
+\BOOKMARK [1][-]{section.5.2}{cheat vs noncheat}{chapter.5}% 35
+\BOOKMARK [1][-]{section.5.3}{reward tournament}{chapter.5}% 36
+\BOOKMARK [1][-]{section.5.4}{random vs pool vs single determinization}{chapter.5}% 37
+\BOOKMARK [1][-]{section.5.5}{rollout tournament}{chapter.5}% 38
+\BOOKMARK [1][-]{section.5.6}{split tournament}{chapter.5}% 39
+\BOOKMARK [1][-]{section.5.7}{dqn tournament}{chapter.5}% 40
+\BOOKMARK [1][-]{section.5.8}{best vs best without some enhancement}{chapter.5}% 41
+\BOOKMARK [1][-]{section.5.9}{state evaluation}{chapter.5}% 42
+\BOOKMARK [2][-]{subsection.5.9.1}{discussion of results}{section.5.9}% 43
+\BOOKMARK [1][-]{section.5.10}{against human / overall playingstrength}{chapter.5}% 44
+\BOOKMARK [0][-]{chapter.6}{Summary}{}% 45
+\BOOKMARK [1][-]{section.6.1}{Results}{chapter.6}% 46
+\BOOKMARK [1][-]{section.6.2}{Future work}{chapter.6}% 47
+\BOOKMARK [1][-]{section.6.3}{Lessons Learned}{chapter.6}% 48
+\BOOKMARK [0][-]{chapter*.7}{Acknowledgements}{}% 49
+\BOOKMARK [0][-]{chapter*.8}{Author's Decleration}{}% 50
+\BOOKMARK [0][-]{chapter*.9}{Appendix}{}% 51
+\BOOKMARK [0][-]{chapter*.10}{Bibliography}{}% 52

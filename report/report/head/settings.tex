@@ -9,9 +9,32 @@
 
 \usepackage{scrpage2}
 \pagestyle{scrheadings}
-\clearscrheadfoot     %Kopf- und Fußzeile werden gelöscht
-\ofoot{\pagemark}     %Seitenzahl wird in die Fußzeile außen geschrieben
+\clearscrheadfoot     % Kopf- und Fußzeile werden gelöscht
+\ofoot{\pagemark}     % Seitenzahl wird in die Fußzeile außen geschrieben
 
 \usepackage{hyperref}
-
 \usepackage{lipsum}
+
+
+\usepackage{enumitem}
+\setlist[description]{leftmargin=\parindent,labelindent=\parindent}
+
+
+% Titles
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries}{}{0pt}{\Huge}[]
+  % format, label, sep, before-code, after-code
+\titlespacing*{\chapter}
+  {0pt}{10pt}{40pt}
+
+\usepackage{nameref} % \nameref{...} also shows the name in the reference
+
+
+\usepackage{wrapfig} % To wrap figures with text
+
+\usepackage[colorinlistoftodos,prependcaption,textsize=tiny]{todonotes}
+
+\usepackage{amsmath}
+
+\setlength\parindent{0pt} % noindent everywhere

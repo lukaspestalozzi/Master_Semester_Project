@@ -1,3 +1,28 @@
-\section{Experiments / Tournaments}
+\chapter{Experiments / Tournaments}
+\label{ch:experiments}
+- Tournament of some agents: A team for each agent (containing 2 identical agents), Each team then plays against every other team once.
+depending on how close the agents are to each other and how long one game takes to simulate, a game may go form 1'000 points up to 100'000 points.
+The difference of the points is then the measure on how much better one agent is to another.
+there is of course a variance (depending mostly on the dealt cards and luck). This is why sometimes more and longer games were simulated.
 
-\lipsum[1-2]
+\section{minimax, random, mcts tournament}
+
+\section{cheat vs noncheat} % TODO add semi cheat?
+- cheat (not surprisingly) better
+\section{reward tournament}
+- reward based on ranking is best.
+- absolute and relative reward suffer from the fact that points reach from -200 to 200 but most of the time they are between 0 an 100. also suffer from the problem that when an agent could finish (which is practically always the best action), he does not because reward depends also on how the teammate plays. and with random rollout may vary a lot from simulation to simulation (agent can't distinguish between his own and teammate actions)
+- bad luck in rollout may give bad score to a good action -> -200 is too small
+
+\section{random vs pool vs single determinization}
+\section{rollout tournament}
+\section{split tournament} % TODO add minimax at the end?
+\section{dqn tournament}
+\section{best vs best without some enhancement}
+\section{state evaluation}
+\label{sec:evaluationexp}
+\subsection{discussion of results}
+Note that the evaluations suffer from the \textit{credit- assignment problem} (both agents get the same reward, regardless of the order they finished) but they encourage teamplay.
+
+
+\section{against human / overall playingstrength}
