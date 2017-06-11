@@ -1,33 +1,489 @@
-\chapter{Experiments / Tournaments}
+\chapter{Experiments}
 \label{ch:experiments}
-- Tournament of some agents: A team for each agent (containing 2 identical agents), Each team then plays against every other team once.
-depending on how close the agents are to each other and how long one game takes to simulate, a game may go form 1'000 points up to 100'000 points.
-The difference of the points is then the measure on how much better one agent is to another.
-there is of course a variance (depending mostly on the dealt cards and luck). This is why sometimes more and longer games were simulated.
+In this section the tournaments done with the agents are described and the results are shortly discussed.
 
-\section{minimax, random, mcts tournament}
+To evaluate two agents against each other, a full Tichu game is played with two instances of each agent forming a team.
+Depending on how close the agents are and how long it takes them to play a game, the targeted points may range from 1'000 up to 100'000 points.
+The difference of the final points is then the measure on how much better one agent is to another.
+There is of course a rather high variance in each game result (depending mostly on the dealt cards and luck) which is why longer games give a better impression on the relative strength of the agents.
 
-\section{cheat vs noncheat} % TODO add semi cheat?
-- cheat (not surprisingly) better
-\section{reward tournament}
-- reward based on ranking is best.
-- absolute and relative reward suffer from the fact that points reach from -200 to 200 but most of the time they are between 0 an 100. also suffer from the problem that when an agent could finish (which is practically always the best action), he does not because reward depends also on how the teammate plays. and with random rollout may vary a lot from simulation to simulation (agent can't distinguish between his own and teammate actions)
-- bad luck in rollout may give bad score to a good action -> -200 is too small
+Several agents can play a tournament, where each agent plays one game against each other agent.
 
-\section{random vs pool vs single determinization}
-\section{rollout tournament}
-\section{split tournament} % TODO add minimax at the end?
-\section{dqn tournament}
-\section{best vs best without some enhancement}
-\section{state evaluation}
+The Default MCTS Agent used in most experiments is the one from \ref{sec:defaultmctsagent} with random determinization and random rollout policy.
+
+\section{Minimax, Random, default MCTS Tournament}
+\label{sec:minimaxtournament}
+
+\subsection*{Setup}
+\textbf{Target Points:} 2000\\
+\textbf{Agents:}
+\begin{itemize}
+    \setlength\itemsep{2px}
+    \item MinimaxAgent (from \ref{sec:minimaxagent}) with search-depth 9
+    \item RandomAgent (from \ref{sec:randomagent})
+    \item Default MCTS Agent with 100 iterations.
+\end{itemize}
+
+
+\subsection*{Results}
+\begin{table}[h!]
+  \centering
+
+  \begin{tabular}{ccc}
+    \textbf{Team1} & \textbf{Result}  & \textbf{Team2}\\
+    \hline
+    \textbf{Minimax} & 2070 : 730  & Random\\
+    \hline
+    Minimax & 145  : 2055 & \textbf{MCTS}\\
+    \hline
+    Random & 390  : 2110 & \textbf{MCTS}\\
+    \hline
+  \end{tabular}
+  \caption[Result of the Minimax vs. Random vs. default MCTS Tournament]{Result of the Minimax vs. Random vs. default MCTS Tournament.\newline The MCTS agent clearly beats the other two, while Minimax also clearly beats the Random algorithm.}
+\end{table}
+
+\subsection*{Discussion}
+In this tournament a baseline between the MCTS and the random agent is established. And it is confirmed that MCTS easily beats Minimax, which easily beats the random agent.
+This result is not surprising not least because the utility function for minimax is very basic.
+
+A small surprise is that MCTS wins higher against Minimax than against the random agent, but this may just be a chance event.
+
+
+\section{Cheating Tournament}
+\label{sec:cheatexp}
+A tournament to get an idea how useful it is to know the cards of the other players.
+\subsection*{Setup}
+\textbf{Target Points:} 7000\\
+\textbf{Agents:}
+All agents are Default MCTS Agents with 100 iterations and varying degrees of cheating.
+Agents cheat by looking at a given proportion of the enemies cards and fix them in each determinization, giving the agent an advantage.
+\begin{itemize}
+    \setlength\itemsep{2px}
+    \item NoCheat Agent: Does not cheat
+    \item Cheat2 Agent: Looks at 20\% of the enemy cards
+    \item Cheat6 Agent: Looks at 60\% of the enemy cards
+    \item Cheat8 Agent: Looks at 80\% of the enemy cards
+    \item FullCheat Agent: Looks at 100\% of the enemy cards
+\end{itemize}
+
+\subsection*{Results}
+\begin{table}[h!]
+  \centering
+
+  \begin{tabular}{ccc}
+    \textbf{Team1} & \textbf{Result}  & \textbf{Team2}\\
+    \hline
+    NoCheat & 5585 : 7015 & \textbf{Cheat2}\\
+    \hline
+    NoCheat & 5210 : 7010 & \textbf{Cheat6}\\
+    \hline
+    NoCheat & 6490 : 7070 & \textbf{Cheat8}\\
+    \hline
+    NoCheat & 5000 : 7090& \textbf{FullCheat}\\
+    \hline
+
+    Cheat2 &  6945 : 7085& \textbf{Cheat6}\\
+    \hline
+    Cheat2 &  4795 : 7105 & \textbf{Cheat8}\\
+    \hline
+    Cheat2 &  5520, 7040 & \textbf{FullCheat}\\
+
+    \hline
+    \textbf{Cheat6} & 7025 : 6475  & Cheat8\\
+    \hline
+    Cheat6 & 6350: 7050  & \textbf{FullCheat}\\
+
+    \hline
+    Cheat8 & 6770: 7030  & \textbf{FullCheat}\\
+    \hline
+  \end{tabular}
+  \caption[Result of the Cheating Tournament]{The agents cheating more win their matches, with the exception that Cheat6 beat Cheat8.}
+\end{table}
+
+\subsection*{Discussion}
+The results are quite variable. The more cheating agents almost always win their matches against more honest agents, but not as decisive as may be expected. In 5 out of the 9 matches, the loosing player gets more than 6000 points.\\
+Cheating seems to improve the agents chance to win, but not by a lot.
+
+In \textit{Dou Di Zhu}, \cite{ismcts} found that knowing the handcards of the other players is only a significant advantage in 1/3 of all the deals. This may be similar in Tichu and would explain the results.\\
+For clearer results more experiments have to be made.
+
+
+\section{Reward Tournament}
 \label{sec:evaluationexp}
-\subsection{discussion of results}
-Note that the evaluations suffer from the \textit{credit- assignment problem} (both agents get the same reward, regardless of the order they finished) but they encourage teamplay.
-\subsection{best action}
+To determine the best evaluation strategy of terminal states. The different strategies are described in section~\ref{sssec:evaluation}.
+\subsection*{Setup}
+\textbf{Target Points:} 5000\\
+\textbf{Agents:}
+All agents are Default MCTS Agents with 100 iterations but rollouts generate the rewards differently. The names are taken from section~\ref{sssec:evaluation}
+\begin{itemize}
+    \setlength\itemsep{2px}
+    \item Absolute Points
+    \item Absolute Normalized Points
+    \item Relative Points
+    \item Relative Normalized Points
+    \item Ranking Based
+\end{itemize}
+
+\subsection*{Results}
+\begin{table}[h!]
+  \centering
+  \begin{tabular}{ccc}
+    \textbf{Team1} & \textbf{Result}  & \textbf{Team2}\\
+    \hline
+    \textbf{Ranking} & 5125 : 2275  & Absolute\\
+    \hline
+    \textbf{Ranking} & 5050 : 4650  & Relative\\
+    \hline
+    \textbf{Ranking} & 5165 : 1035  & Relative Normalized\\
+    \hline
+    \textbf{Ranking} & 5000 : 600  & Absolute Normalized\\
+    \hline
+
+    Absolute & 3635 : 5065  & \textbf{Relative}\\
+    \hline
+    \textbf{Absolute} & 5135 : 865  & Relative Normalized\\
+    \hline
+    \textbf{Absolute} & 5060 : 840  & Absolute Normalized\\
+
+    \hline
+    \textbf{Relative} &  5105 : 1195 & Relative Normalized\\
+    \hline
+    \textbf{Relative} & 5075 : 825  & Absolute Normalized\\
+
+    \hline
+    \textbf{Relative Normalized} & 5030 : 2860  & Absolute Normalized\\
+    \hline
+  \end{tabular}
+  \caption[Result of the Reward Tournament]{\textit{Ranking} wins all its matches. \textit{Relative} wins all but one, \textit{Absolute} wins 2 and \textit{Relative Normalized} wins only against \textit{Absolute Normalized}, which looses all its matches.}
+\end{table}
+
+\subsection*{Discussion}
+The ranking and relative reward system seem to be clearly better than the others.
+Ranking also beat Relative, but not by a lot.
+
+\section{Determinization Tournament}
+\label{sec:detexp}
+To evaluate the three determinization strategies described in section~\ref{sec:determinization}.
+\subsection*{Setup}
+\textbf{Target Points:} 10000 (30000 for the match RandomDet vs SingleDet because the result is very close).\\
+\textbf{Agents:}
+All agents are Default MCTS Agents with 10 seconds time to determine the next move. Each utilizes a different determinization strategy.
+\begin{itemize}
+    \setlength\itemsep{2px}
+    \item RandomDet: Random determinization
+    \item CombinationDet: Distributes entire combinations at once based on prior probabilities
+    \item SingleDet: Distributes a card after another based on prior probabilities
+\end{itemize}
+
+\subsection*{Results}
+\begin{table}[h!]
+  \centering
+
+  \begin{tabular}{ccc}
+    \textbf{Team1} & \textbf{Result}  & \textbf{Team2}\\
+    \hline
+    \textbf{RandomDet} &  10030 : 2670 & CombinationDet\\
+    \hline
+    RandomDet &  27565 : 30095 & \textbf{SingleDet}\\
+    \hline
+    CombinationDet & 4090 : 10010  & \textbf{SingleDet}\\
+    \hline
+  \end{tabular}
+  \caption[Result of the Determinization Tournament]{\textit{SingleDet} its two matches, \textit{RandomDet} wins one}
+\end{table}
+
+\subsection*{Discussion}
+The Combination Determinization performs very poorly, but the Single Determinization is not worse than the Random Determinization. It wins the match against the Random Determinization but not by a huge margin. It seems that either the prior probabilities could not be exploited enough, or the accuracy of the determinizations is not as important as expected.
+
+\section{EPIC Tournament}
+A tournament to evaluate the strength of the EPIC enhancement to ISMCTS.
+The match MCTS vs Random was omitted since it is not relevant in this context.
+\textbf{Target Points:} 5000\\
+\textbf{Agents:}
+\begin{itemize}
+    \setlength\itemsep{2px}
+    \item EPIC: Default MCTS Agent with the EPIC enhancement
+    \item MCTS: Default MCTS Agent (without EPIC)
+    \item Random Agent
+\end{itemize}
+
+\subsection*{Results}
+\begin{table}[H]
+  \centering
+  \begin{tabular}{ccc}
+    \textbf{Team1} & \textbf{Result}  & \textbf{Team2}\\
+    \hline
+    EPIC & 3140, 5160 & \textbf{MCTS}\\
+    \hline
+    \textbf{EPIC} & 5090, 1810 & Random \\
+    \hline
+  \end{tabular}
+  \caption[Result of the EPIC Tournament]{MCTS wins against EPIC but EPIC still clearly beat Random}
+\end{table}
+
+\subsection*{Discussion}
+Sadly the EPIC enhancement seems not to improve the playing strength of the Agent.
+This may have many reasons. I guess EPIC suffers a lot from the loss of trick ordering during a simulation. It can't distinguish between playing a combination at the beginning and playing it later on. But in reality it is important for example playing an Ace when the Dragon was not yet played is risky, while playing it after the Dragon almost guarantees the win of the trick.
+
+\section{Deep-Q learning Tournament}
+\label{sec:nnexp}
+To compare the different network architectures.
+\subsection*{Setup}
+\textbf{Target Points:} 10000\\
+\textbf{Agents:}
+\begin{itemize}
+    \setlength\itemsep{5px}
+    \item Dqn56
+    \item Dqn56-separate
+    \item Dqn17
+    \item Dqn17-separate
+    \item Random Agent
+\end{itemize}
+
+\subsection*{Results}
+\begin{table}[h!]
+  \centering
+
+  \begin{tabular}{ccc}
+    \textbf{Team1} & \textbf{Result}  & \textbf{Team2}\\
+    \hline
+    \textbf{Random} & 10185, 2015  & Dqn56\\
+    \hline
+    Random & 7690, 10010  & \textbf{Dqn56-separate}\\
+    \hline
+    \textbf{Random} &  10170, 8830 & Dqn17\\
+    \hline
+    \textbf{Random} & 10070, 9130  & Dqn17-separate\\
+    \hline
+
+    Dqn56 & 6390, 10110  & \textbf{Dqn56-separate}\\
+    \hline
+    Dqn56 & 4570, 10030  & \textbf{Dqn17}\\
+    \hline
+    Dqn56 & 1525, 10175  & \textbf{Dqn17-separate}\\
+    \hline
+
+    \textbf{Dqn56-separate} &  10165, 4835 & Dqn17\\
+    \hline
+    \textbf{Dqn56-separate} & 10000, 2000  & Dqn17-separate\\
+    \hline
+
+    Dqn17 & 9735, 10165  & \textbf{Dqn17-separate}\\
+    \hline
+  \end{tabular}
+  \caption[Result of the Q-learning Tournament]{Dqn56-separate wins all of its games, while the random wins all except against Dqn56-separate}
+\end{table}
+
+\subsection*{Discussion}
+Disappointingly, only Dqn56-separate manages to beat the Random agent. Both DQN17 agents were beaten rather close.
+It shows that creating an neural network that works is not that easy.
+It might just be that the agents need to be trained much longer to reach a higher playing strength. But it might as well be that the network architecture has to be different.
+In any case, more experiments are needed.
+
+\section{Rollout Tournament}
+The tournament comparing the rollout strategies.
+\subsection*{Setup}
+\textbf{Target Points:} 20000\\
+\textbf{Agents:}
+\begin{itemize}
+    \setlength\itemsep{2px}
+    \item NNRollout: Default MCTS agent but with a DQN-agent as default policy.
+    \item Default MCTS Agent (with random rollout policy)
+    \item LGRF: Default MCTS agent with the LGRF rollout policy.
+    \item Random Agent
+\end{itemize}
+
+\subsection*{Results}
+\begin{table}[h!]
+  \centering
+
+  \begin{tabular}{ccc}
+    \textbf{Team1} & \textbf{Result}  & \textbf{Team2}\\
+    \hline
+    \textbf{NNRollout} & 20095 : 4035 & Random\\
+    \hline
+    NNRollout &  7930 : 20010 & \textbf{DefaultMCTS} \\
+    \hline
+    \textbf{NNRollout} & 20035 : 17480 & LGRF \\
+    \hline
+    LGRF & 4010 : 20020  & \textbf{DefaultMCTS} \\
+    \hline
+    \textbf{LGRF} & 20090 : 8910  & Random \\
+    \hline
+  \end{tabular}
+  \caption[Result of the Rollout Tournament]{DefaultMCTS beats both NNRollout and LGRF decisively. And NNRollout beats LGRF. The Random agent looses all matches}
+\end{table}
+
+\subsection*{Discussion}
+Neither NNRollout nor LGRF manage to beat the power of randomness. Apparently, the random rollout is quite a passable strategy.
+LGRF suffers from some problems already discussed in section~\ref{sec:lgrf} so this is not further surprising.
+The DQN-agent already performed badly against the random algorithm in \ref{sec:nnexp}, thus the result is not that surprising.
+
+\section{Split Tournament}
+To determine how efficient the MCTS agent is at the beginning of the game, the \textit{Split Agent} was created. The Split Agent contains two other agents and depending on how many handcards the player has, the first or the second agent determine the next action. The number of handcards when the agents switch is called the \textit{switch length}. The first agent decides until the number of handcards reach the \textit{switch length}, from then on the second agent decides.
+
+\subsection*{Setup}
+\textbf{Target Points:} 10000\\
+\textbf{Agents:}
+All agents are Split Agents with a Default MCTS Agents with 100 iterations as first agent and a Random as second agent.
+\begin{itemize}
+    \setlength\itemsep{2px}
+    \item Sw13: \textit{switch length} at 13
+    \item Sw12: \textit{switch length} at 12
+    \item Sw11: \textit{switch length} at 11
+    \item Sw10: \textit{switch length} at 10
+    \item Sw9: \textit{switch length} at 9
+    \item Sw7: \textit{switch length} at 7
+    \item Sw5: \textit{switch length} at 5
+    \item Sw3: \textit{switch length} at 3
+    \item Random Agent
+
+\end{itemize}
+
+\subsection*{Results}
+
+\begin{table}[H]
+  \centering
+  \label{tab:splitresults}
+  \begin{tabular}{ccc}
+    \textbf{Team1} & \textbf{Result}  & \textbf{Team2}\\
+    \hline
+    Sw13 &  9025 : 10175 & \textbf{Sw12}\\
+    \hline
+    Sw13 & 7565 : 10035  & \textbf{Sw11}\\
+    \hline
+    Sw13 &  9085 : 10015 & \textbf{Sw10}\\
+    \hline
+    Sw13 & 8935 : 10065  & \textbf{Sw9}\\
+    \hline
+    Sw13 &  9150 : 10050 & \textbf{Random}\\
+    \hline
+
+    Sw12 & 9160 : 10040  & \textbf{Sw11}\\
+    \hline
+    Sw12 & 7980 : 10020  & \textbf{Sw10}\\
+    \hline
+    Sw12 & 9065 : 10035  & \textbf{Sw9}\\
+    \hline
+    \textbf{Sw12} & 10080 : 9720  & Random\\
+    \hline
+
+    \textbf{Sw11} & 10005 : 9695  & Sw10\\
+    \hline
+    \textbf{Sw11} & 10060 : 9140  & Sw9\\
+    \hline
+    \textbf{Sw11} &  10065 : 7535 & Random\\
+    \hline
+
+    Sw10 & 8075 : 10025  & \textbf{Sw9}\\
+    \hline
+    \textbf{Sw10} & 10050 : 5450  & Random\\
+    \hline
+    \textbf{Sw9} & 10010 : 6790  & Random\\
+    \hline
+
+    Sw9 & 8100 : 10100  & \textbf{Sw7}\\
+    \hline
+    Sw9 & 3690 : 10010 & \textbf{Sw5}\\
+    \hline
+    Sw9 & 3730 : 10170  & \textbf{Sw3}\\
+    \hline
+    \textbf{Sw9} & 10045 : 5055  & Random\\
+    \hline
+
+
+    Sw7 & 7700 : 10000 & \textbf{Sw5}\\
+    \hline
+    Sw7 &  5275 : 10125 & \textbf{Sw3}\\
+    \hline
+    \textbf{Sw7} &  10020 : 4980 & Random\\
+    \hline
+
+    Sw5 & 7030 : 10170  & \textbf{Sw3}\\
+    \hline
+    \textbf{Sw5} & 10065 : 3135  & Random\\
+    \hline
+
+    \textbf{Sw3} & 10065 : 2335  & Random\\
+    \hline
+
+  \end{tabular}
+  \caption[Result of the Switch Tournament]{The lower switch agents win most of their matches against a higher one.}
+\end{table}
+
+\subsection*{Discussion}
+The lower switch agents win 22 out of 25 matches. Only the Sw13 loosing against the random agent and Sw11 winning two matches against Sw10 and Sw9. This indicates that MCTS helps even when only used at the very beginning of the game.
+
+
+\section{Best Action Tournament}
 \label{sec:bestactionexp}
-\subsection{move groups}
+To determine how the best action should be selected after the search (see section~\ref{sec:bestaction}).
+
+\subsection*{Setup}
+\textbf{Target Points:} 5000\\
+\textbf{Agents:}
+\begin{itemize}
+    \setlength\itemsep{2px}
+    \item MostVisited
+    \item MaxUCT value
+    \item Average Reward
+\end{itemize}
+
+\subsection*{Results}
+\begin{table}[h!]
+  \centering
+
+  \begin{tabular}{ccc}
+    \textbf{Team1} & \textbf{Result}  & \textbf{Team2}\\
+    \hline
+    \textbf{MostVisited} & 3190, 1310  & MaxUCT\\
+    \hline
+    \textbf{MostVisited} & 3050, 2250  & Average Reward\\
+    \hline
+    MaxUCT & 2345, 3055  & \textbf{Average Reward}\\
+  \end{tabular}
+  \caption[Result of the Best Action Tournament]{MostVisited wins all its matches, and AverageReward places second.}
+\end{table}
+
+\subsection*{Discussion}
+MostVisited clearly is the best way to choose the best action. This confirms the suggestion made in \cite{ismcts, whitehouse14}.
+
+
+\section{Move Groups Match}
 \label{sec:movegroupsexp}
+A match between a MCTS agent using movegroups against one without them.
+\subsection*{Setup}
+\textbf{Target Points:} 10000\\
+\textbf{Agents:}
+\begin{itemize}
+    \setlength\itemsep{2px}
+    \item Movegroup: An default MCTS agent with move group selection
+    \item NoMovegroup: An default MCTS agent without move group selection
+\end{itemize}
 
+\subsection*{Results}
+\begin{table}[h!]
+  \centering
 
+  \begin{tabular}{ccc}
+    \textbf{Team1} & \textbf{Result}  & \textbf{Team2}\\
+    \hline
+    Movegroup &  4535 : 10065  & \textbf{NoMovegroup}\\
+    \hline
+  \end{tabular}
+  \caption[Result of the Move Group Match]{}
+\end{table}
 
-\section{against human / overall playingstrength}
+\subsection*{Discussion}
+The Movegroup Agent gets defeated quite clearly, but there is not enough time to conduct more experiments and to find the reason.
+I guess the definition of the groups might be the problem and another approach would yield better results.
+
+\section{Playing against a Human}
+During the semester I played every once in a while against some version of the ISMCTS agents. Here are some points I noticed:
+\begin{description}
+    \item[Overall Play] Against a non-cheating agent even a beginner may win most matches against the agent. The agent makes especially in the beginning quite a lot of suboptimal moves, in particular, it quickly plays its highest cards at the earliest opportunity. The Dragon typically is played in the first 2-3 tricks. However, towards the end of the game the agent plays better, and if you make a mistake towards the end, it is hard to win.
+    The possibilities towards the end of the game are much smaller, and the agent can much better 'guess' the remaining cards of the enemies.
+    \item[Cheating Agent] The cheating agent, unsurprisingly, plays stronger than the non-cheating ones.
+    \item[Teamplay] Towards the end, it seems that the teammate agent actually helps. For example, the teammate tends to pass on a trick where I'm leading, even though it could have played.
+    \item[Phoenix] The agents seem not to deal well with the phoenix. They seldom use it in a 'smart' way, and it seems that agents with the phoenix make bad decisions in simple situations. This is probably because the Phoenix drastically increases the amount of possible actions for the agent and thus it can't search deeply enough and the actions become more random.
+\end{description}

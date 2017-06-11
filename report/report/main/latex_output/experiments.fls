@@ -1,0 +1,10 @@
+PWD /mnt/Data/Dropbox/Studium/EPFL/MA4/sem_project/report/report/main
+INPUT /etc/texmf/web2c/texmf.cnf
+INPUT /var/lib/texmf/web2c/pdftex/pdflatex.fmt
+INPUT experiments.tex
+OUTPUT ./latex_output/experiments.log
+INPUT /usr/share/texmf/fonts/map/fontname/texfonts.map
+INPUT /usr/share/texmf/fonts/tfm/public/cm/cmbx10.tfm
+INPUT /usr/share/texmf/fonts/tfm/public/cm/cmti10.tfm
+OUTPUT ./latex_output/experiments.pdf
+INPUT /var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map

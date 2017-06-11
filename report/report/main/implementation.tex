@@ -1,18 +1,25 @@
 \chapter{Implementation}
 \label{ch:impl}
-Because there is no (to my knowledge) open framework for tichu and AI, I had to implement my own.
-python, whole framework, compatible with OpenAIgym to be able to use RL libraries
+As I could not find any open source implementation of the game Tichu that could be used out of the box without major modification\footnote{There are plenty halfhearted implementation on github.}, and the owners of \textit{Brettspielwelt.de}\footnote{A platform providing the possibility to play games online, including Tichu.} did not respond to my inquiries, I decided to write my own framework.
+As programming language I choose Python (v3.6) because it allows fast developing and has dynamic typing which I find to be very convenient.
+Despite that, the implementation of the framework and the different agents took up most of the time for this project.
 
+It follows a brief overview of the architecture of the framework and some difficulties I encountered during the implementation.
 
-\section{architecture}
-gamemanager, gamestate, cardset, combination, player, agent interface, environment interface
-agent gets gamestate and returns action. gamestate contains handcards of all players, so the agent can cheat if so desired.
-note that agents are "stateless" but could easily be expanded with methos such as "gamestarts" or "newround" etc...
-\todo{mention not repeating same actions drops branching factor}
+\section{Architecture}
+The framework is implemented to be compatible with the environments of \textit{OpenAI-gym}\footnote{A platform providing environments to train AI-agents in predefined environments ranging from the "mountain-car" problem to the classical Atari games. (https://gym.openai.com/)}. Besides providing a standardized interface, it allows the use of third party libraries which are written to solve the \textit{OpenAI-gym} challenges, such as \textit{Keras-rl} \cite{kerasrl} (a reinforcement learning library).
 
-For example in a Hand with the three kings $K\heartsuit, K\diamondsuit, K\clubsuit$ it is possible to play three different pairs of kings. However, it does not matter at all which two kings are played since the suit has no relevance. In this case only one out of the three possible pairs has to be considered as a possible action.\newline
-The only exception to this observation is when the hand contains a \textit{straight-flush} containing a king. Then it does matter which king(suit) is played in order to not 'destroy' the \textit{straight-flush}.
+The heart of the implementation is the representation of the gamestate. It took some time to come up with a compact and fast way to represent a state. I ended up making the class TichuState immutable\footnote{immutable meaning that the values of attributes of an instance never change.} and created the functions \textit{possible\_actions()} and \textit{next\_state(Action)}. \\
+Calling \textit{possible\_actions()} on a TichuState instance returns all legal actions for the state and calling \textit{next\_state(Action)} returns the resulting state when applying the given action to the state.
 
+The Agent interface is minimal and consists of the single function \textit{action(State)}, that, given a game-state returns the action the agent wants to play. Note that the \textit{State} is the perfect-information state of the game. This allows the agent to "cheat" (ie. look at the handcards of the other players).
 
-\section{difficulties}
-finding architecture, determine all possible DIFFERENT combinations in a set of cards, performance (especially mcts),
+An advantage of implementing my own framework is that the agents can utilize the same code as the game-implementation itself and no conversion between different state representations have to be made.
+
+\section{Difficulties}
+The first challenge was to find a good architecture for the whole framework. The in the previous section presented architecture was preceded by two other approaches which were not nearly as compact and convenient to use.
+Another "software architecture" challenge was, how to implement the many different agents (described in the next chapter) without duplicating code everywhere. Luckily, Python has a very convenient multi-class-inheritance scheme, which allows a kind of "code injection" by inheriting from multiple parent classes\footnote{Watch Raymond Hettinger's Pycon2015 talk "Super Considered Super" for more details: https://www.youtube.com/watch?v=EiOglTERPEo}.
+
+Many challenges revolved around performance. Python is not designed to be fast, which became a problem when doing Monte Carlo Simulations. Most notably, finding all playable \textit{different} combinations in a set of cards had to be optimized considerably.
+An important observation was that for similar combinations it does not matter which one is played and therefore only one of them has to be considered when searching for the best action to play.
+As an example, a set of cards containing the three kings $K\heartsuit, K\diamondsuit, K\clubsuit$, also contains three different \textit{pairs} of Kings ($K\heartsuit, K\diamondsuit$ and $K\heartsuit, K\clubsuit$ and $K\diamondsuit, K\clubsuit$). However, it does not matter at all which two kings are played since the suit has no relevance in Tichu. In this case only one out of the three possible pairs has to be considered as a possible action. There is of course one exception to this observation: when the set also contains a \textit{straight-flush} containing one of the Kings. Then it does matter which King (suit) is played in order not to 'destroy' the \textit{straight-flush}. But this case is easy enough to detect and seldom enough not to impact performance. So the algorithm just returns all different combinations in this case.

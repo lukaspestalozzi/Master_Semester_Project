@@ -1,8 +1,17 @@
 \chapter{Summary}
+In this project I implemented a framework to play Tichu and explored the effectiveness of various Monte Carlo Tree Search methods and enhancements.
+I demonstrate that MCTS handles the many difficulties of Tichu reasonable well but also that more improvements can be made.
+Based on the experiments, the best default MCTS agent uses the single determinization strategy and a random default policy. The EPIC enhancement as well as the Movegroups couldn't improve over the default agent. However, I did not yet explored all aspects of the Tichu game and some experiments would need to be analyzed more in detail.
+Doing this, it should be possible to create an agent that can play on human level.
 
-
-\section{Results}
 \section{Future work}
+I'd like to continue this project. The first thing to do however, is to port the entire framework to Java or C++. A big problem was, that playing tournaments with MCTS took a lot of time. Even when using as few as 100 iterations, a single game took several hours to complete. A compiled language may improve the speed drastically and with it the possibility to do more iterations.
+
+The results for the DQN-rollout strategy were rather disappointing. I's like to improve on that.
+Eventually it would be fun to evaluate my agents against other people's agents.
 
 \section{Lessons Learned}
-maybe could have found framework (eg. tichumania, or other sites) Implementing took most of the time.
+Towards the end of the project I still had many ideas and improvements in my mind but the time lacked to implement them all. It would have helped a lot to clearly define what I wanted to achieve in the scope of the project and then stick to that. Also, my time management could still be improved.
+
+On the plus side, I learned a lot about MCTS methods and their applications.
+And since a big part of the project was spent implementing the framework I can say that I now know python quite well.

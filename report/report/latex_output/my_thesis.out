@@ -3,51 +3,46 @@
 \BOOKMARK [1][-]{section*.2}{List of figures}{}% 3
 \BOOKMARK [1][-]{section*.3}{List of tables}{}% 4
 \BOOKMARK [0][-]{chapter.1}{Introduction}{}% 5
-\BOOKMARK [1][-]{section.1.1}{"Research Question"}{chapter.1}% 6
-\BOOKMARK [1][-]{section.1.2}{Project Outcomes / Results}{chapter.1}% 7
-\BOOKMARK [1][-]{section.1.3}{Project Overview}{chapter.1}% 8
-\BOOKMARK [0][-]{chapter.2}{The game Tichu}{}% 9
-\BOOKMARK [1][-]{section.2.1}{Rules}{chapter.2}% 10
-\BOOKMARK [1][-]{section.2.2}{Tactics}{chapter.2}% 11
-\BOOKMARK [1][-]{section.2.3}{Tichu and Artificial Intelligence}{chapter.2}% 12
-\BOOKMARK [2][-]{subsection.2.3.1}{Difficulties / herausforderungen}{section.2.3}% 13
-\BOOKMARK [0][-]{chapter.3}{Implementation}{}% 14
-\BOOKMARK [1][-]{section.3.1}{architecture}{chapter.3}% 15
-\BOOKMARK [1][-]{section.3.2}{difficulties}{chapter.3}% 16
-\BOOKMARK [0][-]{chapter.4}{Agents}{}% 17
-\BOOKMARK [1][-]{section.4.1}{Background}{chapter.4}% 18
-\BOOKMARK [2][-]{subsection.4.1.1}{Minimax Search}{section.4.1}% 19
-\BOOKMARK [2][-]{subsection.4.1.2}{Monte Carlo Tree Search \(MCTS\)}{section.4.1}% 20
-\BOOKMARK [2][-]{subsection.4.1.3}{Determinization and Perfect Information MCTS \(PIMCTS\)}{section.4.1}% 21
-\BOOKMARK [2][-]{subsection.4.1.4}{Information Set MCTS \(ISMCTS\)}{section.4.1}% 22
-\BOOKMARK [1][-]{section.4.2}{Stupid and Random Agent}{chapter.4}% 23
-\BOOKMARK [1][-]{section.4.3}{Minimax Agent}{chapter.4}% 24
-\BOOKMARK [1][-]{section.4.4}{Monte Carlo Tree Search Agents}{chapter.4}% 25
-\BOOKMARK [2][-]{subsection.4.4.1}{Default ISMCTS Agent}{section.4.4}% 26
-\BOOKMARK [2][-]{subsection.4.4.2}{Managing the branching factor}{section.4.4}% 27
-\BOOKMARK [2][-]{subsection.4.4.3}{Determinization}{section.4.4}% 28
-\BOOKMARK [2][-]{subsection.4.4.4}{Rollout}{section.4.4}% 29
-\BOOKMARK [1][-]{section.4.5}{NN Agents}{chapter.4}% 30
-\BOOKMARK [2][-]{subsection.4.5.1}{Architectures}{section.4.5}% 31
-\BOOKMARK [2][-]{subsection.4.5.2}{Training}{section.4.5}% 32
-\BOOKMARK [0][-]{chapter.5}{Experiments / Tournaments}{}% 33
-\BOOKMARK [1][-]{section.5.1}{minimax, random, mcts tournament}{chapter.5}% 34
-\BOOKMARK [1][-]{section.5.2}{cheat vs noncheat}{chapter.5}% 35
-\BOOKMARK [1][-]{section.5.3}{reward tournament}{chapter.5}% 36
-\BOOKMARK [1][-]{section.5.4}{random vs pool vs single determinization}{chapter.5}% 37
-\BOOKMARK [1][-]{section.5.5}{rollout tournament}{chapter.5}% 38
-\BOOKMARK [1][-]{section.5.6}{split tournament}{chapter.5}% 39
-\BOOKMARK [1][-]{section.5.7}{dqn tournament}{chapter.5}% 40
-\BOOKMARK [1][-]{section.5.8}{best vs best without some enhancement}{chapter.5}% 41
-\BOOKMARK [1][-]{section.5.9}{state evaluation}{chapter.5}% 42
-\BOOKMARK [2][-]{subsection.5.9.1}{discussion of results}{section.5.9}% 43
-\BOOKMARK [2][-]{subsection.5.9.2}{best action}{section.5.9}% 44
-\BOOKMARK [1][-]{section.5.10}{against human / overall playingstrength}{chapter.5}% 45
-\BOOKMARK [0][-]{chapter.6}{Summary}{}% 46
-\BOOKMARK [1][-]{section.6.1}{Results}{chapter.6}% 47
-\BOOKMARK [1][-]{section.6.2}{Future work}{chapter.6}% 48
-\BOOKMARK [1][-]{section.6.3}{Lessons Learned}{chapter.6}% 49
-\BOOKMARK [0][-]{chapter*.10}{Acknowledgements}{}% 50
-\BOOKMARK [0][-]{chapter*.11}{Author's Decleration}{}% 51
-\BOOKMARK [0][-]{chapter*.12}{Appendix}{}% 52
-\BOOKMARK [0][-]{chapter*.13}{Bibliography}{}% 53
+\BOOKMARK [0][-]{chapter.2}{The game Tichu}{}% 6
+\BOOKMARK [1][-]{section.2.1}{Rules}{chapter.2}% 7
+\BOOKMARK [1][-]{section.2.2}{Tactics}{chapter.2}% 8
+\BOOKMARK [1][-]{section.2.3}{Tichu and Artificial Intelligence}{chapter.2}% 9
+\BOOKMARK [2][-]{subsection.2.3.1}{Difficulties}{section.2.3}% 10
+\BOOKMARK [0][-]{chapter.3}{Implementation}{}% 11
+\BOOKMARK [1][-]{section.3.1}{Architecture}{chapter.3}% 12
+\BOOKMARK [1][-]{section.3.2}{Difficulties}{chapter.3}% 13
+\BOOKMARK [0][-]{chapter.4}{Agents}{}% 14
+\BOOKMARK [1][-]{section.4.1}{Background}{chapter.4}% 15
+\BOOKMARK [2][-]{subsection.4.1.1}{Minimax Search}{section.4.1}% 16
+\BOOKMARK [2][-]{subsection.4.1.2}{Monte Carlo Tree Search \(MCTS\)}{section.4.1}% 17
+\BOOKMARK [2][-]{subsection.4.1.3}{Determinization and Perfect Information MCTS \(PIMCTS\)}{section.4.1}% 18
+\BOOKMARK [2][-]{subsection.4.1.4}{Information Set MCTS \(ISMCTS\)}{section.4.1}% 19
+\BOOKMARK [1][-]{section.4.2}{Simple and Random Agent}{chapter.4}% 20
+\BOOKMARK [1][-]{section.4.3}{Minimax Agent}{chapter.4}% 21
+\BOOKMARK [1][-]{section.4.4}{Monte Carlo Tree Search Agents}{chapter.4}% 22
+\BOOKMARK [2][-]{subsection.4.4.1}{Default ISMCTS Agent}{section.4.4}% 23
+\BOOKMARK [2][-]{subsection.4.4.2}{Managing the branching factor}{section.4.4}% 24
+\BOOKMARK [2][-]{subsection.4.4.3}{Determinization}{section.4.4}% 25
+\BOOKMARK [2][-]{subsection.4.4.4}{Rollout}{section.4.4}% 26
+\BOOKMARK [1][-]{section.4.5}{Neural Network Agents}{chapter.4}% 27
+\BOOKMARK [2][-]{subsection.4.5.1}{Architectures}{section.4.5}% 28
+\BOOKMARK [2][-]{subsection.4.5.2}{Training}{section.4.5}% 29
+\BOOKMARK [0][-]{chapter.5}{Experiments}{}% 30
+\BOOKMARK [1][-]{section.5.1}{Minimax, Random, default MCTS Tournament}{chapter.5}% 31
+\BOOKMARK [1][-]{section.5.2}{Cheating Tournament}{chapter.5}% 32
+\BOOKMARK [1][-]{section.5.3}{Reward Tournament}{chapter.5}% 33
+\BOOKMARK [1][-]{section.5.4}{Determinization Tournament}{chapter.5}% 34
+\BOOKMARK [1][-]{section.5.5}{EPIC Tournament}{chapter.5}% 35
+\BOOKMARK [1][-]{section.5.6}{Deep-Q learning Tournament}{chapter.5}% 36
+\BOOKMARK [1][-]{section.5.7}{Rollout Tournament}{chapter.5}% 37
+\BOOKMARK [1][-]{section.5.8}{Split Tournament}{chapter.5}% 38
+\BOOKMARK [1][-]{section.5.9}{Best Action Tournament}{chapter.5}% 39
+\BOOKMARK [1][-]{section.5.10}{Move Groups Match}{chapter.5}% 40
+\BOOKMARK [1][-]{section.5.11}{Playing against a Human}{chapter.5}% 41
+\BOOKMARK [0][-]{chapter.6}{Summary}{}% 42
+\BOOKMARK [1][-]{section.6.1}{Future work}{chapter.6}% 43
+\BOOKMARK [1][-]{section.6.2}{Lessons Learned}{chapter.6}% 44
+\BOOKMARK [0][-]{chapter*.21}{Acknowledgments}{}% 45
+\BOOKMARK [0][-]{chapter*.22}{Author's Declaration}{}% 46
+\BOOKMARK [0][-]{chapter*.23}{Appendix}{}% 47
+\BOOKMARK [0][-]{figure.caption.30}{Bibliography}{}% 48

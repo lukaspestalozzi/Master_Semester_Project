@@ -1,8 +1,12 @@
 \addvspace {10\p@ }
 \addvspace {10\p@ }
+\contentsline {figure}{\numberline {2.1}{\ignorespaces Tichu the game}}{2}{figure.caption.4}
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {4.1}{\ignorespaces Basic MCTS process}}{9}{figure.caption.6}
-\contentsline {figure}{\numberline {4.2}{\ignorespaces Epic example}}{12}{figure.caption.9}
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Basic MCTS process}}{10}{figure.caption.5}
+\contentsline {figure}{\numberline {4.2}{\ignorespaces Epic example}}{13}{figure.caption.6}
+\contentsline {figure}{\numberline {4.3}{\ignorespaces Determinization Handcards Plot}}{22}{figure.caption.8}
+\contentsline {figure}{\numberline {4.4}{\ignorespaces Neural Network Architectures}}{23}{figure.caption.9}
+\contentsline {figure}{\numberline {4.5}{\ignorespaces Neural Network Training}}{24}{figure.caption.10}
 \addvspace {10\p@ }
 \addvspace {10\p@ }
